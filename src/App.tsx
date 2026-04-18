@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { RootLayout } from './components/layout/RootLayout'
 import { Home } from './pages/Home'
 import { Login } from './pages/Login'
+import { CreateListing } from './pages/CreateListing'
 
 function App() {
   return (
@@ -11,6 +12,11 @@ function App() {
         <Route path="/" element={
           <RootLayout>
             <Home />
+          </RootLayout>
+        } />
+        <Route path="/create-listing" element={
+          <RootLayout>
+            <CreateListing />
           </RootLayout>
         } />
         <Route path="/login" element={<Login />} />

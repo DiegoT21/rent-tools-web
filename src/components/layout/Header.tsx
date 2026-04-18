@@ -1,4 +1,3 @@
-import React from "react";
 import { Link } from "react-router-dom";
 import { Search, Bell, User, MapPin } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -8,12 +7,12 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b bg-white shadow-sm px-6">
       <div className="flex items-center gap-12">
-        <div className="flex items-center gap-2.5">
+        <Link to="/" className="flex items-center gap-2.5 group hover:opacity-80 transition-opacity whitespace-nowrap">
           <img src="/logo.jpeg" alt="RentTools Logo" className="h-8 w-8 object-cover rounded-md" />
           <div className="text-xl font-bold tracking-tight text-slate-900">
             Rent<span className="text-slate-600 font-medium">Tools</span>
           </div>
-        </div>
+        </Link>
         <nav className="flex items-center gap-6">
           <a href="#" className="text-sm font-semibold text-primary border-b-2 border-primary py-5">Ubicación</a>
           <button 
@@ -42,9 +41,11 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
       </div>
 
       <div className="flex items-center gap-4">
-        <Button className="rounded-full bg-primary hover:bg-primary/90 text-white font-semibold px-6 shadow-md shadow-primary/20">
-          Publicar
-        </Button>
+        <Link to="/create-listing">
+          <Button className="rounded-full bg-primary hover:bg-primary/90 text-white font-semibold px-6 shadow-md shadow-primary/20">
+            Publicar
+          </Button>
+        </Link>
         <button className="flex h-9 w-9 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 transition-colors">
           <Bell className="h-5 w-5" />
         </button>
