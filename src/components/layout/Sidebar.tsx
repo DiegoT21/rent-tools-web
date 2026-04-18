@@ -3,19 +3,19 @@ import { Grid, Pickaxe, Settings, ShoppingCart, TestTube, ArrowUpRight } from "l
 import { cn } from "@/lib/utils";
 
 const categories = [
-  { name: "All Equipment", icon: Grid, active: true },
-  { name: "Power Tools", icon: Pickaxe, active: false },
-  { name: "Excavators", icon: Settings, active: false },
-  { name: "Material Handling", icon: ShoppingCart, active: false },
-  { name: "Precision Labs", icon: TestTube, active: false },
+  { name: "Todo el Equipo", icon: Grid, active: true },
+  { name: "Herramientas de Poder", icon: Pickaxe, active: false },
+  { name: "Excavadoras", icon: Settings, active: false },
+  { name: "Manejo de Materiales", icon: ShoppingCart, active: false },
+  { name: "Lab. de Precisión", icon: TestTube, active: false },
 ];
 
 export function Sidebar({ className }) {
   return (
     <div className={cn("flex flex-col bg-[#f0f3fa] border-r border-[#e5e9f2] p-4", className)}>
       <div className="flex flex-col space-y-1 mb-8 pt-4 px-2">
-        <h2 className="text-lg font-bold text-slate-900 tracking-tight">Categories</h2>
-        <p className="text-xs text-slate-500 font-medium">Professional Inventory</p>
+        <h2 className="text-lg font-bold text-slate-900 tracking-tight">Categorías</h2>
+        <p className="text-xs text-slate-500 font-medium">Inventario Profesional</p>
       </div>
       
       <nav className="flex-1 space-y-1.5">
@@ -38,10 +38,10 @@ export function Sidebar({ className }) {
       <div className="mt-auto p-1">
         <div className="bg-[#1a1f2e] text-white rounded-2xl p-5 relative overflow-hidden group border border-slate-800">
           <div className="relative z-10 flex flex-col gap-1.5">
-            <p className="text-[10px] font-bold tracking-widest text-[#8e9bb3] uppercase">Fleet Access</p>
-            <h3 className="text-sm font-semibold mb-2">Upgrade to Pro</h3>
+            <p className="text-[10px] font-bold tracking-widest text-[#8e9bb3] uppercase">Acceso a la Flota</p>
+            <h3 className="text-sm font-semibold mb-2">Mejorar a Pro</h3>
             <button className="flex w-full items-center justify-center rounded-lg bg-primary hover:bg-[#ff8c26] px-4 py-2 text-xs font-bold text-white transition-colors shadow-[0_0_15px_-3px_rgba(255,122,0,0.5)]">
-              Upgrade to Fleet
+              Mejorar a Flota
             </button>
           </div>
           {/* Decorative shapes behind text */}

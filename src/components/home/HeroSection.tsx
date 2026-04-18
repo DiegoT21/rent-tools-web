@@ -19,21 +19,21 @@ export function HeroSection() {
         
         <div className="relative h-full flex flex-col justify-center p-10 md:p-14">
           <Badge variant="outline" className="text-primary border-primary hover:bg-primary/10 w-fit mb-4 text-[10px] tracking-widest font-bold uppercase">
-            Featured Rental
+            Renta Destacada
           </Badge>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white leading-tight mb-8 max-w-xl">
-            Precision Compact<br />Excavator ZX-40
+            Excavadora Compacta<br />de Precisión ZX-40
           </h1>
           
           <div className="flex flex-wrap items-center gap-6">
             <Button className="bg-primary hover:bg-primary/90 text-white px-8 py-6 rounded-xl font-bold text-lg shadow-lg shadow-primary/25">
-              Rent now
+              Rentar ahora
             </Button>
             <div className="flex flex-col">
-              <span className="text-slate-300 text-xs font-medium">Starting at</span>
+              <span className="text-slate-300 text-xs font-medium">Desde</span>
               <div className="flex items-baseline gap-1">
                 <span className="text-white text-3xl font-bold">$249</span>
-                <span className="text-slate-300 text-sm">/day</span>
+                <span className="text-slate-300 text-sm">/día</span>
               </div>
             </div>
           </div>
@@ -46,16 +46,16 @@ export function HeroSection() {
           <div className="p-6 h-full flex flex-col justify-between relative z-10">
             <div>
               <div className="flex justify-between items-start mb-3">
-                <Badge className="bg-blue-500 text-white hover:bg-blue-600 text-[10px] uppercase font-bold tracking-wider">Season Pass</Badge>
+                <Badge className="bg-blue-500 text-white hover:bg-blue-600 text-[10px] uppercase font-bold tracking-wider">Pase de Temporada</Badge>
                 <Zap className="text-blue-500 h-5 w-5" />
               </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">Generator Sale</h3>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Oferta de Generadores</h3>
               <p className="text-sm text-slate-500 leading-relaxed max-w-[90%]">
-                Save 25% on weekly rentals for all power generation units.
+                Ahorra 25% en rentas semanales para todas las unidades de generación de energía.
               </p>
             </div>
             <button className="flex items-center gap-2 text-sm font-bold text-slate-700 hover:text-primary transition-colors mt-6 w-fit group-hover:translate-x-1 duration-300">
-              View Details <ArrowRight className="h-4 w-4" />
+              Ver Detalles <ArrowRight className="h-4 w-4" />
             </button>
           </div>
         </Card>
@@ -64,18 +64,18 @@ export function HeroSection() {
           <div className="p-6 h-full flex flex-col justify-between relative z-10">
             <div>
               <div className="flex justify-between items-start mb-3">
-                <Badge className="bg-primary text-white hover:bg-primary/90 text-[10px] uppercase font-bold tracking-wider">New Arrival</Badge>
+                <Badge className="bg-primary text-white hover:bg-primary/90 text-[10px] uppercase font-bold tracking-wider">Recién Llegado</Badge>
                 <div className="bg-primary/10 p-1.5 rounded-full text-primary">
                   <Star className="h-4 w-4 fill-primary" />
                 </div>
               </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">Precision Laser Scanners</h3>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Escáneres Láser de Precisión</h3>
               <p className="text-sm text-slate-500 leading-relaxed max-w-[90%]">
-                The latest in 3D site mapping is now available for daily hire.
+                Lo último en mapeo 3D de sitios ya está disponible para renta diaria.
               </p>
             </div>
             <button className="flex items-center gap-2 text-sm font-bold text-slate-700 hover:text-primary transition-colors mt-6 w-fit group-hover:translate-x-1 duration-300">
-              Explore Tech <ArrowRight className="h-4 w-4" />
+              Explorar Tecnología <ArrowRight className="h-4 w-4" />
             </button>
           </div>
         </Card>
