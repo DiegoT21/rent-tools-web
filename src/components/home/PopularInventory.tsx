@@ -5,33 +5,33 @@ import { Card, CardContent } from "@/components/ui/card";
 const inventoryItems = [
   {
     id: 1,
-    category: "POWER TOOLS",
+    category: "HERRAMIENTAS",
     rating: 4.9,
-    title: "Industrial Circular Saw",
+    title: "Sierra Circular Industrial",
     price: 45,
     image: "https://images.unsplash.com/photo-1504148455328-c376907d081c?q=80&w=600&auto=format&fit=crop"
   },
   {
     id: 2,
-    category: "PNEUMATICS",
+    category: "NEUMÁTICA",
     rating: 4.8,
-    title: "Twin-Tank Air Compressor",
+    title: "Compresor de Aire Doble Tanque",
     price: 38,
     image: "https://images.unsplash.com/photo-1581092586614-da20a32e1d7a?q=80&w=600&auto=format&fit=crop"
   },
   {
     id: 3,
-    category: "CONSTRUCTION",
+    category: "CONSTRUCCIÓN",
     rating: 5.0,
-    title: "Direct Drive Cement Mixer",
+    title: "Mezcladora de Cemento",
     price: 72,
     image: "https://images.unsplash.com/photo-1510528659550-9ce838a1ddbd?q=80&w=600&auto=format&fit=crop"
   },
   {
     id: 4,
-    category: "SURVEYING",
+    category: "TOPOGRAFÍA",
     rating: 4.7,
-    title: "360° Rotary Laser Level",
+    title: "Nivel Láser Rotativo 360°",
     price: 55,
     image: "https://images.unsplash.com/photo-1581092334651-ddf68ca96fb8?q=80&w=600&auto=format&fit=crop"
   }
@@ -42,11 +42,11 @@ export function PopularInventory() {
     <div className="mb-12">
       <div className="flex items-end justify-between mb-8">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">Popular Inventory</h2>
-          <p className="text-slate-500 font-medium">Top rated tools for industrial professionals</p>
+          <h2 className="text-3xl font-bold tracking-tight text-slate-900 mb-2">Inventario Popular</h2>
+          <p className="text-slate-500 font-medium">Herramientas mejor calificadas para profesionales industriales</p>
         </div>
         <button className="flex items-center gap-1 text-sm font-bold text-primary hover:text-orange-600 transition-colors">
-          View All Inventory <ChevronRight className="h-4 w-4" />
+          Ver Todo el Inventario <ChevronRight className="h-4 w-4" />
         </button>
       </div>
 
@@ -73,9 +73,10 @@ export function PopularInventory() {
               <div className="flex items-end justify-between">
                 <div className="flex items-baseline gap-1">
                   <span className="text-xl font-bold text-slate-900">${item.price}</span>
-                  <span className="text-xs text-slate-500 font-medium">/day</span>
+                  <span className="text-xs text-slate-500 font-medium">/día</span>
                 </div>
                 <button className="bg-slate-900 hover:bg-primary text-white p-2.5 rounded-lg transition-colors group-hover:shadow-md">
+
                   <ShoppingCart className="h-4 w-4" />
                 </button>
               </div>
