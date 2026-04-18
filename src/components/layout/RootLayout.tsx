@@ -2,7 +2,11 @@ import React from "react";
 import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
 
-export function RootLayout({ children }) {
+interface RootLayoutProps {
+  children: React.ReactNode;
+}
+
+export function RootLayout({ children }: RootLayoutProps) {
   return (
     <div className="flex flex-col min-h-screen bg-[#f8f9fb]">
       <Header />

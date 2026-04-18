@@ -8,9 +8,9 @@ export function Header() {
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b bg-white px-6">
       <div className="flex items-center gap-12">
-        <div className="text-xl font-bold tracking-tight text-slate-900">
+        <Link to="/" className="text-xl font-bold tracking-tight text-slate-900 group">
           Rent<span className="text-slate-600 font-medium">Tools</span>
-        </div>
+        </Link>
         <nav className="flex items-center gap-6">
           <a href="#" className="text-sm font-semibold text-primary border-b-2 border-primary py-5">Location</a>
           <a href="#" className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors">Categories</a>
@@ -34,9 +34,11 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-4">
-        <Button className="rounded-full bg-primary hover:bg-primary/90 text-white font-semibold px-6 shadow-md shadow-primary/20">
-          Post
-        </Button>
+        <Link to="/create-listing">
+          <Button className="rounded-full bg-primary hover:bg-primary/90 text-white font-semibold px-6 shadow-md shadow-primary/20">
+            Post
+          </Button>
+        </Link>
         <button className="flex h-9 w-9 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 transition-colors">
           <Bell className="h-5 w-5" />
         </button>
