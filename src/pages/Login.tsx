@@ -12,14 +12,18 @@ export function Login() {
     <div className="min-h-screen overflow-y-auto bg-[#f8f9fb] text-slate-900">
       <div className="mx-auto flex min-h-screen max-w-[1320px] flex-col px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
         <header className="flex items-center rounded-[22px] border border-white/70 bg-white/85 px-4 py-2.5 shadow-[0_18px_45px_-34px_rgba(15,23,42,0.35)] backdrop-blur md:px-5">
-          <Link to="/" className="flex items-center gap-3 text-slate-950">
-            <span className="relative inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-[18px] bg-[#121c34] shadow-[0_14px_30px_-18px_rgba(18,28,52,0.8)]">
-              <span className="text-[1.35rem] font-black tracking-[-0.08em] text-primary">RT</span>
-              <span className="absolute bottom-1.5 right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white text-[9px] font-black text-[#121c34] shadow-sm">
-                {"\u2713"}
-              </span>
-            </span>
-            <span className="text-lg font-black tracking-tight md:text-xl">RentTools</span>
+          <Link
+            to="/"
+            className="flex items-center gap-3 whitespace-nowrap transition-opacity hover:opacity-80"
+          >
+            <img
+              src="/logo.jpeg"
+              alt="RentTools Logo"
+              className="h-10 w-10 rounded-xl object-cover shadow-[0_10px_24px_-16px_rgba(15,23,42,0.45)]"
+            />
+            <div className="text-[2rem] font-bold tracking-tight text-slate-900 leading-none">
+              Rent<span className="font-medium text-slate-500">Tools</span>
+            </div>
           </Link>
         </header>
 
@@ -183,7 +187,7 @@ export function Login() {
         <footer className="flex flex-col gap-2 px-1 pt-3 pb-1 text-sm text-slate-500 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-lg font-black tracking-tight text-slate-950">
-              RentTools Industrial.
+              RentTools.
             </p>
             <p className="mt-1 text-xs">(c) 2026 RentTools.</p>
           </div>
