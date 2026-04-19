@@ -176,9 +176,9 @@ export function Login() {
 
               <p className="mt-5 text-center text-sm text-slate-500">
                 No tienes una cuenta?{" "}
-                <a href="#" className="font-bold text-primary transition-colors hover:text-[#e86f00]">
-                  Registrate gratis
-                </a>
+               <Link to="/register" className="font-bold text-primary hover:text-[#e86f00]">
+                 Registrate gratis
+               </Link>
               </p>
             </div>
           </section>
