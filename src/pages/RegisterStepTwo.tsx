@@ -1,9 +1,8 @@
 import React from "react";
-import { Link } from "react-router-dom";
-import { ChevronLeft, ShieldCheck, Lock, ArrowRight, Calendar } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom"; // Importación limpia
+import { ChevronLeft, ShieldCheck, Lock, ArrowRight } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { useNavigate } from "react-router-dom";
 import {
   Select,
   SelectContent,
@@ -14,6 +13,13 @@ import {
 
 export function RegisterStepTwo() {
   const navigate = useNavigate();
+
+  const handleNext = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    // Aquí podrías guardar los datos en una base de datos o estado global
+    navigate("/register/step-3");
+  };
+
   return (
     <div className="min-h-screen bg-[#f8f9fb] text-slate-900 font-sans">
       <div className="mx-auto flex min-h-screen max-w-[1280px] flex-col px-4 py-6 md:px-8">
@@ -26,7 +32,7 @@ export function RegisterStepTwo() {
 
         <main className="mt-8 grid flex-1 gap-12 lg:grid-cols-[1fr_1fr] items-center">
           
-          {/* Columna Izquierda: Información de Seguridad */}
+          {/* Columna Izquierda */}
           <section className="space-y-8 lg:pr-12">
             <div className="space-y-6">
               <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 border border-blue-100">
@@ -42,7 +48,6 @@ export function RegisterStepTwo() {
                 Para garantizar la seguridad de nuestra comunidad de alquiler de herramientas, necesitamos validar tus datos oficiales.
               </p>
 
-              {/* Card de Encriptación */}
               <div className="flex items-center gap-4 rounded-2xl bg-white p-5 border border-slate-200/60 shadow-sm max-w-sm">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100">
                   <Lock className="h-6 w-6 text-slate-400" />
@@ -55,9 +60,8 @@ export function RegisterStepTwo() {
             </div>
           </section>
 
-          {/* Columna Derecha: Card de Formulario KYC */}
+          {/* Columna Derecha */}
           <section className="relative">
-            {/* El icono del candado flotante que se ve en tu captura */}
             <div className="absolute -bottom-6 -right-6 opacity-5 invisible xl:visible">
                <Lock className="h-32 w-32" />
             </div>
@@ -68,7 +72,6 @@ export function RegisterStepTwo() {
                 <span className="text-xs font-bold text-slate-400">66% completado</span>
               </div>
 
-              {/* Barra de progreso */}
               <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
                 <div className="h-full w-[66%] rounded-full bg-[#e86f00]" />
               </div>
@@ -77,7 +80,8 @@ export function RegisterStepTwo() {
                 Información Personal
               </h2>
 
-              <form className="mt-8 space-y-6" onSubmit={(e) => e.preventDefault()}>
+              {/* UN SOLO FORMULARIO QUE MANEJA TODO */}
+              <form className="mt-8 space-y-6" onSubmit={handleNext}>
                 <div className="space-y-2">
                   <label className="text-[13px] font-bold text-slate-800">Tipo de Documento</label>
                   <Select defaultValue="dni">
@@ -99,26 +103,24 @@ export function RegisterStepTwo() {
 
                 <div className="space-y-2">
                   <label className="text-[13px] font-bold text-slate-800">Fecha de Nacimiento</label>
-                  <div className="relative">
-                    <Input type="date" className="h-12 bg-[#f3f6fc] border-none rounded-xl pr-10" />
-                  </div>
+                  <Input type="date" className="h-12 bg-[#f3f6fc] border-none rounded-xl" />
                   <p className="text-[10px] text-blue-500 font-medium pt-1">
                     Debes ser mayor de 18 años para alquilar herramientas profesionales.
                   </p>
                 </div>
 
-                <div className="pt-2">
-                  <Button className="h-14 w-full rounded-2xl bg-[#e86f00] text-base font-black text-white hover:bg-[#d46500] flex items-center justify-center gap-2">
-                    Continuar <ArrowRight size={18} />
+                <div className="pt-2 space-y-4">
+                  <Button type="submit" className="h-14 w-full rounded-2xl bg-[#e86f00] text-base font-black text-white hover:bg-[#d46500] shadow-lg shadow-orange-500/20 transition-all">
+                    Continuar <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
                   
                   <button 
                     type="button"
                     onClick={() => navigate("/register")}
-                    className="mt-4 flex w-full items-center justify-center gap-2 text-xs font-bold text-slate-400 ..."
+                    className="flex w-full items-center justify-center gap-2 text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors"
                   >
-                  <ChevronLeft size={16} /> Volver al paso anterior
-                </button>
+                    <ChevronLeft size={16} /> Volver al paso anterior
+                  </button>
                 </div>
               </form>
             </div>
@@ -141,7 +143,7 @@ export function RegisterStepTwo() {
         {/* Footer */}
         <footer className="flex flex-col md:flex-row items-center justify-between py-10 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 border-t border-slate-100 mt-8">
           <div className="flex gap-6">
-            <span>© 2024 RENTTOOLS</span>
+            <span>© 2026 RENTTOOLS</span>
             <a href="#" className="hover:text-slate-900">Términos de servicio</a>
             <a href="#" className="hover:text-slate-900">Privacidad</a>
           </div>
