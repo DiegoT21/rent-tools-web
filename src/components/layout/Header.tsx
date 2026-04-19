@@ -41,7 +41,7 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
       </div>
 
       <div className="flex items-center gap-4">
-        <Link to="/create-listing">
+        <Link to="/profile?tab=publicar">
           <Button className="rounded-full bg-primary hover:bg-primary/90 text-white font-semibold px-6 shadow-md shadow-primary/20">
             Publicar
           </Button>
@@ -49,7 +49,7 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
         <button className="flex h-9 w-9 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 transition-colors">
           <Bell className="h-5 w-5" />
         </button>
-        <Link to="/login" className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors">
+        <Link to="/profile" className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors">
           <User className="h-5 w-5" />
         </Link>
       </div>
