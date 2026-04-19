@@ -4,6 +4,7 @@ import { RootLayout } from './components/layout/RootLayout'
 import { Home } from './pages/Home'
 import { Login } from './pages/Login'
 import { CreateListing } from './pages/CreateListing'
+import { UserProfile } from './pages/UserProfile'
 
 function App() {
   return (
@@ -17,6 +18,11 @@ function App() {
         <Route path="/create-listing" element={
           <RootLayout>
             <CreateListing />
+          </RootLayout>
+        } />
+        <Route path="/profile" element={
+          <RootLayout>
+            <UserProfile />
           </RootLayout>
         } />
         <Route path="/login" element={<Login />} />
