@@ -7,6 +7,7 @@ import { Register } from './pages/Register'
 import { RegisterStepTwo } from './pages/RegisterStepTwo'
 import { RegisterStepThree } from './pages/RegisterStepThree'
 import { CreateListing } from './pages/CreateListing'
+import { UserProfile } from './pages/UserProfile'
 
 function App() {
   return (
@@ -20,6 +21,11 @@ function App() {
         <Route path="/create-listing" element={
           <RootLayout>
             <CreateListing />
+          </RootLayout>
+        } />
+        <Route path="/profile" element={
+          <RootLayout>
+            <UserProfile />
           </RootLayout>
         } />
         <Route path="/login" element={<Login />} />
