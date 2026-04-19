@@ -3,8 +3,16 @@ import { Link } from "react-router-dom";
 import { ChevronRight, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { useNavigate } from "react-router-dom";
 
 export function Register() {
+  const navigate = useNavigate();
+
+  const handleNextStep = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    // Aquí podrías validar los datos antes de navegar
+    navigate("/register/step-2");
+  };
   const [showPassword, setShowPassword] = React.useState(false);
 
   return (
@@ -130,9 +138,12 @@ export function Register() {
                   </span>
                 </label>
 
-                <Button className="h-14 w-full rounded-2xl bg-[#e86f00] text-base font-black text-white shadow-xl shadow-orange-500/20 hover:bg-[#d46500] hover:scale-[1.01] transition-all">
+                <Button 
+                  onClick={handleNextStep}
+                  className="h-14 w-full rounded-2xl bg-[#e86f00] ..."
+                >
                   Continuar al registro
-                </Button>
+               </Button>
 
                 <p className="text-center text-sm text-slate-500 pt-2">
                   ¿Ya tienes una cuenta?{" "}

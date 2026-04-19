@@ -4,6 +4,7 @@ import { RootLayout } from './components/layout/RootLayout'
 import { Home } from './pages/Home'
 import { Login } from './pages/Login'
 import { Register } from './pages/Register'
+import { RegisterStepTwo } from './pages/RegisterStepTwo'
 import { CreateListing } from './pages/CreateListing'
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
         } />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/register/step-2" element={<RegisterStepTwo />} />
       </Routes>
     </BrowserRouter>
   )
