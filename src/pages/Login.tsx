@@ -1,12 +1,38 @@
 import React from "react";
 import { BriefcaseBusiness, Eye, EyeOff, Globe, LockKeyhole, Mail } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import heroImage from "../assets/hero.png";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 
 export function Login() {
+  const navigate = useNavigate();
   const [showPassword, setShowPassword] = React.useState(false);
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      // Import needed at the top of the file: import { authService } from "../services/authService";
+      // We will do another replacement for imports if needed, but for now we assume we'll fix it or just add the import at the top
+      const { authService } = await import("../services/authService");
+
+      await authService.login({ email, password });
+
+      // Redirect to home or dashboard
+      navigate("/");
+    } catch (err: any) {
+      setError(err.response?.data?.message || "Ocurrió un error al iniciar sesión.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen overflow-y-auto bg-[#f8f9fb] text-slate-900">
@@ -90,7 +116,12 @@ export function Login() {
                 </p>
               </div>
 
-              <form className="mt-6 space-y-4" onSubmit={(event) => event.preventDefault()}>
+              <form className="mt-6 space-y-4" onSubmit={handleLogin}>
+                {error && (
+                  <div className="rounded-xl bg-red-50 p-3 text-sm text-red-600 border border-red-200">
+                    {error}
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <label htmlFor="email" className="block text-[13px] font-bold text-slate-900">
                     Correo electronico
@@ -100,7 +131,10 @@ export function Login() {
                     <Input
                       id="email"
                       type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
                       placeholder="ejemplo@empresa.com"
+                      required
                       className="h-12 rounded-xl border-[#dde5f0] bg-[#f3f6fc] pl-12 pr-4 text-sm shadow-none placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-primary/20"
                     />
                   </div>
@@ -124,7 +158,10 @@ export function Login() {
                     <Input
                       id="password"
                       type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
                       placeholder="Ingresa tu contrasena"
+                      required
                       className="h-12 rounded-xl border-[#dde5f0] bg-[#f3f6fc] pl-12 pr-12 text-sm shadow-none placeholder:text-slate-400 focus-visible:ring-2 focus-visible:ring-primary/20"
                     />
                     <button
@@ -146,8 +183,12 @@ export function Login() {
                   Recordarme
                 </label>
 
-                <Button className="h-12 w-full rounded-xl bg-primary text-sm font-black text-white shadow-[0_20px_45px_-28px_rgba(255,122,0,0.95)] hover:bg-[#e86f00]">
-                  Iniciar sesion
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="h-12 w-full rounded-xl bg-primary text-sm font-black text-white shadow-[0_20px_45px_-28px_rgba(255,122,0,0.95)] hover:bg-[#e86f00] disabled:opacity-70"
+                >
+                  {isLoading ? "Iniciando sesion..." : "Iniciar sesion"}
                 </Button>
               </form>
 
@@ -176,9 +217,9 @@ export function Login() {
 
               <p className="mt-5 text-center text-sm text-slate-500">
                 No tienes una cuenta?{" "}
-               <Link to="/register" className="font-bold text-primary hover:text-[#e86f00]">
-                 Registrate gratis
-               </Link>
+                <Link to="/register" className="font-bold text-primary hover:text-[#e86f00]">
+                  Registrate gratis
+                </Link>
               </p>
             </div>
           </section>
