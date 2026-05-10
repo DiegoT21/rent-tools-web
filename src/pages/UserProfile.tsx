@@ -7,6 +7,7 @@ import {
   Edit3, 
   MoreHorizontal, 
   Star,
+  ShieldCheck,
   MapPin,
   Calendar,
   Plus,
@@ -32,6 +33,7 @@ import { Progress } from "@/components/ui/progress";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { CreateListing } from "./CreateListing";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useEffect } from "react";
 
 const menuItems = [
   { id: "perfil", label: "Mi Perfil", icon: User },
@@ -88,6 +90,13 @@ export function UserProfile() {
   const navigate = useNavigate();
   const { user, clearAuth } = useAuthStore();
 
+  // Redirigir a login si no hay usuario (protección de ruta)
+  useEffect(() => {
+    if (!user) {
+      navigate("/login");
+    }
+  }, [user, navigate]);
+
   const handleLogout = () => {
     clearAuth();
     navigate("/login");
@@ -131,7 +140,47 @@ export function UserProfile() {
       </aside>
 
       {/* Área de Contenido Principal */}
-      <main className="flex-1">
+      <main className="flex-1 space-y-6">
+        {activeTab === "perfil" && !user?.isVerified && (
+          <Card className="border-none shadow-sm bg-gradient-to-r from-orange-500 to-orange-600 text-white overflow-hidden relative group">
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
+              <ShieldCheck size={120} />
+            </div>
+            <CardContent className="p-6 relative z-10">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-white/20 hover:bg-white/30 text-white border-none font-bold">
+                      PASO 2 DE 3
+                    </Badge>
+                    <span className="text-sm font-medium text-orange-100 italic">Identidad pendiente</span>
+                  </div>
+                  <h2 className="text-2xl font-black tracking-tight">Casi listo para rentar tus equipos</h2>
+                  <p className="text-orange-100 text-sm font-medium max-w-md">
+                    Completa tu verificación de identidad para poder publicar tus herramientas y empezar a generar ingresos hoy mismo.
+                  </p>
+                </div>
+                
+                <div className="flex flex-col items-center md:items-end gap-3 w-full md:w-auto">
+                  <div className="w-full md:w-48 space-y-1.5">
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-wider">
+                      <span>Progreso</span>
+                      <span>66%</span>
+                    </div>
+                    <Progress value={66} className="h-2 bg-white/20" />
+                  </div>
+                  <Button 
+                    onClick={() => navigate("/register/step-2")}
+                    className="w-full md:w-auto bg-white text-orange-600 hover:bg-orange-50 font-bold px-8 h-11 rounded-xl shadow-lg shadow-black/10 transition-all active:scale-95"
+                  >
+                    Verificar ahora
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {activeTab === "perfil" && (
           <div className="space-y-6 animate-in fade-in duration-500">
             <Card className="border-none shadow-sm overflow-hidden bg-white">

@@ -86,7 +86,7 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
             </Link>
           </div>
         ) : (
-          <Link to="/profile" className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors">
+          <Link to="/login" className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors">
             <User className="h-5 w-5" />
           </Link>
         )}

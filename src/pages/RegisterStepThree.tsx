@@ -12,11 +12,23 @@ import { Button } from "../components/ui/button";
 import { WebcamCapture } from "../components/ui/WebcamCapture";
 import { useAuthStore } from "../store/useAuthStore";
 
+
 export function RegisterStepThree() {
-  const navigate = useNavigate();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { accessToken: storeToken } = useAuthStore();
   const documentImage = location.state?.documentImage || null;
-  const accessToken = location.state?.accessToken || null;
+  const accessToken = location.state?.accessToken || storeToken;
+
+  // Protección total: Validar sesión y que venga del Paso 2
+  React.useEffect(() => {
+    if (!accessToken) {
+      navigate("/register");
+    } else if (!documentImage) {
+      // Si hay sesión pero no hay foto de cédula, mandarlo al Paso 2
+      navigate("/register/step-2");
+    }
+  }, [accessToken, documentImage, navigate]);
 
   const [selfieImage, setSelfieImage] = useState<string | null>(null);
 
