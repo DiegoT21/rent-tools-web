@@ -11,20 +11,30 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { WebcamCapture } from "../components/ui/WebcamCapture";
+import { useAuthStore } from "../store/useAuthStore";
 
 export function RegisterStepTwo() {
-  const navigate = useNavigate();
   const location = useLocation();
-  const accessToken = location.state?.accessToken || null;
+  const navigate = useNavigate();
+const { user, accessToken: storeToken } = useAuthStore();
+
+  const accessToken = location.state?.accessToken || storeToken;
+
+  // Protección: Si no hay token, no puede estar aquí
+  React.useEffect(() => {
+    if (!accessToken) {
+      navigate("/register");
+    }
+  }, [accessToken, navigate]);
 
   const [documentImage, setDocumentImage] = React.useState<string | null>(null);
   const [useManualForm, setUseManualForm] = React.useState(false);
-  
+
   // State for manual form
   const [documentType, setDocumentType] = React.useState("CCPA");
   const [documentNumber, setDocumentNumber] = React.useState("");
   const [dateOfBirth, setDateOfBirth] = React.useState("");
-  
+
   // Loading and error state
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -48,7 +58,7 @@ export function RegisterStepTwo() {
   const handleProcessImage = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
     if (!documentImage) return;
-    
+
     setError(null);
     setIsLoading(true);
 
@@ -66,7 +76,7 @@ export function RegisterStepTwo() {
   return (
     <div className="min-h-screen bg-[#f8f9fb] text-slate-900 font-sans">
       <div className="mx-auto flex min-h-screen max-w-[1280px] flex-col px-4 py-6 md:px-8">
-        
+
         {/* Header */}
         <header className="flex items-center justify-between py-4">
           <span className="text-xl font-black tracking-tight">RentTools</span>
@@ -74,7 +84,7 @@ export function RegisterStepTwo() {
         </header>
 
         <main className="mt-8 grid flex-1 gap-12 lg:grid-cols-[1fr_1fr] items-center">
-          
+
           {/* Columna Izquierda */}
           <section className="space-y-8 lg:pr-12">
             <div className="space-y-6">
@@ -82,11 +92,11 @@ export function RegisterStepTwo() {
                 <ShieldCheck className="h-3.5 w-3.5 text-blue-600" />
                 <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Entorno Seguro</span>
               </div>
-              
+
               <h1 className="text-[3rem] font-black leading-[1.05] tracking-tight text-slate-950">
                 Verifica tu identidad profesional.
               </h1>
-              
+
               <p className="text-slate-500 text-lg leading-relaxed max-w-md">
                 Para garantizar la seguridad de nuestra comunidad de alquiler de herramientas, necesitamos validar tus datos oficiales.
               </p>
@@ -106,7 +116,7 @@ export function RegisterStepTwo() {
           {/* Columna Derecha */}
           <section className="relative">
             <div className="absolute -bottom-6 -right-6 opacity-5 invisible xl:visible">
-               <Lock className="h-32 w-32" />
+              <Lock className="h-32 w-32" />
             </div>
 
             <div className="rounded-[32px] border border-white bg-white p-8 md:p-12 shadow-[0_35px_80px_-35px_rgba(0,0,0,0.1)]">
@@ -134,9 +144,9 @@ export function RegisterStepTwo() {
                     {!documentImage ? (
                       <div className="space-y-4">
                         <p className="text-sm text-slate-500 font-medium">Captura el frente de tu documento de identidad oficial.</p>
-                        <WebcamCapture 
-                          overlayType="document" 
-                          onCapture={(img) => setDocumentImage(img)} 
+                        <WebcamCapture
+                          overlayType="document"
+                          onCapture={(img) => setDocumentImage(img)}
                         />
                         {/* Opción manual deshabilitada temporalmente 
                         <button 
@@ -158,8 +168,8 @@ export function RegisterStepTwo() {
                         <div className="flex items-center gap-2 text-green-600 text-sm font-bold bg-green-50 p-3 rounded-xl">
                           <ShieldCheck className="h-5 w-5" /> Documento capturado con éxito
                         </div>
-                        <Button 
-                          onClick={handleProcessImage} 
+                        <Button
+                          onClick={handleProcessImage}
                           disabled={isLoading}
                           className="h-14 w-full rounded-2xl bg-[#e86f00] text-base font-black text-white hover:bg-[#d46500] shadow-lg shadow-orange-500/20 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
                         >
@@ -167,7 +177,7 @@ export function RegisterStepTwo() {
                             <>Continuar <ArrowRight className="ml-2 h-5 w-5" /></>
                           )}
                         </Button>
-                        <button 
+                        <button
                           onClick={() => setDocumentImage(null)}
                           className="w-full text-center text-xs font-bold text-slate-400 hover:text-slate-600"
                         >
@@ -194,22 +204,22 @@ export function RegisterStepTwo() {
 
                     <div className="space-y-2">
                       <label className="text-[13px] font-bold text-slate-800">Número de Documento</label>
-                      <Input 
-                        placeholder="Ej: 8-1251-1829" 
+                      <Input
+                        placeholder="Ej: 8-1251-1829"
                         value={documentNumber}
                         onChange={(e) => setDocumentNumber(e.target.value)}
-                        className="h-12 bg-[#f3f6fc] border-none rounded-xl" 
+                        className="h-12 bg-[#f3f6fc] border-none rounded-xl"
                         required
                       />
                     </div>
 
                     <div className="space-y-2">
                       <label className="text-[13px] font-bold text-slate-800">Fecha de Nacimiento</label>
-                      <Input 
-                        type="date" 
+                      <Input
+                        type="date"
                         value={dateOfBirth}
                         onChange={(e) => setDateOfBirth(e.target.value)}
-                        className="h-12 bg-[#f3f6fc] border-none rounded-xl" 
+                        className="h-12 bg-[#f3f6fc] border-none rounded-xl"
                         required
                       />
                       <p className="text-[10px] text-blue-500 font-medium pt-1">
@@ -224,8 +234,8 @@ export function RegisterStepTwo() {
                     )}
 
                     <div className="pt-2 space-y-4">
-                      <Button 
-                        type="submit" 
+                      <Button
+                        type="submit"
                         disabled={isLoading}
                         className="h-14 w-full rounded-2xl bg-[#e86f00] text-base font-black text-white hover:bg-[#d46500] shadow-lg shadow-orange-500/20 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
                       >
@@ -233,8 +243,8 @@ export function RegisterStepTwo() {
                           <>Continuar <ArrowRight className="ml-2 h-5 w-5" /></>
                         )}
                       </Button>
-                      
-                      <button 
+
+                      <button
                         type="button"
                         onClick={() => setUseManualForm(false)}
                         className="w-full text-center text-xs font-bold text-slate-400 hover:text-slate-600"
@@ -244,11 +254,11 @@ export function RegisterStepTwo() {
                     </div>
                   </form>
                 )}
-                
+
                 {!documentImage && (
-                  <button 
+                  <button
                     type="button"
-                    onClick={() => navigate("/register")}
+                    onClick={() => navigate("/profile")}
                     className="flex w-full items-center justify-center gap-2 text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors mt-6"
                   >
                     <ChevronLeft size={16} /> Volver al paso anterior
@@ -262,9 +272,9 @@ export function RegisterStepTwo() {
         <div className="mt-12 grid grid-cols-2 gap-4 md:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="aspect-[16/9] overflow-hidden rounded-2xl grayscale opacity-40 hover:opacity-100 hover:grayscale-0 transition-all duration-500 border border-slate-200">
-              <img 
-                src={`https://placehold.co/400x225/png`} 
-                alt={`Stock ${i}`} 
+              <img
+                src={`https://placehold.co/400x225/png`}
+                alt={`Stock ${i}`}
                 className="h-full w-full object-cover"
               />
             </div>
@@ -279,7 +289,7 @@ export function RegisterStepTwo() {
             <a href="#" className="hover:text-slate-900">Privacidad</a>
           </div>
           <div className="flex items-center gap-2 mt-4 md:mt-0">
-             <Lock size={12} /> CONEXIÓN SEGURA SSL
+            <Lock size={12} /> CONEXIÓN SEGURA SSL
           </div>
         </footer>
       </div>
