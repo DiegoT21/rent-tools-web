@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, useNavigate } from "react-router-dom"; // Importación limpia
+import { useLocation, useNavigate } from "react-router-dom"; // Importación limpia
 import { ChevronLeft, ShieldCheck, Lock, ArrowRight } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -10,14 +10,57 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
+import { WebcamCapture } from "../components/ui/WebcamCapture";
 
 export function RegisterStepTwo() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const accessToken = location.state?.accessToken || null;
 
-  const handleNext = (e: React.FormEvent<HTMLFormElement>) => {
+  const [documentImage, setDocumentImage] = React.useState<string | null>(null);
+  const [useManualForm, setUseManualForm] = React.useState(false);
+  
+  // State for manual form
+  const [documentType, setDocumentType] = React.useState("CCPA");
+  const [documentNumber, setDocumentNumber] = React.useState("");
+  const [dateOfBirth, setDateOfBirth] = React.useState("");
+  
+  // Loading and error state
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const handleNext = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // Aquí podrías guardar los datos en una base de datos o estado global
-    navigate("/register/step-3");
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      console.log(`Bypass Manual: Cédula aceptada (Validación deshabilitada)`);
+      navigate("/register/step-3");
+    } catch (err) {
+      console.error('Error al validar la cédula', err);
+      setError("Ocurrió un error al validar su identidad. Intente nuevamente.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleProcessImage = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    if (!documentImage) return;
+    
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      console.log(`Paso 2 completado: Imagen capturada localmente`);
+      navigate("/register/step-3", { state: { documentImage, accessToken } });
+    } catch (err) {
+      console.error('Error al procesar la imagen de la cédula', err);
+      setError("Ocurrió un error al procesar la imagen. Intenta nuevamente.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -80,59 +123,147 @@ export function RegisterStepTwo() {
                 Información Personal
               </h2>
 
-              {/* UN SOLO FORMULARIO QUE MANEJA TODO */}
-              <form className="mt-8 space-y-6" onSubmit={handleNext}>
-                <div className="space-y-2">
-                  <label className="text-[13px] font-bold text-slate-800">Tipo de Documento</label>
-                  <Select defaultValue="dni">
-                    <SelectTrigger className="h-12 bg-[#f3f6fc] border-none rounded-xl">
-                      <SelectValue placeholder="Selecciona documento" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="dni">DNI - Documento Nacional de Identidad</SelectItem>
-                      <SelectItem value="passport">Pasaporte</SelectItem>
-                      <SelectItem value="license">Licencia de Conducir</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="mt-8">
+                {error && (
+                  <div className="mb-6 p-3 text-sm text-red-600 bg-red-50 rounded-xl font-medium border border-red-100">
+                    {error}
+                  </div>
+                )}
+                {!useManualForm ? (
+                  <div className="space-y-6">
+                    {!documentImage ? (
+                      <div className="space-y-4">
+                        <p className="text-sm text-slate-500 font-medium">Captura el frente de tu documento de identidad oficial.</p>
+                        <WebcamCapture 
+                          overlayType="document" 
+                          onCapture={(img) => setDocumentImage(img)} 
+                        />
+                        {/* Opción manual deshabilitada temporalmente 
+                        <button 
+                          onClick={() => {
+                            setError(null);
+                            setUseManualForm(true);
+                          }}
+                          className="w-full text-center text-xs font-bold text-[#e86f00] hover:underline"
+                        >
+                          ¿No tienes cámara? Ingresar datos manualmente
+                        </button>
+                        */}
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="rounded-xl overflow-hidden border-2 border-green-500">
+                          <img src={documentImage} alt="Documento" className="w-full h-auto" />
+                        </div>
+                        <div className="flex items-center gap-2 text-green-600 text-sm font-bold bg-green-50 p-3 rounded-xl">
+                          <ShieldCheck className="h-5 w-5" /> Documento capturado con éxito
+                        </div>
+                        <Button 
+                          onClick={handleProcessImage} 
+                          disabled={isLoading}
+                          className="h-14 w-full rounded-2xl bg-[#e86f00] text-base font-black text-white hover:bg-[#d46500] shadow-lg shadow-orange-500/20 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+                        >
+                          {isLoading ? "Procesando documento..." : (
+                            <>Continuar <ArrowRight className="ml-2 h-5 w-5" /></>
+                          )}
+                        </Button>
+                        <button 
+                          onClick={() => setDocumentImage(null)}
+                          className="w-full text-center text-xs font-bold text-slate-400 hover:text-slate-600"
+                        >
+                          Volver a tomar foto
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <form className="space-y-6" onSubmit={handleNext}>
+                    <div className="space-y-2">
+                      <label className="text-[13px] font-bold text-slate-800">Tipo de Documento</label>
+                      <Select value={documentType} onValueChange={setDocumentType}>
+                        <SelectTrigger className="h-12 bg-[#f3f6fc] border-none rounded-xl">
+                          <SelectValue placeholder="Selecciona documento" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="CCPA">DNI - Documento Nacional de Identidad (CCPA)</SelectItem>
+                          <SelectItem value="passport">Pasaporte</SelectItem>
+                          <SelectItem value="license">Licencia de Conducir</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                <div className="space-y-2">
-                  <label className="text-[13px] font-bold text-slate-800">Número de Documento</label>
-                  <Input placeholder="Ej: 12345678X" className="h-12 bg-[#f3f6fc] border-none rounded-xl" />
-                </div>
+                    <div className="space-y-2">
+                      <label className="text-[13px] font-bold text-slate-800">Número de Documento</label>
+                      <Input 
+                        placeholder="Ej: 8-1251-1829" 
+                        value={documentNumber}
+                        onChange={(e) => setDocumentNumber(e.target.value)}
+                        className="h-12 bg-[#f3f6fc] border-none rounded-xl" 
+                        required
+                      />
+                    </div>
 
-                <div className="space-y-2">
-                  <label className="text-[13px] font-bold text-slate-800">Fecha de Nacimiento</label>
-                  <Input type="date" className="h-12 bg-[#f3f6fc] border-none rounded-xl" />
-                  <p className="text-[10px] text-blue-500 font-medium pt-1">
-                    Debes ser mayor de 18 años para alquilar herramientas profesionales.
-                  </p>
-                </div>
+                    <div className="space-y-2">
+                      <label className="text-[13px] font-bold text-slate-800">Fecha de Nacimiento</label>
+                      <Input 
+                        type="date" 
+                        value={dateOfBirth}
+                        onChange={(e) => setDateOfBirth(e.target.value)}
+                        className="h-12 bg-[#f3f6fc] border-none rounded-xl" 
+                        required
+                      />
+                      <p className="text-[10px] text-blue-500 font-medium pt-1">
+                        Debes ser mayor de 18 años para alquilar herramientas profesionales.
+                      </p>
+                    </div>
 
-                <div className="pt-2 space-y-4">
-                  <Button type="submit" className="h-14 w-full rounded-2xl bg-[#e86f00] text-base font-black text-white hover:bg-[#d46500] shadow-lg shadow-orange-500/20 transition-all">
-                    Continuar <ArrowRight className="ml-2 h-5 w-5" />
-                  </Button>
-                  
+                    {error && (
+                      <div className="p-3 text-sm text-red-600 bg-red-50 rounded-xl font-medium border border-red-100">
+                        {error}
+                      </div>
+                    )}
+
+                    <div className="pt-2 space-y-4">
+                      <Button 
+                        type="submit" 
+                        disabled={isLoading}
+                        className="h-14 w-full rounded-2xl bg-[#e86f00] text-base font-black text-white hover:bg-[#d46500] shadow-lg shadow-orange-500/20 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+                      >
+                        {isLoading ? "Validando identidad..." : (
+                          <>Continuar <ArrowRight className="ml-2 h-5 w-5" /></>
+                        )}
+                      </Button>
+                      
+                      <button 
+                        type="button"
+                        onClick={() => setUseManualForm(false)}
+                        className="w-full text-center text-xs font-bold text-slate-400 hover:text-slate-600"
+                      >
+                        Volver a usar la cámara
+                      </button>
+                    </div>
+                  </form>
+                )}
+                
+                {!documentImage && (
                   <button 
                     type="button"
                     onClick={() => navigate("/register")}
-                    className="flex w-full items-center justify-center gap-2 text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors"
+                    className="flex w-full items-center justify-center gap-2 text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors mt-6"
                   >
                     <ChevronLeft size={16} /> Volver al paso anterior
                   </button>
-                </div>
-              </form>
+                )}
+              </div>
             </div>
           </section>
         </main>
 
-        {/* Galería Inferior */}
         <div className="mt-12 grid grid-cols-2 gap-4 md:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="aspect-[16/9] overflow-hidden rounded-2xl grayscale opacity-40 hover:opacity-100 hover:grayscale-0 transition-all duration-500 border border-slate-200">
               <img 
-                src={`/api/placeholder/400/225`} 
+                src={`https://placehold.co/400x225/png`} 
                 alt={`Stock ${i}`} 
                 className="h-full w-full object-cover"
               />

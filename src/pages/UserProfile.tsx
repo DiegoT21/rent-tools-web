@@ -31,8 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { CreateListing } from "./CreateListing";
-import React from "react";
-import { useAuthStore } from "@/store/authStore";
+import { useAuthStore } from "@/store/useAuthStore";
 
 const menuItems = [
   { id: "perfil", label: "Mi Perfil", icon: User },
@@ -87,28 +86,11 @@ export function UserProfile() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "perfil";
   const navigate = useNavigate();
-  
-  const { user } = useAuthStore();
+  const { user, clearAuth } = useAuthStore();
 
-  React.useEffect(() => {
-    if (!user) {
-      import('@/services/authService').then(({ authService }) => {
-        authService.getProfile().catch((err) => {
-          console.error("Error fetching profile", err);
-          navigate('/login');
-        });
-      });
-    }
-  }, [user, navigate]);
-
-  const handleLogout = async () => {
-    try {
-      const { authService } = await import('@/services/authService');
-      await authService.logout();
-    } catch (e) {
-      console.error(e);
-      navigate('/login');
-    }
+  const handleLogout = () => {
+    clearAuth();
+    navigate("/login");
   };
 
   const setActiveTab = (tab: string) => {
@@ -168,7 +150,7 @@ export function UserProfile() {
                     <div className="space-y-3 pt-2">
                       <div className="space-y-1">
                         <h1 className="text-2xl font-bold text-slate-900">
-                          {user ? `${user.firstName || ''} ${user.lastName || ''}` : "Cargando..."}
+                          {user ? `${user.firstName} ${user.lastName || ''}` : 'Invitado'}
                         </h1>
                         <div className="flex items-center gap-4 text-sm text-slate-500 font-medium">
                           <div className="flex items-center gap-1">

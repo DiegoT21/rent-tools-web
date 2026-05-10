@@ -1,9 +1,25 @@
-import { Link } from "react-router-dom";
-import { Search, Bell, User, MapPin } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Search, Bell, User, MapPin, ShieldCheck, ShieldAlert } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useAuthStore } from "@/store/useAuthStore";
 
 export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () => void, isSidebarOpen?: boolean }) {
+  const navigate = useNavigate();
+  const { user } = useAuthStore();
+
+  const handlePublicarClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (user && !user.isVerified) {
+      e.preventDefault();
+      alert("Debes verificar tu identidad primero para poder publicar herramientas.");
+      navigate("/register/step-2");
+    } else if (!user) {
+      e.preventDefault();
+      navigate("/register");
+    } else {
+      navigate("/profile?tab=publicar");
+    }
+  };
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b bg-white shadow-sm px-6">
       <div className="flex items-center gap-12">
@@ -41,17 +57,39 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
       </div>
 
       <div className="flex items-center gap-4">
-        <Link to="/profile?tab=publicar">
-          <Button className="rounded-full bg-primary hover:bg-primary/90 text-white font-semibold px-6 shadow-md shadow-primary/20">
-            Publicar
-          </Button>
-        </Link>
+        <Button 
+          onClick={handlePublicarClick}
+          className="rounded-full bg-primary hover:bg-primary/90 text-white font-semibold px-6 shadow-md shadow-primary/20"
+        >
+          Publicar
+        </Button>
         <button className="flex h-9 w-9 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 transition-colors">
           <Bell className="h-5 w-5" />
         </button>
-        <Link to="/profile" className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors">
-          <User className="h-5 w-5" />
-        </Link>
+        
+        {user ? (
+          <div className="flex items-center gap-3 ml-2">
+            <div className="flex flex-col items-end">
+              <span className="text-sm font-semibold text-slate-900">Hola, {user.firstName}</span>
+              {user.isVerified ? (
+                <span className="flex items-center gap-1 text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-200">
+                  <ShieldCheck size={10} /> Cuenta Verificada
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-[10px] font-bold text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full border border-yellow-200">
+                  <ShieldAlert size={10} /> Verificación Pendiente
+                </span>
+              )}
+            </div>
+            <Link to="/profile" className="flex h-10 w-10 items-center justify-center rounded-full bg-[#eff6ff] text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors">
+              <span className="font-bold">{user.firstName.charAt(0)}{user.lastName?.charAt(0)}</span>
+            </Link>
+          </div>
+        ) : (
+          <Link to="/profile" className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors">
+            <User className="h-5 w-5" />
+          </Link>
+        )}
       </div>
     </header>
   );
