@@ -78,7 +78,7 @@ api.interceptors.response.use(
       try {
         // Llamar endpoint de refresh (las cookies viajan automáticamente gracias a withCredentials: true)
         const response = await api.post('/auth/refresh');
-        
+
         // El backend responde con { success: true, data: { accessToken: '...' } }
         const newAccessToken = response.data.data.accessToken;
 
@@ -94,13 +94,13 @@ api.interceptors.response.use(
       } catch (refreshError) {
         // Si el refresco falla (el refreshToken expiró o fue revocado)
         processQueue(refreshError as AxiosError, null);
-        
+
         // Limpiar el estado de sesión en el frontend
         useAuthStore.getState().clearSession();
-        
+
         // Redirigir al usuario al Login forzosamente (usando window.location o el enrutador)
         window.location.href = '/login';
-        
+
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
