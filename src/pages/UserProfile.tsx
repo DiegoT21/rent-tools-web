@@ -259,6 +259,10 @@ export function UserProfile() {
   }, [activeTab, accessToken, requestsMode]);
 
   const showRenterReviews = async (renterUuid: string, renterName: string) => {
+    if (!renterUuid) {
+      await alerts.warning("Sin identificador", "No se pudo obtener el id del solicitante para cargar sus reviews.");
+      return;
+    }
     try {
       const data = await userService.getReviews(renterUuid);
       const summary = data.summary ?? { count: 0, averageRating: 0 };
@@ -813,7 +817,10 @@ export function UserProfile() {
               {!requestsLoading &&
                 !requestsError &&
                 requests.map((req) => {
-                  const renterName = `${req.renter?.firstName ?? "Usuario"} ${req.renter?.lastName ?? ""}`.trim();
+                  const renterUuid = String((req as any)?.renter?.uuid ?? (req as any)?.renter?._id ?? (req as any)?.renter?.id ?? "");
+                  const renterFirst = (req as any)?.renter?.firstName ?? (req as any)?.renter?.name ?? "";
+                  const renterLast = (req as any)?.renter?.lastName ?? "";
+                  const renterName = `${String(renterFirst || "Usuario")} ${String(renterLast || "")}`.trim();
                   const toolName = req.tool?.name ?? "Herramienta";
                   const statusLabel =
                     req.status === "approved" ? "Aprobada" : req.status === "rejected" ? "Rechazada" : "Pendiente";
@@ -858,7 +865,7 @@ export function UserProfile() {
                           <div className="flex gap-2 shrink-0">
                             <Button
                               variant="secondary"
-                              onClick={() => showRenterReviews(req.renter.uuid, renterName)}
+                              onClick={() => showRenterReviews(renterUuid, renterName)}
                               className="h-11 px-5 rounded-xl bg-slate-50 text-slate-700 font-bold hover:bg-slate-100"
                             >
                               Ver reviews
