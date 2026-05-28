@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { ChevronLeft, ChevronRight, MapPin } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -69,8 +69,19 @@ function ToolLocationMap({ lat, lng }: { lat: number; lng: number }) {
   const center: [number, number] = [lat, lng];
 
   return (
-    <div className="relative rounded-2xl overflow-hidden h-[280px] border border-slate-200 bg-slate-100">
-      <MapContainer center={center} zoom={15} style={{ width: "100%", height: "100%" }} scrollWheelZoom={false}>
+    <div className="relative rounded-xl overflow-hidden h-[220px] border border-slate-200 bg-slate-100">
+      <MapContainer
+        center={center}
+        zoom={15}
+        style={{ width: "100%", height: "100%" }}
+        scrollWheelZoom={false}
+        zoomControl={false}
+        dragging={false}
+        doubleClickZoom={false}
+        boxZoom={false}
+        keyboard={false}
+        touchZoom={false}
+      >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -86,6 +97,8 @@ export function ToolDetails() {
   const [tool, setTool] = useState<PublicTool | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showMap, setShowMap] = useState(false);
+  const [showFullDescription, setShowFullDescription] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -115,6 +128,9 @@ export function ToolDetails() {
   const images = useMemo(() => (tool ? toolService.getToolImages(tool, 3) : []), [tool]);
   const lat = typeof (tool as any)?.latitude === "number" ? (tool as any).latitude : null;
   const lng = typeof (tool as any)?.longitude === "number" ? (tool as any).longitude : null;
+  const address = typeof (tool as any)?.address === "string" ? (tool as any).address : null;
+  const brand = typeof (tool as any)?.brand === "string" ? (tool as any).brand : null;
+  const description = typeof (tool as any)?.description === "string" ? (tool as any).description : null;
 
   if (loading) {
     return <div className="max-w-5xl mx-auto py-10 px-4 text-slate-600">Cargando publicación...</div>;
@@ -130,43 +146,73 @@ export function ToolDetails() {
 
   return (
     <div className="max-w-5xl mx-auto py-10 px-4">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         <ImageCarousel images={images} alt={tool.name} />
 
         <Card className="border-slate-100 shadow-sm">
           <CardContent className="p-6 space-y-4">
-            <div>
-              <div className="text-xs font-bold tracking-widest text-slate-400 uppercase">
+            <div className="space-y-1">
+              <div className="text-[11px] font-bold tracking-widest text-slate-400 uppercase">
                 {(tool.category ?? "HERRAMIENTAS").toString()}
               </div>
-              <h1 className="text-2xl font-bold text-slate-900">{tool.name}</h1>
-              {typeof (tool as any).brand === "string" && (
-                <div className="text-sm text-slate-600 mt-1">{(tool as any).brand}</div>
-              )}
+              <h1 className="text-2xl font-bold text-slate-900 leading-tight">{tool.name}</h1>
+              {brand && <div className="text-sm text-slate-600">{brand}</div>}
             </div>
 
             {typeof tool.pricePerDay === "number" && (
-              <div className="flex items-end gap-2">
-                <div className="text-3xl font-bold text-slate-900">${tool.pricePerDay}</div>
-                <div className="text-sm text-slate-500 font-medium">/día</div>
+              <div className="flex items-end gap-3">
+                <div className="text-4xl font-bold text-slate-900">${tool.pricePerDay}</div>
+                <div className="text-sm text-slate-500 font-semibold mb-1">/día</div>
               </div>
             )}
 
-            {typeof (tool as any).address === "string" && (
-              <div className="flex items-start gap-2 text-slate-600">
-                <MapPin className="h-5 w-5 mt-0.5 text-slate-500" />
-                <span className="text-sm">{(tool as any).address}</span>
+            {(address || (lat !== null && lng !== null)) && (
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowMap((v) => !v)}
+                  className="w-full flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-left hover:bg-slate-50 transition-colors"
+                  aria-expanded={showMap}
+                >
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-slate-500" />
+                    <div className="text-sm font-semibold text-slate-800">Ubicación</div>
+                  </div>
+                  <ChevronDown className={cn("h-4 w-4 text-slate-500 transition-transform", showMap && "rotate-180")} />
+                </button>
+
+                {showMap && (
+                  <div className="mt-3 space-y-3">
+                    {address && <div className="text-sm text-slate-600">{address}</div>}
+                    {lat !== null && lng !== null && <ToolLocationMap lat={lat} lng={lng} />}
+                  </div>
+                )}
               </div>
             )}
 
-            {lat !== null && lng !== null && <ToolLocationMap lat={lat} lng={lng} />}
-
-            {typeof (tool as any).description === "string" && (
-              <div className="text-sm text-slate-700 whitespace-pre-line">{(tool as any).description}</div>
+            {description && (
+              <div className="pt-1">
+                <div className="text-sm font-semibold text-slate-800 mb-1">Descripción</div>
+                <div className={cn("text-sm text-slate-700 whitespace-pre-line", !showFullDescription && "line-clamp-5")}>
+                  {description}
+                </div>
+                {description.length > 220 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowFullDescription((v) => !v)}
+                    className="mt-2 text-sm font-semibold text-primary hover:text-orange-600"
+                  >
+                    {showFullDescription ? "Ver menos" : "Ver más"}
+                  </button>
+                )}
+              </div>
             )}
 
-            <div className="pt-2">
-              <Button className="w-full">Solicitar alquiler</Button>
+            <div className="pt-3">
+              <Button className="w-full h-11">Solicitar alquiler</Button>
+              <div className="mt-2 text-xs text-slate-500">
+                Verifica disponibilidad y coordina entrega con el propietario.
+              </div>
             </div>
           </CardContent>
         </Card>
