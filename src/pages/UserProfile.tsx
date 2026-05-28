@@ -817,9 +817,10 @@ export function UserProfile() {
               {!requestsLoading &&
                 !requestsError &&
                 requests.map((req) => {
-                  const renterUuid = String((req as any)?.renter?.uuid ?? (req as any)?.renter?._id ?? (req as any)?.renter?.id ?? "");
-                  const renterFirst = (req as any)?.renter?.firstName ?? (req as any)?.renter?.name ?? "";
-                  const renterLast = (req as any)?.renter?.lastName ?? "";
+                  const person = (req as any)?.tenant ?? (req as any)?.renter ?? (req as any)?.user ?? null;
+                  const renterUuid = String(person?.uuid ?? person?._id ?? person?.id ?? "");
+                  const renterFirst = person?.firstName ?? person?.name ?? "";
+                  const renterLast = person?.lastName ?? "";
                   const renterName = `${String(renterFirst || "Usuario")} ${String(renterLast || "")}`.trim();
                   const toolName = req.tool?.name ?? "Herramienta";
                   const statusLabel =
@@ -840,7 +841,7 @@ export function UserProfile() {
                               {statusLabel}
                             </Badge>
                             <div className="text-[10px] font-black text-slate-400 tracking-widest uppercase">
-                              {req.fromDate} → {req.toDate}
+                              {(req as any).fromDate ?? (req as any).startDate ?? "—"} → {(req as any).toDate ?? (req as any).endDate ?? "—"}
                             </div>
                           </div>
                           <div className="text-xl font-bold text-slate-900">{toolName}</div>
@@ -866,6 +867,7 @@ export function UserProfile() {
                             <Button
                               variant="secondary"
                               onClick={() => showRenterReviews(renterUuid, renterName)}
+                              disabled={!renterUuid}
                               className="h-11 px-5 rounded-xl bg-slate-50 text-slate-700 font-bold hover:bg-slate-100"
                             >
                               Ver reviews

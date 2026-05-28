@@ -22,20 +22,29 @@ export interface RentalRequestListItem {
     pricePerDay?: number;
     imageUrls?: string[];
   };
-  renter: {
-    uuid: string;
+  tenant?: {
+    uuid?: string;
+    _id?: string;
+    id?: string;
     firstName?: string;
     lastName?: string;
     email?: string;
+    name?: string;
   };
-  owner: {
-    uuid: string;
+  renter?: {
+    uuid?: string;
+    _id?: string;
+    id?: string;
     firstName?: string;
     lastName?: string;
     email?: string;
+    name?: string;
   };
-  fromDate: string;
-  toDate: string;
+  owner?: any;
+  startDate?: string;
+  endDate?: string;
+  fromDate?: string;
+  toDate?: string;
   message?: string;
   status: RentalRequestStatusValue;
   rejectionReason?: string;
@@ -80,4 +89,3 @@ export const rentalRequestService = {
     return unwrap(response);
   },
 };
-
