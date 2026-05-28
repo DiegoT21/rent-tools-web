@@ -20,14 +20,14 @@ export const authService = {
    */
   login: async (credentials: LoginCredentials) => {
     const response = await api.post('/auth/login', credentials);
-    
+
     // El backend devuelve { data: { accessToken: '...', user: {...} } }
     const { accessToken, user } = response.data.data || response.data;
-    
+
     // Guardar el accessToken y el usuario en memoria (Zustand)
     if (accessToken) useAuthStore.getState().setAccessToken(accessToken);
     if (user) useAuthStore.getState().setUser(user);
-    
+
     return response.data;
   },
 
@@ -36,12 +36,12 @@ export const authService = {
    */
   register: async (userData: RegisterData) => {
     const response = await api.post('/auth/register', userData);
-    
+
     // Si tu backend devuelve un token y usuario al registrar
     const { accessToken, user } = response.data.data || response.data;
     if (accessToken) useAuthStore.getState().setAccessToken(accessToken);
     if (user) useAuthStore.getState().setUser(user);
-    
+
     return response.data;
   },
 
@@ -61,7 +61,7 @@ export const authService = {
   logout: async () => {
     // Limpiar el estado del frontend (Zustand)
     useAuthStore.getState().clearSession();
-      
+
     // Redirigir a login
     window.location.href = '/login';
   }
