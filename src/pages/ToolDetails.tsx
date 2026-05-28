@@ -11,6 +11,8 @@ import "leaflet/dist/leaflet.css";
 import { useAuthStore } from "@/store/authStore";
 import { useNavigate } from "react-router-dom";
 import { alerts } from "@/lib/alerts";
+import Swal from "sweetalert2";
+import { rentalRequestService } from "@/services/rentalRequestService";
 
 const DefaultIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -124,6 +126,8 @@ export function ToolDetails() {
   const [showMap, setShowMap] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
+  const [requestStatusLoading, setRequestStatusLoading] = useState(false);
+  const [hasPendingRequest, setHasPendingRequest] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -174,15 +178,146 @@ export function ToolDetails() {
     setImageIndex(0);
   }, [uuid]);
 
-  const handleRequestRental = () => {
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!uuid) return;
+      const isLoggedIn = Boolean(accessToken) || Boolean(user);
+      if (!isLoggedIn) {
+        setHasPendingRequest(false);
+        return;
+      }
+
+      setRequestStatusLoading(true);
+      try {
+        const status = await rentalRequestService.getStatus(uuid);
+        if (!cancelled) setHasPendingRequest(status.hasPending);
+      } catch {
+        if (!cancelled) setHasPendingRequest(false);
+      } finally {
+        if (!cancelled) setRequestStatusLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [uuid, accessToken, user]);
+
+  const handleRequestRental = async () => {
     const isLoggedIn = Boolean(accessToken) || Boolean(user);
     if (!isLoggedIn) {
-      alerts.info("Inicia sesión", "Para solicitar un alquiler necesitas iniciar sesión.");
+      await alerts.info("Inicia sesión", "Para solicitar un alquiler necesitas iniciar sesión.");
       navigate("/login", { state: { returnTo: `/tools/${uuid ?? ""}` } });
       return;
     }
 
-    alerts.toast("Listo: continúa con tu solicitud", "success");
+    if (!uuid || !tool) return;
+    if (hasPendingRequest) {
+      await alerts.info("Solicitud pendiente", "Ya enviaste una solicitud para esta publicación. Está en revisión.");
+      return;
+    }
+
+    const pricePerDay = typeof tool.pricePerDay === "number" ? tool.pricePerDay : 0;
+    const deposit = typeof (tool as any)?.depositAmount === "number" ? (tool as any).depositAmount : 0;
+
+    const today = new Date();
+    const isoToday = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()))
+      .toISOString()
+      .slice(0, 10);
+
+    const { isConfirmed, value } = await Swal.fire({
+      title: "Confirmar solicitud",
+      html: `
+        <div style="text-align:left">
+          <div style="font-weight:700;margin-bottom:8px;">${tool.name}</div>
+          <div style="color:#64748b;margin-bottom:12px;">Precio: <b>$${pricePerDay}</b> / día${deposit ? ` · Depósito: <b>$${deposit}</b>` : ""}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+              Desde
+              <input id="rt_from" type="date" class="swal2-input" style="margin:0;height:40px" value="${isoToday}" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+              Hasta
+              <input id="rt_to" type="date" class="swal2-input" style="margin:0;height:40px" value="${isoToday}" />
+            </label>
+          </div>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+            Mensaje (opcional)
+            <input id="rt_msg" class="swal2-input" style="margin:0;height:40px" placeholder="Ej. Lo necesito para un trabajo..." />
+          </label>
+          <div id="rt_summary" style="margin-top:10px;color:#0f172a;font-size:13px;"></div>
+        </div>
+      `,
+      confirmButtonText: "Enviar solicitud",
+      showCancelButton: true,
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#f97316",
+      cancelButtonColor: "#0f172a",
+      didOpen: () => {
+        const fromEl = document.getElementById("rt_from") as HTMLInputElement | null;
+        const toEl = document.getElementById("rt_to") as HTMLInputElement | null;
+        const summaryEl = document.getElementById("rt_summary") as HTMLDivElement | null;
+        const compute = () => {
+          if (!fromEl || !toEl || !summaryEl) return;
+          const from = fromEl.value;
+          const to = toEl.value;
+          if (!from || !to) {
+            summaryEl.textContent = "";
+            return;
+          }
+          const fromDate = new Date(from + "T00:00:00");
+          const toDate = new Date(to + "T00:00:00");
+          const diffMs = toDate.getTime() - fromDate.getTime();
+          const days = Math.floor(diffMs / 86400000) + 1;
+          if (!Number.isFinite(days) || days <= 0) {
+            summaryEl.innerHTML = `<span style="color:#b91c1c;font-weight:600;">Rango de fechas inválido.</span>`;
+            return;
+          }
+          const total = pricePerDay * days + (deposit || 0);
+          summaryEl.innerHTML = `Resumen: <b>${days}</b> día(s) · Total estimado: <b>$${total}</b> ${deposit ? `<span style="color:#64748b">(incluye depósito)</span>` : ""}`;
+        };
+        fromEl?.addEventListener("change", compute);
+        toEl?.addEventListener("change", compute);
+        compute();
+      },
+      preConfirm: () => {
+        const fromEl = document.getElementById("rt_from") as HTMLInputElement | null;
+        const toEl = document.getElementById("rt_to") as HTMLInputElement | null;
+        const msgEl = document.getElementById("rt_msg") as HTMLInputElement | null;
+        const fromDate = fromEl?.value ?? "";
+        const toDate = toEl?.value ?? "";
+        if (!fromDate || !toDate) {
+          Swal.showValidationMessage("Selecciona las fechas.");
+          return;
+        }
+        if (toDate < fromDate) {
+          Swal.showValidationMessage("La fecha 'Hasta' no puede ser anterior a 'Desde'.");
+          return;
+        }
+        return { fromDate, toDate, message: (msgEl?.value ?? "").trim() };
+      },
+    });
+
+    if (!isConfirmed || !value) return;
+
+    try {
+      await rentalRequestService.create({
+        toolUuid: uuid,
+        fromDate: value.fromDate,
+        toDate: value.toDate,
+        message: value.message || undefined,
+      });
+      setHasPendingRequest(true);
+      await alerts.success("Solicitud enviada", "El propietario la verá en su sección de solicitudes.");
+    } catch (e: any) {
+      const status = e?.response?.status;
+      if (status === 409) {
+        await alerts.error("Fechas no disponibles", "Ese rango de fechas entra en conflicto con otra solicitud/reserva.");
+        return;
+      }
+      await alerts.error("No se pudo enviar", e?.response?.data?.message || "Ocurrió un error al enviar la solicitud.");
+    }
   };
 
   if (loading) {
@@ -309,8 +444,8 @@ export function ToolDetails() {
             )}
 
             <div className="pt-3">
-              <Button className="w-full h-11" onClick={handleRequestRental}>
-                Solicitar alquiler
+              <Button className="w-full h-11" onClick={handleRequestRental} disabled={requestStatusLoading || hasPendingRequest}>
+                {hasPendingRequest ? "Solicitud enviada" : requestStatusLoading ? "Verificando..." : "Solicitar alquiler"}
               </Button>
               <div className="mt-2 text-xs text-slate-500">
                 Verifica disponibilidad y coordina entrega con el propietario.

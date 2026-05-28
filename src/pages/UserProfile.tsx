@@ -37,6 +37,10 @@ import { CreateListing } from "./CreateListing";
 import { useAuthStore } from "@/store/authStore";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
+import { rentalRequestService, RentalRequestListItem } from "@/services/rentalRequestService";
+import { userService } from "@/services/userService";
+import { alerts } from "@/lib/alerts";
+import Swal from "sweetalert2";
 
 function safeParseDate(value: unknown): Date | null {
   if (typeof value === "string" || typeof value === "number") {
@@ -166,6 +170,13 @@ export function UserProfile() {
   const [inventoryTotalPages, setInventoryTotalPages] = useState<number>(1);
   const [inventorySearch, setInventorySearch] = useState("");
 
+  const [requestsMode, setRequestsMode] = useState<"received" | "sent">("received");
+  const [requests, setRequests] = useState<RentalRequestListItem[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [requestsError, setRequestsError] = useState<string | null>(null);
+  const [requestsPage, setRequestsPage] = useState(1);
+  const [requestsTotalPages, setRequestsTotalPages] = useState(1);
+
   // Redirigir a login si no hay usuario (protección de ruta)
   useEffect(() => {
     if (!accessToken) {
@@ -215,6 +226,114 @@ export function UserProfile() {
     fetchInventoryPage({ page: 1, mode: "replace" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, accessToken]);
+
+  const fetchRequestsPage = async (opts: { page: number; mode: "replace" | "append"; kind: "received" | "sent" }) => {
+    if (!accessToken) return;
+    setRequestsLoading(true);
+    setRequestsError(null);
+
+    try {
+      const result =
+        opts.kind === "received"
+          ? await rentalRequestService.getReceived(opts.page)
+          : await rentalRequestService.getSent(opts.page);
+
+      setRequests((prev) => (opts.mode === "append" ? [...prev, ...result.data] : result.data));
+      setRequestsPage(Number(result.pagination?.page ?? opts.page));
+      setRequestsTotalPages(Number(result.pagination?.totalPages ?? 1));
+    } catch (e: any) {
+      setRequests([]);
+      setRequestsError(e?.response?.data?.message || "No se pudieron cargar las solicitudes.");
+      setRequestsPage(1);
+      setRequestsTotalPages(1);
+    } finally {
+      setRequestsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!accessToken) return;
+    if (activeTab !== "solicitudes") return;
+    fetchRequestsPage({ page: 1, mode: "replace", kind: requestsMode });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, accessToken, requestsMode]);
+
+  const showRenterReviews = async (renterUuid: string, renterName: string) => {
+    try {
+      const data = await userService.getReviews(renterUuid);
+      const summary = data.summary ?? { count: 0, averageRating: 0 };
+      const reviews = Array.isArray(data.reviews) ? data.reviews : [];
+      const rows = reviews
+        .slice(0, 6)
+        .map((r) => {
+          const rating = typeof r.rating === "number" ? r.rating : 0;
+          const comment = (r.comment ?? "").toString();
+          return `<div style="padding:10px 0;border-top:1px solid #e2e8f0;">
+            <div style="font-weight:700;color:#0f172a;">${rating.toFixed(1)} / 5</div>
+            <div style="color:#334155;font-size:13px;white-space:pre-line;">${comment || "Sin comentario"}</div>
+          </div>`;
+        })
+        .join("");
+
+      await Swal.fire({
+        title: `Reviews de ${renterName}`,
+        html: `
+          <div style="text-align:left">
+            <div style="margin-bottom:10px;color:#0f172a;">
+              <b>${summary.averageRating?.toFixed?.(1) ?? summary.averageRating}</b> promedio · <b>${summary.count}</b> review(s)
+            </div>
+            <div style="max-height:320px;overflow:auto;border:1px solid #e2e8f0;border-radius:12px;padding:0 12px;">
+              ${rows || `<div style="padding:14px 0;color:#64748b;">Este usuario aún no tiene reviews.</div>`}
+            </div>
+          </div>
+        `,
+        confirmButtonText: "Listo",
+        confirmButtonColor: "#f97316",
+      });
+    } catch (e: any) {
+      await alerts.error("No se pudieron cargar los reviews", e?.response?.data?.message || "Intenta de nuevo.");
+    }
+  };
+
+  const approveRequest = async (req: RentalRequestListItem) => {
+    const ok = await alerts.confirm({
+      title: "Aprobar solicitud",
+      text: `¿Aprobar la solicitud de ${req.renter?.firstName ?? "usuario"} para "${req.tool?.name ?? "herramienta"}"?`,
+      confirmText: "Aprobar",
+      cancelText: "Cancelar",
+    });
+    if (!ok) return;
+    try {
+      await rentalRequestService.updateStatus(req.uuid, { status: "approved" });
+      await alerts.success("Aprobada", "La solicitud fue aprobada.");
+      fetchRequestsPage({ page: 1, mode: "replace", kind: "received" });
+    } catch (e: any) {
+      await alerts.error("No se pudo aprobar", e?.response?.data?.message || "Intenta de nuevo.");
+    }
+  };
+
+  const rejectRequest = async (req: RentalRequestListItem) => {
+    const { isConfirmed, value } = await Swal.fire({
+      title: "Rechazar solicitud",
+      input: "text",
+      inputLabel: "Motivo (opcional)",
+      inputPlaceholder: "Ej. No disponible en esas fechas",
+      showCancelButton: true,
+      confirmButtonText: "Rechazar",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#f97316",
+      cancelButtonColor: "#0f172a",
+      preConfirm: (val) => (typeof val === "string" ? val.trim() : ""),
+    });
+    if (!isConfirmed) return;
+    try {
+      await rentalRequestService.updateStatus(req.uuid, { status: "rejected", rejectionReason: value || undefined });
+      await alerts.success("Rechazada", "La solicitud fue rechazada.");
+      fetchRequestsPage({ page: 1, mode: "replace", kind: "received" });
+    } catch (e: any) {
+      await alerts.error("No se pudo rechazar", e?.response?.data?.message || "Intenta de nuevo.");
+    }
+  };
 
   const inventoryCards = useMemo(() => {
     const query = inventorySearch.trim().toLowerCase();
@@ -627,6 +746,156 @@ export function UserProfile() {
                   className="bg-orange-50 text-primary font-bold h-12 px-8 rounded-xl hover:bg-orange-100 transition-colors"
                 >
                   {inventoryLoading ? "Cargando..." : "Cargar más herramientas"}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "solicitudes" && (
+          <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  Cuenta <span className="text-[8px]">●</span> Solicitudes
+                </p>
+                <h1 className="text-4xl font-black text-slate-900 tracking-tight">Solicitudes</h1>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant={requestsMode === "received" ? "default" : "secondary"}
+                  onClick={() => setRequestsMode("received")}
+                  className={cn(
+                    "h-11 px-6 rounded-xl font-bold",
+                    requestsMode === "received"
+                      ? "bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-200"
+                      : "bg-slate-50 text-slate-700 hover:bg-slate-100"
+                  )}
+                >
+                  Recibidas
+                </Button>
+                <Button
+                  variant={requestsMode === "sent" ? "default" : "secondary"}
+                  onClick={() => setRequestsMode("sent")}
+                  className={cn(
+                    "h-11 px-6 rounded-xl font-bold",
+                    requestsMode === "sent"
+                      ? "bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-200"
+                      : "bg-slate-50 text-slate-700 hover:bg-slate-100"
+                  )}
+                >
+                  Enviadas
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {requestsLoading && (
+                <Card className="border-none shadow-sm bg-white">
+                  <CardContent className="p-6 text-slate-600 font-semibold">Cargando solicitudes...</CardContent>
+                </Card>
+              )}
+
+              {!requestsLoading && requestsError && (
+                <Card className="border-none shadow-sm bg-white border border-red-100">
+                  <CardContent className="p-6 text-red-600 font-semibold">{requestsError}</CardContent>
+                </Card>
+              )}
+
+              {!requestsLoading && !requestsError && requests.length === 0 && (
+                <Card className="border-none shadow-sm bg-white">
+                  <CardContent className="p-6 text-slate-600 font-semibold">
+                    No tienes solicitudes {requestsMode === "received" ? "recibidas" : "enviadas"}.
+                  </CardContent>
+                </Card>
+              )}
+
+              {!requestsLoading &&
+                !requestsError &&
+                requests.map((req) => {
+                  const renterName = `${req.renter?.firstName ?? "Usuario"} ${req.renter?.lastName ?? ""}`.trim();
+                  const toolName = req.tool?.name ?? "Herramienta";
+                  const statusLabel =
+                    req.status === "approved" ? "Aprobada" : req.status === "rejected" ? "Rechazada" : "Pendiente";
+                  const statusClass =
+                    req.status === "approved"
+                      ? "bg-green-50 text-green-700 border-green-200"
+                      : req.status === "rejected"
+                      ? "bg-red-50 text-red-700 border-red-200"
+                      : "bg-orange-50 text-orange-700 border-orange-200";
+
+                  return (
+                    <Card key={req.uuid} className="border-none shadow-sm bg-white overflow-hidden">
+                      <CardContent className="p-6 flex flex-col md:flex-row md:items-center gap-5">
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className={cn("rounded-full px-3 py-0.5 font-bold text-[10px]", statusClass)}>
+                              {statusLabel}
+                            </Badge>
+                            <div className="text-[10px] font-black text-slate-400 tracking-widest uppercase">
+                              {req.fromDate} → {req.toDate}
+                            </div>
+                          </div>
+                          <div className="text-xl font-bold text-slate-900">{toolName}</div>
+                          <div className="text-sm text-slate-600">
+                            {requestsMode === "received" ? (
+                              <span>
+                                Solicitante: <span className="font-semibold">{renterName}</span>
+                              </span>
+                            ) : (
+                              <span>
+                                Estado: <span className="font-semibold">{statusLabel}</span>
+                              </span>
+                            )}
+                          </div>
+                          {req.message && <div className="text-sm text-slate-500 line-clamp-2">“{req.message}”</div>}
+                          {req.status === "rejected" && req.rejectionReason && (
+                            <div className="text-sm text-red-600">Motivo: {req.rejectionReason}</div>
+                          )}
+                        </div>
+
+                        {requestsMode === "received" && (
+                          <div className="flex gap-2 shrink-0">
+                            <Button
+                              variant="secondary"
+                              onClick={() => showRenterReviews(req.renter.uuid, renterName)}
+                              className="h-11 px-5 rounded-xl bg-slate-50 text-slate-700 font-bold hover:bg-slate-100"
+                            >
+                              Ver reviews
+                            </Button>
+
+                            <Button
+                              onClick={() => approveRequest(req)}
+                              disabled={req.status !== "pending"}
+                              className="h-11 px-5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold"
+                            >
+                              Aprobar
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              onClick={() => rejectRequest(req)}
+                              disabled={req.status !== "pending"}
+                              className="h-11 px-5 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50"
+                            >
+                              Rechazar
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+            </div>
+
+            <div className="flex justify-center pt-4">
+              {requestsPage < requestsTotalPages && (
+                <Button
+                  variant="secondary"
+                  disabled={requestsLoading}
+                  onClick={() => fetchRequestsPage({ page: requestsPage + 1, mode: "append", kind: requestsMode })}
+                  className="bg-orange-50 text-primary font-bold h-12 px-8 rounded-xl hover:bg-orange-100 transition-colors"
+                >
+                  {requestsLoading ? "Cargando..." : "Cargar más"}
                 </Button>
               )}
             </div>
