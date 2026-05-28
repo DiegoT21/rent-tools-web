@@ -3,6 +3,7 @@ import { api } from "@/lib/api";
 export interface PublicTool {
   id?: string;
   _id?: string;
+  uuid?: string;
   name: string;
   category?: string;
   pricePerDay?: number;
@@ -10,12 +11,33 @@ export interface PublicTool {
   imageUrl?: string;
   images?: string[];
   mediaUrls?: string[];
+  fileKeys?: string[];
+  photos?: string[];
+  coverUrl?: string;
+  thumbnailUrl?: string;
   isAvailable?: boolean;
 }
 
 const normalizeArray = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];
   return value.filter((v): v is string => typeof v === "string" && v.length > 0);
+};
+
+const mediaBaseUrl =
+  (import.meta as any).env?.VITE_MEDIA_PUBLIC_BASE_URL ||
+  (import.meta as any).env?.VITE_S3_PUBLIC_BASE_URL ||
+  "";
+
+const isAbsoluteUrl = (value: string) => /^https?:\/\//i.test(value);
+
+const resolveMaybeKeyToUrl = (value: string): string | null => {
+  if (!value) return null;
+  if (isAbsoluteUrl(value)) return value;
+  if (!mediaBaseUrl) return null;
+
+  const base = String(mediaBaseUrl).replace(/\/+$/, "");
+  const path = value.replace(/^\/+/, "");
+  return `${base}/${path}`;
 };
 
 export const toolService = {
@@ -29,16 +51,25 @@ export const toolService = {
   },
 
   getToolCoverImage: (tool: PublicTool): string | null => {
-    const candidates = [
+    const rawCandidates = [
+      tool.coverUrl,
+      tool.thumbnailUrl,
       tool.imageUrl,
+      ...normalizeArray(tool.photos),
       ...normalizeArray(tool.images),
       ...normalizeArray(tool.mediaUrls),
+      ...normalizeArray(tool.fileKeys),
     ].filter((v): v is string => typeof v === "string" && v.length > 0);
 
-    return candidates[0] ?? null;
+    for (const raw of rawCandidates) {
+      const resolved = resolveMaybeKeyToUrl(raw);
+      if (resolved) return resolved;
+    }
+
+    return null;
   },
 
   getToolId: (tool: PublicTool): string => {
-    return String(tool.id ?? tool._id ?? "");
+    return String(tool.uuid ?? tool.id ?? tool._id ?? "");
   },
 };
