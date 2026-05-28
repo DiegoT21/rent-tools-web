@@ -8,6 +8,8 @@ import { PublicTool, toolService } from "@/services/toolService";
 import { MapContainer, Marker, TileLayer } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { useAuthStore } from "@/store/authStore";
+import { useNavigate } from "react-router-dom";
 
 const DefaultIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -112,6 +114,9 @@ function ToolLocationMap({ lat, lng }: { lat: number; lng: number }) {
 
 export function ToolDetails() {
   const { uuid } = useParams();
+  const navigate = useNavigate();
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const user = useAuthStore((s) => s.user);
   const [tool, setTool] = useState<PublicTool | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -150,12 +155,33 @@ export function ToolDetails() {
   const address = typeof (tool as any)?.address === "string" ? (tool as any).address : null;
   const brand = typeof (tool as any)?.brand === "string" ? (tool as any).brand : null;
   const description = typeof (tool as any)?.description === "string" ? (tool as any).description : null;
-  const usageLevel = typeof (tool as any)?.usageLevel === "string" ? (tool as any).usageLevel : null;
+  const usageLevelRaw = typeof (tool as any)?.usageLevel === "string" ? (tool as any).usageLevel : null;
+  const usageLevel = useMemo(() => {
+    const value = (usageLevelRaw ?? "").toLowerCase();
+    if (!value) return null;
+    const map: Record<string, string> = {
+      new: "Nuevo",
+      excellent: "Excelente",
+      good: "Bueno",
+      fair: "Regular",
+    };
+    return map[value] ?? usageLevelRaw;
+  }, [usageLevelRaw]);
   const depositAmount = typeof (tool as any)?.depositAmount === "number" ? (tool as any).depositAmount : null;
 
   useEffect(() => {
     setImageIndex(0);
   }, [uuid]);
+
+  const handleRequestRental = () => {
+    const isLoggedIn = Boolean(accessToken) || Boolean(user);
+    if (!isLoggedIn) {
+      navigate("/login", { state: { returnTo: `/tools/${uuid ?? ""}` } });
+      return;
+    }
+
+    alert("OK: aquí iría el flujo de solicitud de alquiler.");
+  };
 
   if (loading) {
     return <div className="max-w-5xl mx-auto py-10 px-4 text-slate-600">Cargando publicación...</div>;
@@ -281,7 +307,9 @@ export function ToolDetails() {
             )}
 
             <div className="pt-3">
-              <Button className="w-full h-11">Solicitar alquiler</Button>
+              <Button className="w-full h-11" onClick={handleRequestRental}>
+                Solicitar alquiler
+              </Button>
               <div className="mt-2 text-xs text-slate-500">
                 Verifica disponibilidad y coordina entrega con el propietario.
               </div>
