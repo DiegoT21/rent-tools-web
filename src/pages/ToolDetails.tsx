@@ -5,6 +5,18 @@ import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PublicTool, toolService } from "@/services/toolService";
+import { MapContainer, Marker, TileLayer } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
+const DefaultIcon = L.icon({
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+});
+
+L.Marker.prototype.options.icon = DefaultIcon;
 
 function ImageCarousel({ images, alt }: { images: string[]; alt: string }) {
   const pics = images.slice(0, 3);
@@ -53,6 +65,22 @@ function ImageCarousel({ images, alt }: { images: string[]; alt: string }) {
   );
 }
 
+function ToolLocationMap({ lat, lng }: { lat: number; lng: number }) {
+  const center: [number, number] = [lat, lng];
+
+  return (
+    <div className="relative rounded-2xl overflow-hidden h-[280px] border border-slate-200 bg-slate-100">
+      <MapContainer center={center} zoom={15} style={{ width: "100%", height: "100%" }} scrollWheelZoom={false}>
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        <Marker position={center} />
+      </MapContainer>
+    </div>
+  );
+}
+
 export function ToolDetails() {
   const { uuid } = useParams();
   const [tool, setTool] = useState<PublicTool | null>(null);
@@ -85,6 +113,8 @@ export function ToolDetails() {
   }, [uuid]);
 
   const images = useMemo(() => (tool ? toolService.getToolImages(tool, 3) : []), [tool]);
+  const lat = typeof (tool as any)?.latitude === "number" ? (tool as any).latitude : null;
+  const lng = typeof (tool as any)?.longitude === "number" ? (tool as any).longitude : null;
 
   if (loading) {
     return <div className="max-w-5xl mx-auto py-10 px-4 text-slate-600">Cargando publicación...</div>;
@@ -129,6 +159,8 @@ export function ToolDetails() {
               </div>
             )}
 
+            {lat !== null && lng !== null && <ToolLocationMap lat={lat} lng={lng} />}
+
             {typeof (tool as any).description === "string" && (
               <div className="text-sm text-slate-700 whitespace-pre-line">{(tool as any).description}</div>
             )}
@@ -142,4 +174,3 @@ export function ToolDetails() {
     </div>
   );
 }
-
