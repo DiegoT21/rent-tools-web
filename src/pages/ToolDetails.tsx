@@ -173,6 +173,15 @@ export function ToolDetails() {
     return map[value] ?? usageLevelRaw;
   }, [usageLevelRaw]);
   const depositAmount = typeof (tool as any)?.depositAmount === "number" ? (tool as any).depositAmount : null;
+  const ownerUuid = typeof (tool as any)?.owner?.uuid === "string" ? (tool as any).owner.uuid : null;
+  const currentUserUuid =
+    typeof (user as any)?.uuid === "string"
+      ? (user as any).uuid
+      : typeof (user as any)?._id === "string"
+      ? (user as any)._id
+      : typeof (user as any)?.id === "string"
+      ? (user as any).id
+      : null;
 
   useEffect(() => {
     setImageIndex(0);
@@ -213,6 +222,10 @@ export function ToolDetails() {
     }
 
     if (!uuid || !tool) return;
+    if (ownerUuid && currentUserUuid && ownerUuid === currentUserUuid) {
+      await alerts.warning("Acción no permitida", "No puedes solicitar el alquiler de tu propia herramienta.");
+      return;
+    }
     if (hasPendingRequest) {
       await alerts.info("Solicitud pendiente", "Ya enviaste una solicitud para esta publicación. Está en revisión.");
       return;
