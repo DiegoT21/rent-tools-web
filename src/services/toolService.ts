@@ -9,6 +9,7 @@ export interface PublicTool {
   pricePerDay?: number;
   rating?: number;
   imageUrl?: string;
+  imageUrls?: string[];
   images?: string[];
   mediaUrls?: string[];
   fileKeys?: string[];
@@ -55,6 +56,7 @@ export const toolService = {
       tool.coverUrl,
       tool.thumbnailUrl,
       tool.imageUrl,
+      ...normalizeArray(tool.imageUrls),
       ...normalizeArray(tool.photos),
       ...normalizeArray(tool.images),
       ...normalizeArray(tool.mediaUrls),
