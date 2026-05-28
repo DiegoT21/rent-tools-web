@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { alerts } from "@/lib/alerts";
 import Swal from "sweetalert2";
 import { rentalRequestService } from "@/services/rentalRequestService";
+import { userService, UserReview } from "@/services/userService";
 
 const DefaultIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -128,6 +129,11 @@ export function ToolDetails() {
   const [imageIndex, setImageIndex] = useState(0);
   const [requestStatusLoading, setRequestStatusLoading] = useState(false);
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
+  const [ownerReviewsLoading, setOwnerReviewsLoading] = useState(false);
+  const [ownerReviewsError, setOwnerReviewsError] = useState<string | null>(null);
+  const [ownerReviews, setOwnerReviews] = useState<UserReview[]>([]);
+  const [ownerSummary, setOwnerSummary] = useState<{ count: number; averageRating: number } | null>(null);
+  const [showOwnerReviews, setShowOwnerReviews] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -174,6 +180,10 @@ export function ToolDetails() {
   }, [usageLevelRaw]);
   const depositAmount = typeof (tool as any)?.depositAmount === "number" ? (tool as any).depositAmount : null;
   const ownerUuid = typeof (tool as any)?.owner?.uuid === "string" ? (tool as any).owner.uuid : null;
+  const ownerName =
+    typeof (tool as any)?.owner?.firstName === "string"
+      ? `${(tool as any).owner.firstName}${typeof (tool as any).owner.lastName === "string" ? ` ${(tool as any).owner.lastName}` : ""}`.trim()
+      : null;
   const currentUserUuid =
     typeof (user as any)?.uuid === "string"
       ? (user as any).uuid
@@ -186,6 +196,54 @@ export function ToolDetails() {
   useEffect(() => {
     setImageIndex(0);
   }, [uuid]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!ownerUuid) {
+        setOwnerReviews([]);
+        setOwnerSummary(null);
+        return;
+      }
+      setOwnerReviewsLoading(true);
+      setOwnerReviewsError(null);
+      try {
+        const data = await userService.getReviews(ownerUuid);
+        if (cancelled) return;
+        setOwnerReviews(data.reviews ?? []);
+        setOwnerSummary(data.summary ?? { count: 0, averageRating: 0 });
+      } catch (e: any) {
+        if (cancelled) return;
+        setOwnerReviews([]);
+        setOwnerSummary(null);
+        setOwnerReviewsError(e?.response?.data?.message || "No se pudieron cargar los reviews del propietario.");
+      } finally {
+        if (!cancelled) setOwnerReviewsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ownerUuid]);
+
+  const StarRow = ({ rating }: { rating: number }) => {
+    const full = Math.round(Math.max(0, Math.min(5, rating)));
+    return (
+      <div className="flex items-center gap-1">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <span
+            key={i}
+            className={cn(
+              "inline-block h-2.5 w-2.5 rounded-full",
+              i < full ? "bg-orange-500" : "bg-slate-200"
+            )}
+            aria-hidden="true"
+          />
+        ))}
+      </div>
+    );
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -452,6 +510,88 @@ export function ToolDetails() {
                   >
                     {showFullDescription ? "Ver menos" : "Ver más"}
                   </button>
+                )}
+              </div>
+            )}
+
+            {(ownerUuid || ownerName) && (
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowOwnerReviews((v) => !v)}
+                  className="w-full flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-left hover:bg-slate-50 transition-colors"
+                  aria-expanded={showOwnerReviews}
+                >
+                  <div className="flex flex-col">
+                    <div className="text-sm font-semibold text-slate-800">
+                      Publicado por {ownerName ?? "Propietario"}
+                    </div>
+                    {ownerSummary && (
+                      <div className="mt-1 flex items-center gap-2 text-xs text-slate-600">
+                        <StarRow rating={ownerSummary.averageRating ?? 0} />
+                        <span>
+                          {(ownerSummary.averageRating ?? 0).toFixed(1)} · {ownerSummary.count} review(s)
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <ChevronDown className={cn("h-4 w-4 text-slate-500 transition-transform", showOwnerReviews && "rotate-180")} />
+                </button>
+
+                {showOwnerReviews && (
+                  <div className="mt-3 space-y-2">
+                    {ownerReviewsLoading && <div className="text-sm text-slate-600">Cargando reviews...</div>}
+                    {!ownerReviewsLoading && ownerReviewsError && (
+                      <div className="text-sm text-red-600">{ownerReviewsError}</div>
+                    )}
+                    {!ownerReviewsLoading && !ownerReviewsError && ownerReviews.length === 0 && (
+                      <div className="text-sm text-slate-600">Este propietario aún no tiene reviews.</div>
+                    )}
+                    {!ownerReviewsLoading &&
+                      !ownerReviewsError &&
+                      ownerReviews.slice(0, 4).map((r, idx) => (
+                        <div key={r.uuid ?? idx} className="rounded-xl border border-slate-200 bg-white p-3">
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm font-semibold text-slate-800">
+                              {typeof r.rating === "number" ? r.rating.toFixed(1) : "—"} / 5
+                            </div>
+                            <div className="text-xs text-slate-500">
+                              {typeof r.createdAt === "string" ? new Date(r.createdAt).toLocaleDateString() : ""}
+                            </div>
+                          </div>
+                          <div className="mt-1 text-sm text-slate-700 whitespace-pre-line">{r.comment || "Sin comentario"}</div>
+                        </div>
+                      ))}
+                    {!ownerReviewsLoading && !ownerReviewsError && ownerReviews.length > 4 && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const summaryText = ownerSummary
+                            ? `<div style="margin-bottom:10px;color:#0f172a;"><b>${(ownerSummary.averageRating ?? 0).toFixed(
+                                1
+                              )}</b> promedio · <b>${ownerSummary.count}</b> review(s)</div>`
+                            : "";
+                          const rows = ownerReviews
+                            .map(
+                              (rev) => `<div style="padding:10px 0;border-top:1px solid #e2e8f0;">
+                                <div style="font-weight:700;color:#0f172a;">${(rev.rating ?? 0).toFixed(1)} / 5</div>
+                                <div style="color:#334155;font-size:13px;white-space:pre-line;">${(rev.comment ?? "Sin comentario").toString()}</div>
+                              </div>`
+                            )
+                            .join("");
+                          await Swal.fire({
+                            title: `Reviews de ${ownerName ?? "propietario"}`,
+                            html: `<div style="text-align:left">${summaryText}<div style="max-height:340px;overflow:auto;border:1px solid #e2e8f0;border-radius:12px;padding:0 12px;">${rows}</div></div>`,
+                            confirmButtonText: "Listo",
+                            confirmButtonColor: "#f97316",
+                          });
+                        }}
+                        className="text-sm font-semibold text-primary hover:text-orange-600"
+                      >
+                        Ver todos los reviews
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             )}
