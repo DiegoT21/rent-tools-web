@@ -51,7 +51,7 @@ export const toolService = {
     return [];
   },
 
-  getToolCoverImage: (tool: PublicTool): string | null => {
+  getToolImages: (tool: PublicTool, limit = 3): string[] => {
     const rawCandidates = [
       tool.coverUrl,
       tool.thumbnailUrl,
@@ -63,12 +63,21 @@ export const toolService = {
       ...normalizeArray(tool.fileKeys),
     ].filter((v): v is string => typeof v === "string" && v.length > 0);
 
+    const unique: string[] = [];
+    const seen = new Set<string>();
     for (const raw of rawCandidates) {
       const resolved = resolveMaybeKeyToUrl(raw);
-      if (resolved) return resolved;
+      if (!resolved) continue;
+      if (seen.has(resolved)) continue;
+      seen.add(resolved);
+      unique.push(resolved);
+      if (unique.length >= limit) break;
     }
+    return unique;
+  },
 
-    return null;
+  getToolCoverImage: (tool: PublicTool): string | null => {
+    return toolService.getToolImages(tool, 1)[0] ?? null;
   },
 
   getToolId: (tool: PublicTool): string => {

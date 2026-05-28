@@ -1,10 +1,70 @@
 import { useEffect, useMemo, useState } from "react";
-import { Star, ShoppingCart, ChevronRight } from "lucide-react";
+import { Star, ShoppingCart, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PublicTool, toolService } from "@/services/toolService";
+import { cn } from "@/lib/utils";
 
 const fallbackImage =
   "https://images.unsplash.com/photo-1504148455328-c376907d081c?q=80&w=600&auto=format&fit=crop";
+
+function ToolImageCarousel({ images, alt }: { images: string[]; alt: string }) {
+  const pics = (images.length ? images : [fallbackImage]).slice(0, 3);
+  const [index, setIndex] = useState(0);
+  const hasArrows = pics.length > 1 && images.length > 1;
+
+  const prev = () => setIndex((i) => (i - 1 + pics.length) % pics.length);
+  const next = () => setIndex((i) => (i + 1) % pics.length);
+
+  return (
+    <div className="relative pt-[70%] overflow-hidden bg-slate-100">
+      <img
+        src={pics[index]}
+        alt={alt}
+        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+      />
+
+      {hasArrows && (
+        <>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              prev();
+            }}
+            className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-white/90 border border-slate-200 text-slate-700 hover:bg-white grid place-items-center"
+            aria-label="Imagen anterior"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              next();
+            }}
+            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-white/90 border border-slate-200 text-slate-700 hover:bg-white grid place-items-center"
+            aria-label="Imagen siguiente"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </>
+      )}
+
+      {images.length > 1 && (
+        <div className="absolute bottom-2 left-0 right-0 flex items-center justify-center gap-1.5">
+          {pics.map((_, i) => (
+            <span
+              key={i}
+              className={cn("h-1.5 w-1.5 rounded-full", i === index ? "bg-primary" : "bg-white/80")}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function PopularInventory() {
   const [tools, setTools] = useState<PublicTool[]>([]);
@@ -54,7 +114,7 @@ export function PopularInventory() {
 
         {visibleTools.map((tool) => {
           const id = toolService.getToolId(tool) || tool.name;
-          const image = toolService.getToolCoverImage(tool) ?? fallbackImage;
+          const images = toolService.getToolImages(tool, 3);
           const category = (tool.category ?? "HERRAMIENTAS").toString().toUpperCase();
           const rating = typeof tool.rating === "number" ? tool.rating : 4.8;
           const price = typeof tool.pricePerDay === "number" ? tool.pricePerDay : 0;
@@ -64,13 +124,7 @@ export function PopularInventory() {
               key={id}
               className="overflow-hidden border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 group cursor-pointer bg-white"
             >
-              <div className="relative pt-[70%] overflow-hidden bg-slate-100">
-                <img
-                  src={image}
-                  alt={tool.name}
-                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                />
-              </div>
+              <ToolImageCarousel images={images} alt={tool.name} />
               <CardContent className="p-5">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">{category}</span>
@@ -98,4 +152,3 @@ export function PopularInventory() {
     </div>
   );
 }
-
