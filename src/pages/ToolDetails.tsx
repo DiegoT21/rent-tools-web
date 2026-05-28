@@ -10,6 +10,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useAuthStore } from "@/store/authStore";
 import { useNavigate } from "react-router-dom";
+import { alerts } from "@/lib/alerts";
 
 const DefaultIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -176,11 +177,12 @@ export function ToolDetails() {
   const handleRequestRental = () => {
     const isLoggedIn = Boolean(accessToken) || Boolean(user);
     if (!isLoggedIn) {
+      alerts.info("Inicia sesión", "Para solicitar un alquiler necesitas iniciar sesión.");
       navigate("/login", { state: { returnTo: `/tools/${uuid ?? ""}` } });
       return;
     }
 
-    alert("OK: aquí iría el flujo de solicitud de alquiler.");
+    alerts.toast("Listo: continúa con tu solicitud", "success");
   };
 
   if (loading) {

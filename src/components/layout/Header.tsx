@@ -3,6 +3,7 @@ import { Search, Bell, User, MapPin, ShieldCheck, ShieldAlert } from "lucide-rea
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/useAuthStore";
+import { alerts } from "@/lib/alerts";
 
 export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () => void, isSidebarOpen?: boolean }) {
   const navigate = useNavigate();
@@ -11,7 +12,7 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
   const handlePublicarClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (user && !user.isVerified) {
       e.preventDefault();
-      alert("Debes verificar tu identidad primero para poder publicar herramientas.");
+      alerts.warning("Verificación requerida", "Debes verificar tu identidad primero para poder publicar herramientas.");
       navigate("/register/step-2");
     } else if (!user) {
       e.preventDefault();

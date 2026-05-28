@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
+import { alerts } from "@/lib/alerts";
 
 export enum ToolUsageLevel {
   NEW = 'new',
@@ -137,17 +138,17 @@ export function CreateListing() {
 
   const handleSubmit = async () => {
     if (!user) {
-      alert("Debes iniciar sesión para publicar una herramienta.");
+      await alerts.warning("Inicia sesión", "Debes iniciar sesión para publicar una herramienta.");
       return;
     }
 
     if (!location) {
-      alert("Por favor establece una ubicación en el mapa.");
+      await alerts.warning("Falta ubicación", "Por favor establece una ubicación en el mapa.");
       return;
     }
 
     if (selectedMediaFiles.length < 3) {
-      alert("Debes seleccionar al menos 3 fotos para publicar la herramienta.");
+      await alerts.warning("Faltan fotos", "Debes seleccionar al menos 3 fotos para publicar la herramienta.");
       return;
     }
 
@@ -155,7 +156,7 @@ export function CreateListing() {
     setUploadProgress(null);
     try {
       if (!invoiceFile) {
-        alert("Debes subir la factura/comprobante para publicar la herramienta.");
+        await alerts.warning("Falta comprobante", "Debes subir la factura/comprobante para publicar la herramienta.");
         return;
       }
 
@@ -192,12 +193,11 @@ export function CreateListing() {
       const response = await api.post("/tools", payload);
 
       if (response.data) {
-        alert("Herramienta publicada exitosamente!");
-        // Aquí podrías redirigir al usuario o limpiar el formulario
+        await alerts.success("Publicado", "Herramienta publicada exitosamente.");
       }
     } catch (error: any) {
       console.error("Error al publicar la herramienta:", error);
-      alert(error.response?.data?.message || "Ocurrió un error al publicar la herramienta.");
+      await alerts.error("No se pudo publicar", error.response?.data?.message || "Ocurrió un error al publicar la herramienta.");
     } finally {
       setLoading(false);
       setUploadProgress(null);

@@ -11,6 +11,7 @@ import {
 import { Button } from "../components/ui/button";
 import { WebcamCapture } from "../components/ui/WebcamCapture";
 import { useAuthStore } from "../store/useAuthStore";
+import { alerts } from "@/lib/alerts";
 
 
 export function RegisterStepThree() {
@@ -37,7 +38,7 @@ export function RegisterStepThree() {
 
   const handleFinish = async () => {
     if (!selfieImage) {
-      alert("Por favor, toma una selfie para continuar.");
+      await alerts.warning("Falta selfie", "Por favor, toma una selfie para continuar.");
       return;
     }
 
@@ -66,7 +67,7 @@ export function RegisterStepThree() {
 
       if (response.ok && data.verified) {
         console.log("Similitud de rostros exitosa", data);
-        alert("¡Registro completado! Identidad verificada con éxito.");
+        await alerts.success("Registro completado", "Identidad verificada con éxito.");
         
         // Guardar token y obtener perfil si hay accessToken
         if (accessToken) {
