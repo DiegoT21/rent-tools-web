@@ -18,14 +18,23 @@ const DefaultIcon = L.icon({
 
 L.Marker.prototype.options.icon = DefaultIcon;
 
-function ImageCarousel({ images, alt }: { images: string[]; alt: string }) {
+function ImageCarousel({
+  images,
+  alt,
+  index,
+  onIndexChange,
+}: {
+  images: string[];
+  alt: string;
+  index: number;
+  onIndexChange: (next: number) => void;
+}) {
   const pics = images.slice(0, 3);
-  const [index, setIndex] = useState(0);
 
   if (pics.length === 0) return null;
 
-  const prev = () => setIndex((i) => (i - 1 + pics.length) % pics.length);
-  const next = () => setIndex((i) => (i + 1) % pics.length);
+  const prev = () => onIndexChange((index - 1 + pics.length) % pics.length);
+  const next = () => onIndexChange((index + 1) % pics.length);
 
   return (
     <div className="w-full">
@@ -57,7 +66,16 @@ function ImageCarousel({ images, alt }: { images: string[]; alt: string }) {
       {pics.length > 1 && (
         <div className="mt-2 flex items-center justify-center gap-1.5">
           {pics.map((_, i) => (
-            <span key={i} className={cn("h-2 w-2 rounded-full", i === index ? "bg-primary" : "bg-slate-200")} />
+            <button
+              key={i}
+              type="button"
+              onClick={() => onIndexChange(i)}
+              className={cn(
+                "h-2 w-2 rounded-full transition-colors",
+                i === index ? "bg-primary" : "bg-slate-200 hover:bg-slate-300"
+              )}
+              aria-label={`Ir a imagen ${i + 1}`}
+            />
           ))}
         </div>
       )}
@@ -99,6 +117,7 @@ export function ToolDetails() {
   const [error, setError] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
+  const [imageIndex, setImageIndex] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -131,6 +150,12 @@ export function ToolDetails() {
   const address = typeof (tool as any)?.address === "string" ? (tool as any).address : null;
   const brand = typeof (tool as any)?.brand === "string" ? (tool as any).brand : null;
   const description = typeof (tool as any)?.description === "string" ? (tool as any).description : null;
+  const usageLevel = typeof (tool as any)?.usageLevel === "string" ? (tool as any).usageLevel : null;
+  const depositAmount = typeof (tool as any)?.depositAmount === "number" ? (tool as any).depositAmount : null;
+
+  useEffect(() => {
+    setImageIndex(0);
+  }, [uuid]);
 
   if (loading) {
     return <div className="max-w-5xl mx-auto py-10 px-4 text-slate-600">Cargando publicación...</div>;
@@ -147,7 +172,54 @@ export function ToolDetails() {
   return (
     <div className="max-w-5xl mx-auto py-10 px-4">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-        <ImageCarousel images={images} alt={tool.name} />
+        <div className="space-y-4">
+          <ImageCarousel images={images} alt={tool.name} index={imageIndex} onIndexChange={setImageIndex} />
+
+          {images.length > 1 && (
+            <div className="grid grid-cols-3 gap-3">
+              {images.slice(0, 3).map((src, i) => (
+                <button
+                  key={src}
+                  type="button"
+                  onClick={() => setImageIndex(i)}
+                  className={cn(
+                    "relative aspect-[16/10] rounded-xl overflow-hidden border bg-slate-100",
+                    i === imageIndex ? "border-primary ring-2 ring-primary/20" : "border-slate-200 hover:border-slate-300"
+                  )}
+                  aria-label={`Ver imagen ${i + 1}`}
+                >
+                  <img src={src} alt={`${tool.name} ${i + 1}`} className="absolute inset-0 w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
+
+          <Card className="border-slate-100 shadow-sm">
+            <CardContent className="p-5">
+              <div className="text-sm font-semibold text-slate-800 mb-3">Detalles rápidos</div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="text-xs text-slate-500">Estado</div>
+                  <div className="font-semibold text-slate-800">{tool.isAvailable ? "Disponible" : "No disponible"}</div>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="text-xs text-slate-500">Uso</div>
+                  <div className="font-semibold text-slate-800">{usageLevel ?? "—"}</div>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="text-xs text-slate-500">Depósito</div>
+                  <div className="font-semibold text-slate-800">
+                    {typeof depositAmount === "number" ? `$${depositAmount}` : "—"}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="text-xs text-slate-500">Categoría</div>
+                  <div className="font-semibold text-slate-800">{(tool.category ?? "—").toString()}</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         <Card className="border-slate-100 shadow-sm">
           <CardContent className="p-6 space-y-4">
