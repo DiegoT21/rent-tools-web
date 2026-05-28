@@ -51,6 +51,14 @@ export const toolService = {
     return [];
   },
 
+  getToolByUuid: async (uuid: string): Promise<PublicTool | null> => {
+    if (!uuid) return null;
+    const response = await api.get(`/tools/${encodeURIComponent(uuid)}`);
+    const data = (response as any).data?.data ?? (response as any).data;
+    if (data && typeof data === "object") return data as PublicTool;
+    return null;
+  },
+
   getToolImages: (tool: PublicTool, limit = 3): string[] => {
     const rawCandidates = [
       tool.coverUrl,

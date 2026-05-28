@@ -8,6 +8,7 @@ import { RegisterStepTwo } from './pages/RegisterStepTwo'
 import { RegisterStepThree } from './pages/RegisterStepThree'
 import { CreateListing } from './pages/CreateListing'
 import { UserProfile } from './pages/UserProfile'
+import { ToolDetails } from './pages/ToolDetails'
 
 function App() {
   return (
@@ -21,6 +22,11 @@ function App() {
         <Route path="/create-listing" element={
           <RootLayout>
             <CreateListing />
+          </RootLayout>
+        } />
+        <Route path="/tools/:uuid" element={
+          <RootLayout>
+            <ToolDetails />
           </RootLayout>
         } />
         <Route path="/profile" element={

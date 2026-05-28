@@ -3,6 +3,7 @@ import { Star, ShoppingCart, ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PublicTool, toolService } from "@/services/toolService";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
 
 const fallbackImage =
   "https://images.unsplash.com/photo-1504148455328-c376907d081c?q=80&w=600&auto=format&fit=crop";
@@ -67,6 +68,7 @@ function ToolImageCarousel({ images, alt }: { images: string[]; alt: string }) {
 }
 
 export function PopularInventory() {
+  const navigate = useNavigate();
   const [tools, setTools] = useState<PublicTool[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -118,11 +120,15 @@ export function PopularInventory() {
           const category = (tool.category ?? "HERRAMIENTAS").toString().toUpperCase();
           const rating = typeof tool.rating === "number" ? tool.rating : 4.8;
           const price = typeof tool.pricePerDay === "number" ? tool.pricePerDay : 0;
+          const uuid = String((tool as any).uuid ?? toolService.getToolId(tool) ?? "");
 
           return (
             <Card
               key={id}
               className="overflow-hidden border-slate-100 shadow-sm hover:shadow-xl transition-all duration-300 group cursor-pointer bg-white"
+              onClick={() => {
+                if (uuid) navigate(`/tools/${uuid}`);
+              }}
             >
               <ToolImageCarousel images={images} alt={tool.name} />
               <CardContent className="p-5">
@@ -140,7 +146,14 @@ export function PopularInventory() {
                     <span className="text-xl font-bold text-slate-900">${price}</span>
                     <span className="text-xs text-slate-500 font-medium">/día</span>
                   </div>
-                  <button className="bg-slate-900 hover:bg-primary text-white p-2.5 rounded-lg transition-colors group-hover:shadow-md">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    className="bg-slate-900 hover:bg-primary text-white p-2.5 rounded-lg transition-colors group-hover:shadow-md"
+                  >
                     <ShoppingCart className="h-4 w-4" />
                   </button>
                 </div>
