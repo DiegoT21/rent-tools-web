@@ -28,6 +28,9 @@ export function CreateListing() {
   console.log("Usuario actual en el store:", user);
   const [loading, setLoading] = useState(false);
   const [location, setLocation] = useState<{ address: string; lat: number; lng: number } | null>(null);
+  const [selectedMediaFiles, setSelectedMediaFiles] = useState<File[]>([]);
+  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -57,6 +60,81 @@ export function CreateListing() {
     setLocation(selectedLocation);
   };
 
+  const handleMediaFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const newFiles = Array.from(e.target.files);
+    setSelectedMediaFiles((prev) => {
+      const merged = [...prev, ...newFiles];
+      const seen = new Set<string>();
+      const deduped: File[] = [];
+
+      for (const file of merged) {
+        const key = `${file.name}__${file.size}__${file.lastModified}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(file);
+      }
+
+      return deduped.slice(0, 12);
+    });
+
+    // Permite volver a seleccionar el mismo archivo en el próximo click
+    e.target.value = "";
+  };
+
+  const handleInvoiceFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.[0]) return;
+    setInvoiceFile(e.target.files[0]);
+  };
+
+  const getUploadUrlAndKey = async (file: File, isPrivate: boolean) => {
+    const response = await api.post("/media/upload-url", {
+      fileName: file.name,
+      contentType: file.type || "application/octet-stream",
+      isPrivate,
+    });
+
+    const data = (response as any).data?.data ?? (response as any).data;
+    const uploadUrl = data?.uploadUrl ?? data?.url ?? data?.signedUrl;
+    const fileKey = data?.fileKey ?? data?.key;
+    const method = (data?.method ?? (data?.fields ? "POST" : "PUT")) as "PUT" | "POST";
+    const fields = (data?.fields ?? null) as Record<string, string> | null;
+
+    if (!uploadUrl || !fileKey) {
+      throw new Error("Respuesta inválida de /media/upload-url (faltan uploadUrl o fileKey).");
+    }
+
+    return { uploadUrl: String(uploadUrl), fileKey: String(fileKey), method, fields };
+  };
+
+  const uploadToPresignedUrl = async (signed: { uploadUrl: string; method: "PUT" | "POST"; fields: Record<string, string> | null }, file: File) => {
+    if (signed.method === "POST" && signed.fields) {
+      const form = new FormData();
+      for (const [k, v] of Object.entries(signed.fields)) form.append(k, v);
+      form.append("file", file);
+
+      const res = await fetch(signed.uploadUrl, { method: "POST", body: form });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        throw new Error(`Falló la subida a S3 (POST) (HTTP ${res.status}) ${body}`.trim());
+      }
+      return;
+    }
+
+    const res = await fetch(signed.uploadUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": file.type || "application/octet-stream",
+      },
+      body: file,
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`Falló la subida a S3 (PUT) (HTTP ${res.status}) ${body}`.trim());
+    }
+  };
+
   const handleSubmit = async () => {
     if (!user) {
       alert("Debes iniciar sesión para publicar una herramienta.");
@@ -68,22 +146,46 @@ export function CreateListing() {
       return;
     }
 
+    if (selectedMediaFiles.length < 3) {
+      alert("Debes seleccionar al menos 3 fotos para publicar la herramienta.");
+      return;
+    }
+
     setLoading(true);
+    setUploadProgress(null);
     try {
+      if (!invoiceFile) {
+        alert("Debes subir la factura/comprobante para publicar la herramienta.");
+        return;
+      }
+
+      setUploadProgress("Generando URLs de subida...");
+
+      // Backend espera 3 imÃ¡genes (mÃ­nimo 3). Tomamos las primeras 3.
+      const mediaToUpload = selectedMediaFiles.slice(0, 3);
+      const mediaSigned = await Promise.all(mediaToUpload.map((f) => getUploadUrlAndKey(f, false)));
+      const invoiceSigned = await getUploadUrlAndKey(invoiceFile, true);
+
+      setUploadProgress(`Subiendo ${mediaToUpload.length} fotos...`);
+      for (let i = 0; i < mediaToUpload.length; i++) {
+        await uploadToPresignedUrl(mediaSigned[i], mediaToUpload[i]);
+        setUploadProgress(`Subiendo fotos... (${i + 1}/${mediaToUpload.length})`);
+      }
+
+      setUploadProgress("Subiendo factura/comprobante...");
+      await uploadToPresignedUrl(invoiceSigned, invoiceFile);
+
+      setUploadProgress("Publicando herramienta...");
+
       const payload = {
-        uuid: crypto.randomUUID(),
         ...formData,
         pricePerDay: Number(formData.pricePerDay),
         address: location.address,
         latitude: location.lat,
         longitude: location.lng,
         owner: user.id || user._id, // Dependiendo de cómo venga el usuario del store
-        images: [
-          "https://placehold.co/600x400?text=Foto+Frontal",
-          "https://placehold.co/600x400?text=Foto+Lateral",
-          "https://placehold.co/600x400?text=Foto+Serie"
-        ],
-        invoiceUrl: "https://placehold.co/600x400?text=Factura",
+        fileKeys: mediaSigned.map((m) => m.fileKey),
+        invoiceFileKey: invoiceSigned.fileKey,
         isAvailable: true
       };
 
@@ -98,6 +200,7 @@ export function CreateListing() {
       alert(error.response?.data?.message || "Ocurrió un error al publicar la herramienta.");
     } finally {
       setLoading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -208,15 +311,43 @@ export function CreateListing() {
           <CardTitle className="text-xl font-bold text-slate-800">Archivos Multimedia</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="border-2 border-dashed border-slate-200 rounded-xl p-12 text-center space-y-4 hover:bg-slate-50 transition-colors cursor-pointer group">
+          <label htmlFor="media-files-input" className="block w-full border-2 border-dashed border-slate-200 rounded-3xl p-10 text-center space-y-5 hover:bg-slate-50 transition-colors cursor-pointer group">
             <div className="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto group-hover:bg-primary/10 transition-colors">
               <CloudUpload className="h-8 w-8 text-slate-400 group-hover:text-primary transition-colors" />
             </div>
-            <div className="space-y-1">
-              <p className="font-bold text-lg text-slate-700">Arrastra y suelta fotos de alta resolución</p>
-              <p className="text-sm text-slate-500">Mínimo 3 fotos requeridas: Frontal, Lateral y Etiqueta de Serie. (Máx 10MB por archivo)</p>
+            <div className="space-y-2">
+              <p className="font-bold text-lg text-slate-700">Arrastra o haz clic para seleccionar fotos</p>
+              <p className="text-sm text-slate-500">
+                Selecciona al menos 3 fotos: frontal, lateral y etiqueta de serie. Máx 10MB por archivo.
+              </p>
             </div>
-          </div>
+          </label>
+          <input
+            id="media-files-input"
+            type="file"
+            className="hidden"
+            multiple
+            accept="image/*"
+            onChange={handleMediaFilesChange}
+          />
+          {selectedMediaFiles.length > 0 && (
+            <div className="mt-5 space-y-3">
+              <div className="flex items-center justify-between text-sm text-slate-600">
+                <span>{selectedMediaFiles.length} archivo{selectedMediaFiles.length > 1 ? "s" : ""} seleccionado{selectedMediaFiles.length > 1 ? "s" : ""}</span>
+                <span className={`${selectedMediaFiles.length < 3 ? "text-red-600" : "text-emerald-600"}`}>
+                  {selectedMediaFiles.length < 3 ? "Selecciona al menos 3 imágenes" : "Listo para continuar"}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {selectedMediaFiles.map((file, index) => (
+                  <div key={`${file.name}-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left">
+                    <p className="font-semibold text-sm text-slate-800 truncate">{file.name}</p>
+                    <p className="text-xs text-slate-500 mt-1">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -239,13 +370,22 @@ export function CreateListing() {
                 onChange={handleInputChange}
               />
             </div>
-            <div className="bg-[#eef2ff] rounded-lg p-4 flex items-center justify-between group cursor-pointer hover:bg-[#e0e7ff] transition-colors border border-transparent hover:border-primary/20">
+            <label htmlFor="invoice-file-input" className="bg-[#eef2ff] rounded-lg p-4 flex items-center justify-between group cursor-pointer hover:bg-[#e0e7ff] transition-colors border border-transparent hover:border-primary/20">
               <div className="flex items-center gap-3">
                 <Upload className="h-5 w-5 text-slate-500" />
                 <span className="text-slate-600 font-medium text-sm">Subir Factura/Comprobante</span>
               </div>
-              <span className="text-primary font-bold text-xs tracking-wider uppercase">Explorar</span>
-            </div>
+              <span className="text-primary font-bold text-xs tracking-wider uppercase">
+                {invoiceFile?.name ?? "Explorar"}
+              </span>
+            </label>
+            <input
+              id="invoice-file-input"
+              type="file"
+              className="hidden"
+              accept="image/*,application/pdf"
+              onChange={handleInvoiceFileChange}
+            />
           </CardContent>
         </Card>
 
@@ -275,6 +415,11 @@ export function CreateListing() {
       </div>
 
       <div className="flex flex-col items-end pt-8">
+        {uploadProgress && (
+          <div className="w-full mb-3 text-sm text-slate-600">
+            {uploadProgress}
+          </div>
+        )}
         <Button
           onClick={handleSubmit}
           disabled={loading}

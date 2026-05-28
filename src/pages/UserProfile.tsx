@@ -15,6 +15,8 @@ import {
   Search,
   SlidersHorizontal,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Pencil,
   Pause,
   Trash2,
@@ -32,8 +34,75 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { CreateListing } from "./CreateListing";
-import { useAuthStore } from "@/store/useAuthStore";
-import { useEffect } from "react";
+import { useAuthStore } from "@/store/authStore";
+import { useEffect, useMemo, useState } from "react";
+import { api } from "@/lib/api";
+
+function safeParseDate(value: unknown): Date | null {
+  if (typeof value === "string" || typeof value === "number") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+}
+
+function ImageCarousel({ images, alt }: { images: string[]; alt: string }) {
+  const pics = (images || []).filter(Boolean).slice(0, 3);
+  const [index, setIndex] = useState(0);
+
+  if (pics.length === 0) {
+    return (
+      <div className="w-20 h-20 rounded-2xl flex items-center justify-center shrink-0 bg-slate-100 text-slate-900">
+        <Wrench className="h-10 w-10" />
+      </div>
+    );
+  }
+
+  const prev = () => setIndex((i) => (i - 1 + pics.length) % pics.length);
+  const next = () => setIndex((i) => (i + 1) % pics.length);
+
+  return (
+    <div className="w-20 shrink-0">
+      <div className="relative w-20 h-20 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200">
+        <img src={pics[index]} alt={alt} className="w-full h-full object-cover" />
+
+        {pics.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                prev();
+              }}
+              className="absolute left-1 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full bg-white/90 border border-slate-200 text-slate-700 hover:bg-white grid place-items-center"
+              aria-label="Imagen anterior"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                next();
+              }}
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 rounded-full bg-white/90 border border-slate-200 text-slate-700 hover:bg-white grid place-items-center"
+              aria-label="Imagen siguiente"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </>
+        )}
+      </div>
+      {pics.length > 1 && (
+        <div className="mt-1 flex items-center justify-center gap-1">
+          {pics.map((_, i) => (
+            <span key={i} className={cn("h-1.5 w-1.5 rounded-full", i === index ? "bg-primary" : "bg-slate-200")} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const menuItems = [
   { id: "perfil", label: "Mi Perfil", icon: User },
@@ -88,23 +157,134 @@ export function UserProfile() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "perfil";
   const navigate = useNavigate();
-  const { user, clearAuth } = useAuthStore();
+  const { user, accessToken, clearSession } = useAuthStore();
+  const [inventory, setInventory] = useState<any[]>([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [inventoryError, setInventoryError] = useState<string | null>(null);
+  const [inventoryPage, setInventoryPage] = useState(1);
+  const [inventoryTotal, setInventoryTotal] = useState<number>(0);
+  const [inventoryTotalPages, setInventoryTotalPages] = useState<number>(1);
+  const [inventorySearch, setInventorySearch] = useState("");
 
   // Redirigir a login si no hay usuario (protección de ruta)
   useEffect(() => {
-    if (!user) {
+    if (!accessToken) {
       navigate("/login");
     }
-  }, [user, navigate]);
+  }, [accessToken, navigate]);
 
   const handleLogout = () => {
-    clearAuth();
+    clearSession();
     navigate("/login");
   };
 
   const setActiveTab = (tab: string) => {
     setSearchParams({ tab });
   };
+
+  const fetchInventoryPage = async (opts: { page: number; mode: "replace" | "append" }) => {
+    if (!accessToken) return;
+
+    setInventoryLoading(true);
+    setInventoryError(null);
+    try {
+      const response = await api.get("/tools/me", { params: { page: opts.page } });
+      const payload = response.data;
+      const tools = Array.isArray(payload?.data) ? payload.data : [];
+      const pagination = payload?.pagination;
+
+      setInventory((prev) => (opts.mode === "append" ? [...prev, ...tools] : tools));
+      setInventoryPage(Number(pagination?.page ?? opts.page));
+      setInventoryTotal(Number(pagination?.total ?? tools.length));
+      setInventoryTotalPages(Number(pagination?.totalPages ?? 1));
+    } catch (err: any) {
+      setInventory([]);
+      setInventoryError(err?.response?.data?.message || "No se pudo cargar tu inventario.");
+      setInventoryPage(1);
+      setInventoryTotal(0);
+      setInventoryTotalPages(1);
+    } finally {
+      setInventoryLoading(false);
+    }
+  };
+
+  // Carga inventario para: (a) tab inventario (lista) y (b) tab perfil (conteo de publicaciones)
+  useEffect(() => {
+    if (!accessToken) return;
+    if (activeTab !== "inventario" && activeTab !== "perfil") return;
+    fetchInventoryPage({ page: 1, mode: "replace" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, accessToken]);
+
+  const inventoryCards = useMemo(() => {
+    const query = inventorySearch.trim().toLowerCase();
+    const filtered = query
+      ? inventory.filter((t) => (t?.name || "").toString().toLowerCase().includes(query))
+      : inventory;
+
+    return filtered.map((tool) => {
+      const key = tool?._id || tool?.id || tool?.uuid || tool?.name || crypto.randomUUID();
+      const available = tool?.isAvailable !== false;
+      const status = available ? "Disponible" : "No disponible";
+      const statusColor = available
+        ? "bg-teal-50 text-teal-600 border-teal-100"
+        : "bg-slate-100 text-slate-500 border-slate-200";
+      const borderColor = available ? "border-l-teal-500" : "border-l-slate-400";
+      const price = typeof tool?.pricePerDay === "number" ? tool.pricePerDay.toFixed(2) : "--";
+      const category = (tool?.category || "Sin categorÃ­a").toString().toUpperCase();
+      const images = Array.isArray(tool?.imageUrls) ? tool.imageUrls : Array.isArray(tool?.images) ? tool.images : [];
+
+      return { key, tool, available, status, statusColor, borderColor, price, category, images };
+    });
+  }, [inventory, inventorySearch]);
+
+  const metrics = useMemo(() => {
+    const totalPublicaciones = inventoryTotal || inventory.length;
+    const alquilados = inventory.filter((t) => t?.isAvailable === false).length;
+
+    // Ingresos: hasta que el backend provea métricas de rentas/pagos, se queda en 0.
+    const ingresosMes = 0;
+
+    // Publicaciones esta semana (y delta vs semana anterior) si existe createdAt
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startThisWeek = new Date(startOfToday);
+    startThisWeek.setDate(startThisWeek.getDate() - 7);
+    const startPrevWeek = new Date(startOfToday);
+    startPrevWeek.setDate(startPrevWeek.getDate() - 14);
+
+    const createdDates = inventory
+      .map((t) => safeParseDate(t?.createdAt))
+      .filter((d): d is Date => Boolean(d));
+
+    const thisWeekCount = createdDates.filter((d) => d >= startThisWeek && d < startOfToday).length;
+    const prevWeekCount = createdDates.filter((d) => d >= startPrevWeek && d < startThisWeek).length;
+
+    let publicacionesBadge: string | null = null;
+    if (createdDates.length > 0) {
+      if (thisWeekCount === prevWeekCount) publicacionesBadge = `${thisWeekCount} esta semana`;
+      else {
+        const diff = thisWeekCount - prevWeekCount;
+        publicacionesBadge = `${diff > 0 ? "+" : ""}${diff} vs semana pasada`;
+      }
+    } else {
+      publicacionesBadge = `${totalPublicaciones} en total`;
+    }
+
+    const utilizacion = totalPublicaciones > 0 ? Math.round((alquilados / totalPublicaciones) * 100) : 0;
+    const utilizacionBadge = `${utilizacion}% utilizaciÃ³n`;
+
+    const ingresosBadge = "+0% vs mes pasado";
+
+    return {
+      totalPublicaciones,
+      alquilados,
+      ingresosMes,
+      publicacionesBadge,
+      utilizacionBadge,
+      ingresosBadge,
+    };
+  }, [inventory]);
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 flex gap-8 min-h-[calc(100vh-140px)]">
@@ -222,7 +402,7 @@ export function UserProfile() {
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Rentas</p>
                         </div>
                         <div className="text-center">
-                          <p className="text-xl font-bold text-slate-900">0</p>
+                          <p className="text-xl font-bold text-slate-900">{metrics.totalPublicaciones}</p>
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Publicaciones</p>
                         </div>
                       </div>
@@ -300,12 +480,12 @@ export function UserProfile() {
                       <Package className="h-5 w-5 text-primary" />
                     </div>
                     <Badge variant="secondary" className="bg-orange-50 text-orange-600 border-none font-bold text-[10px]">
-                      +2 esta semana
+                      {metrics.publicacionesBadge}
                     </Badge>
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Publicaciones</p>
-                    <p className="text-4xl font-black text-slate-900">48</p>
+                    <p className="text-4xl font-black text-slate-900">{metrics.totalPublicaciones}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -317,12 +497,12 @@ export function UserProfile() {
                       <Wrench className="h-5 w-5 text-primary" />
                     </div>
                     <Badge variant="secondary" className="bg-orange-50 text-orange-600 border-none font-bold text-[10px]">
-                      82% utilización
+                      {metrics.utilizacionBadge}
                     </Badge>
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Actualmente Alquilados</p>
-                    <p className="text-4xl font-black text-slate-900">32</p>
+                    <p className="text-4xl font-black text-slate-900">{metrics.alquilados}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -334,12 +514,12 @@ export function UserProfile() {
                       <ArrowUpRight className="h-5 w-5 text-primary" />
                     </div>
                     <Badge variant="secondary" className="bg-orange-50 text-orange-600 border-none font-bold text-[10px]">
-                      +12% vs mes pasado
+                      {metrics.ingresosBadge}
                     </Badge>
                   </div>
                   <div className="space-y-1">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ingresos del mes</p>
-                    <p className="text-4xl font-black text-slate-900">$14,250</p>
+                    <p className="text-4xl font-black text-slate-900">${metrics.ingresosMes}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -352,6 +532,8 @@ export function UserProfile() {
                 <Input 
                   placeholder="Buscar equipo por nombre o ID..." 
                   className="pl-10 h-12 bg-slate-50 border-transparent rounded-xl focus-visible:ring-primary/20"
+                  value={inventorySearch}
+                  onChange={(e) => setInventorySearch(e.target.value)}
                 />
               </div>
               <div className="flex gap-2">
@@ -368,16 +550,37 @@ export function UserProfile() {
 
             {/* Lista de Productos */}
             <div className="space-y-4">
-              {inventoryItems.map((item) => (
-                <Card key={item.id} className={cn("border-none shadow-sm bg-white overflow-hidden border-l-4", item.borderColor)}>
+              {inventoryLoading && (
+                <Card className="border-none shadow-sm bg-white">
+                  <CardContent className="p-6 text-slate-600 font-semibold">
+                    Cargando inventario...
+                  </CardContent>
+                </Card>
+              )}
+
+              {!inventoryLoading && inventoryError && (
+                <Card className="border-none shadow-sm bg-white border border-red-100">
+                  <CardContent className="p-6 text-red-600 font-semibold">
+                    {inventoryError}
+                  </CardContent>
+                </Card>
+              )}
+
+              {!inventoryLoading && !inventoryError && inventoryCards.length === 0 && (
+                <Card className="border-none shadow-sm bg-white">
+                  <CardContent className="p-6 text-slate-600 font-semibold">
+                    AÃºn no tienes herramientas publicadas.
+                  </CardContent>
+                </Card>
+              )}
+              {!inventoryLoading && !inventoryError && inventoryCards.map((item) => (
+                <Card key={item.key} className={cn("border-none shadow-sm bg-white overflow-hidden border-l-4", item.borderColor)}>
                   <CardContent className="p-6 flex flex-col md:flex-row items-center gap-6">
                     {/* Imagen/Icono representativo */}
-                    <div className={cn("w-20 h-20 rounded-2xl flex items-center justify-center shrink-0", item.iconBg)}>
-                      <item.icon className="h-10 w-10" />
-                    </div>
+                    <ImageCarousel images={item.images} alt={item.tool?.name || "Herramienta"} />
 
                     <div className="flex-1 space-y-1 text-center md:text-left">
-                      <h3 className="text-xl font-bold text-slate-900">{item.name}</h3>
+                      <h3 className="text-xl font-bold text-slate-900">{item.tool?.name || "Sin nombre"}</h3>
                       <p className="text-[10px] font-black text-slate-400 tracking-widest uppercase">{item.category}</p>
                     </div>
 
@@ -388,14 +591,14 @@ export function UserProfile() {
                           {item.status}
                         </Badge>
                       </div>
-                      <Progress value={item.status === "Disponible" ? 100 : item.status === "Alquilado" ? 60 : 30} className="h-1.5 bg-slate-100" />
+                      <Progress value={item.available ? 100 : 30} className="h-1.5 bg-slate-100" />
                     </div>
 
                     <div className="text-center md:text-right px-8 border-x border-slate-50">
                       <p className="text-2xl font-black text-slate-900">${item.price}<span className="text-xs text-slate-400 font-bold"> /día</span></p>
                       <p className="text-[10px] font-bold text-primary uppercase tracking-tight flex items-center justify-center md:justify-end gap-1">
                         <ArrowUpRight className="h-3 w-3" />
-                        {item.stats}
+                        Publicada
                       </p>
                     </div>
 
@@ -404,7 +607,7 @@ export function UserProfile() {
                         <Pencil className="h-5 w-5" />
                       </Button>
                       <Button variant="ghost" size="icon" className="rounded-full text-slate-400 hover:bg-slate-50">
-                        {item.status === "Mantenimiento" ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}
+                        {item.available ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
                       </Button>
                       <Button variant="ghost" size="icon" className="rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50">
                         <Trash2 className="h-5 w-5" />
@@ -416,9 +619,16 @@ export function UserProfile() {
             </div>
 
             <div className="flex justify-center pt-4">
-              <Button variant="secondary" className="bg-orange-50 text-primary font-bold h-12 px-8 rounded-xl hover:bg-orange-100 transition-colors">
-                Cargar más herramientas
-              </Button>
+              {inventoryPage < inventoryTotalPages && (
+                <Button
+                  variant="secondary"
+                  disabled={inventoryLoading}
+                  onClick={() => fetchInventoryPage({ page: inventoryPage + 1, mode: "append" })}
+                  className="bg-orange-50 text-primary font-bold h-12 px-8 rounded-xl hover:bg-orange-100 transition-colors"
+                >
+                  {inventoryLoading ? "Cargando..." : "Cargar más herramientas"}
+                </Button>
+              )}
             </div>
           </div>
         )}
