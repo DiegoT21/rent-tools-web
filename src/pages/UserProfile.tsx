@@ -299,6 +299,110 @@ export function UserProfile() {
     }
   };
 
+  const counterPropose = async (req: RentalRequestListItem) => {
+    const { isConfirmed, value } = await Swal.fire({
+      title: "Proponer cambio (pickup)",
+      html: `
+        <div style="text-align:left">
+          <div style="color:#64748b;font-size:13px;margin-bottom:8px;">Propón un punto y hora aproximados.</div>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;margin-bottom:10px;">
+            Lugar (texto)
+            <input id="cp_addr" class="swal2-input" style="margin:0;height:40px" placeholder="Ej. Albrook Mall - entrada norte" />
+          </label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+              Lat (opcional)
+              <input id="cp_lat" class="swal2-input" style="margin:0;height:40px" placeholder="8.99" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+              Lng (opcional)
+              <input id="cp_lng" class="swal2-input" style="margin:0;height:40px" placeholder="-79.56" />
+            </label>
+          </div>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;margin-bottom:10px;">
+            Hora de entrega
+            <input id="cp_at" type="datetime-local" class="swal2-input" style="margin:0;height:40px" />
+          </label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+            Notas (opcional)
+            <input id="cp_notes" class="swal2-input" style="margin:0;height:40px" placeholder="Ej. Frente al banco X" />
+          </label>
+        </div>
+      `,
+      confirmButtonText: "Enviar cambio",
+      showCancelButton: true,
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#f97316",
+      cancelButtonColor: "#0f172a",
+      preConfirm: () => {
+        const addr = (document.getElementById("cp_addr") as HTMLInputElement | null)?.value?.trim() ?? "";
+        const latRaw = (document.getElementById("cp_lat") as HTMLInputElement | null)?.value?.trim() ?? "";
+        const lngRaw = (document.getElementById("cp_lng") as HTMLInputElement | null)?.value?.trim() ?? "";
+        const atRaw = (document.getElementById("cp_at") as HTMLInputElement | null)?.value ?? "";
+        const notes = (document.getElementById("cp_notes") as HTMLInputElement | null)?.value?.trim() ?? "";
+        if (!addr) {
+          Swal.showValidationMessage("El lugar es requerido.");
+          return;
+        }
+        if (!atRaw) {
+          Swal.showValidationMessage("La hora de entrega es requerida.");
+          return;
+        }
+        const pickupAt = new Date(atRaw).toISOString();
+        const lat = latRaw ? Number(latRaw) : undefined;
+        const lng = lngRaw ? Number(lngRaw) : undefined;
+        if ((latRaw && Number.isNaN(lat)) || (lngRaw && Number.isNaN(lng))) {
+          Swal.showValidationMessage("Lat/Lng inválidos.");
+          return;
+        }
+        return { addressLabel: addr, pickupAt, lat, lng, notes: notes || undefined };
+      },
+    });
+
+    if (!isConfirmed || !value) return;
+    try {
+      await rentalRequestService.act(req.uuid, { action: "counter_propose", pickup: value });
+      await alerts.success("Enviado", "Se envió tu propuesta al solicitante.");
+      fetchRequestsPage({ page: 1, mode: "replace", kind: "received" });
+    } catch (e: any) {
+      await alerts.error("No se pudo enviar", e?.response?.data?.message || "Intenta de nuevo.");
+    }
+  };
+
+  const acceptCounter = async (req: RentalRequestListItem) => {
+    const ok = await alerts.confirm({
+      title: "Aceptar cambio",
+      text: "¿Aceptas la propuesta del propietario?",
+      confirmText: "Aceptar",
+      cancelText: "Cancelar",
+    });
+    if (!ok) return;
+    try {
+      await rentalRequestService.act(req.uuid, { action: "accept_counter" });
+      await alerts.success("Aceptado", "Se aceptó la propuesta. Espera aprobación final.");
+      fetchRequestsPage({ page: 1, mode: "replace", kind: "sent" });
+    } catch (e: any) {
+      await alerts.error("No se pudo aceptar", e?.response?.data?.message || "Intenta de nuevo.");
+    }
+  };
+
+  const cancelRequest = async (req: RentalRequestListItem) => {
+    const ok = await alerts.confirm({
+      title: "Cancelar solicitud",
+      text: "¿Seguro que deseas cancelar esta solicitud?",
+      confirmText: "Cancelar solicitud",
+      cancelText: "Volver",
+    });
+    if (!ok) return;
+    try {
+      await rentalRequestService.act(req.uuid, { action: "cancel" });
+      await alerts.success("Cancelada", "Tu solicitud fue cancelada.");
+      fetchRequestsPage({ page: 1, mode: "replace", kind: "sent" });
+    } catch (e: any) {
+      await alerts.error("No se pudo cancelar", e?.response?.data?.message || "Intenta de nuevo.");
+    }
+  };
+
   const approveRequest = async (req: RentalRequestListItem) => {
     const ok = await alerts.confirm({
       title: "Aprobar solicitud",
@@ -308,9 +412,11 @@ export function UserProfile() {
     });
     if (!ok) return;
     try {
-      await rentalRequestService.updateStatus(req.uuid, { status: "approved" });
-      await alerts.success("Aprobada", "La solicitud fue aprobada.");
+      const result = await rentalRequestService.act(req.uuid, { action: "approve" });
+      await alerts.success("Aprobada", "La solicitud fue aprobada. Se generó el contrato.");
+      const contractUuid = String(result?.contract?.uuid ?? result?.contractUuid ?? "");
       fetchRequestsPage({ page: 1, mode: "replace", kind: "received" });
+      if (contractUuid) navigate(`/rentals/contracts/${contractUuid}`);
     } catch (e: any) {
       await alerts.error("No se pudo aprobar", e?.response?.data?.message || "Intenta de nuevo.");
     }
@@ -331,7 +437,7 @@ export function UserProfile() {
     });
     if (!isConfirmed) return;
     try {
-      await rentalRequestService.updateStatus(req.uuid, { status: "rejected", rejectionReason: value || undefined });
+      await rentalRequestService.act(req.uuid, { action: "reject", rejectionReason: value || undefined });
       await alerts.success("Rechazada", "La solicitud fue rechazada.");
       fetchRequestsPage({ page: 1, mode: "replace", kind: "received" });
     } catch (e: any) {
@@ -823,6 +929,7 @@ export function UserProfile() {
                   const renterLast = person?.lastName ?? "";
                   const renterName = `${String(renterFirst || "Usuario")} ${String(renterLast || "")}`.trim();
                   const toolName = req.tool?.name ?? "Herramienta";
+                  const contractUuid = String((req as any)?.contract?.uuid ?? (req as any)?.contractUuid ?? "");
                   const statusLabel =
                     req.status === "approved" ? "Aprobada" : req.status === "rejected" ? "Rechazada" : "Pendiente";
                   const statusClass =
@@ -874,6 +981,15 @@ export function UserProfile() {
                             </Button>
 
                             <Button
+                              variant="secondary"
+                              onClick={() => counterPropose(req)}
+                              disabled={req.status !== "pending"}
+                              className="h-11 px-5 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50"
+                            >
+                              Proponer cambio
+                            </Button>
+
+                            <Button
                               onClick={() => approveRequest(req)}
                               disabled={req.status !== "pending"}
                               className="h-11 px-5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold"
@@ -888,6 +1004,45 @@ export function UserProfile() {
                             >
                               Rechazar
                             </Button>
+
+                            {contractUuid && (
+                              <Button
+                                variant="secondary"
+                                onClick={() => navigate(`/rentals/contracts/${contractUuid}`)}
+                                className="h-11 px-5 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800"
+                              >
+                                Ver contrato
+                              </Button>
+                            )}
+                          </div>
+                        )}
+
+                        {requestsMode === "sent" && (
+                          <div className="flex gap-2 shrink-0">
+                            <Button
+                              variant="secondary"
+                              onClick={() => acceptCounter(req)}
+                              disabled={req.status !== "pending"}
+                              className="h-11 px-5 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50"
+                            >
+                              Aceptar cambio
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              onClick={() => cancelRequest(req)}
+                              disabled={req.status !== "pending"}
+                              className="h-11 px-5 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50"
+                            >
+                              Cancelar
+                            </Button>
+                            {contractUuid && (
+                              <Button
+                                onClick={() => navigate(`/rentals/contracts/${contractUuid}`)}
+                                className="h-11 px-5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold"
+                              >
+                                Ver contrato
+                              </Button>
+                            )}
                           </div>
                         )}
                       </CardContent>

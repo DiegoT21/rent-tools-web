@@ -15,6 +15,7 @@ export type RentalRequestStatusValue = "pending" | "approved" | "rejected";
 
 export interface RentalRequestListItem {
   uuid: string;
+  toolUuid?: string;
   tool: {
     uuid: string;
     name: string;
@@ -46,6 +47,29 @@ export interface RentalRequestListItem {
   fromDate?: string;
   toDate?: string;
   message?: string;
+  pickup?: {
+    lat?: number;
+    lng?: number;
+    addressLabel?: string;
+    notes?: string;
+    pickupAt?: string;
+  };
+  pickupProposal?: {
+    lat?: number;
+    lng?: number;
+    addressLabel?: string;
+    notes?: string;
+    pickupAt?: string;
+  };
+  pickupCounterProposal?: {
+    lat?: number;
+    lng?: number;
+    addressLabel?: string;
+    notes?: string;
+    pickupAt?: string;
+  };
+  contract?: { uuid?: string };
+  contractUuid?: string;
   status: RentalRequestStatusValue;
   rejectionReason?: string;
   createdAt?: string;
@@ -85,6 +109,19 @@ export const rentalRequestService = {
   },
 
   updateStatus: async (uuid: string, body: { status: "approved" } | { status: "rejected"; rejectionReason?: string }) => {
+    const response = await api.patch(`/rentals/requests/${encodeURIComponent(uuid)}`, body);
+    return unwrap(response);
+  },
+
+  act: async (
+    uuid: string,
+    body:
+      | { action: "counter_propose"; pickup: { lat?: number; lng?: number; addressLabel: string; notes?: string; pickupAt: string } }
+      | { action: "accept_counter" }
+      | { action: "cancel" }
+      | { action: "approve" }
+      | { action: "reject"; rejectionReason?: string }
+  ) => {
     const response = await api.patch(`/rentals/requests/${encodeURIComponent(uuid)}`, body);
     return unwrap(response);
   },
