@@ -440,7 +440,15 @@ export function UserProfile() {
         contractUuid = String(contract?.uuid ?? "");
       }
       fetchRequestsPage({ page: 1, mode: "replace", kind: "received" });
-      if (contractUuid) navigate(`/rentals/contracts/${contractUuid}`);
+      if (contractUuid) {
+        const go = await alerts.confirm({
+          title: "Contrato generado",
+          text: "La solicitud fue aprobada. ¿Quieres abrir el contrato ahora?",
+          confirmText: "Ver contrato",
+          cancelText: "Más tarde",
+        });
+        if (go) navigate(`/rentals/contracts/${contractUuid}`);
+      }
     } catch (e: any) {
       await alerts.error("No se pudo aprobar", e?.response?.data?.message || "Intenta de nuevo.");
     }
