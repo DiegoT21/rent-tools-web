@@ -105,7 +105,6 @@ const normalizeListPayload = (payload: any) => {
 };
 
 export const rentalRequestService = {
-export const rentalRequestService = {
   getStatus: async (toolUuid: string): Promise<RentalRequestStatus> => {
     const response = await api.get("/rentals/requests/status", { params: { toolUuid } });
     const data = unwrap(response);
