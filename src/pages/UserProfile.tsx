@@ -241,11 +241,13 @@ export function UserProfile() {
       setRequests((prev) => (opts.mode === "append" ? [...prev, ...result.data] : result.data));
       setRequestsPage(Number(result.pagination?.page ?? opts.page));
       setRequestsTotalPages(Number(result.pagination?.totalPages ?? 1));
+      return result.data;
     } catch (e: any) {
       setRequests([]);
       setRequestsError(e?.response?.data?.message || "No se pudieron cargar las solicitudes.");
       setRequestsPage(1);
       setRequestsTotalPages(1);
+      return [];
     } finally {
       setRequestsLoading(false);
     }
@@ -254,7 +256,20 @@ export function UserProfile() {
   useEffect(() => {
     if (!accessToken) return;
     if (activeTab !== "solicitudes") return;
-    fetchRequestsPage({ page: 1, mode: "replace", kind: requestsMode });
+    (async () => {
+      const current = await fetchRequestsPage({ page: 1, mode: "replace", kind: requestsMode });
+      // Si el usuario no tiene recibidas pero sí enviadas, cambiamos automáticamente a "enviadas"
+      if (requestsMode === "received") {
+        try {
+          const sent = await rentalRequestService.getSent(1);
+          if ((sent.data?.length ?? 0) > 0 && (current?.length ?? 0) === 0) {
+            setRequestsMode("sent");
+          }
+        } catch {
+          // ignore
+        }
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, accessToken, requestsMode]);
 
