@@ -172,6 +172,7 @@ export function UserProfile() {
   const [inventorySearch, setInventorySearch] = useState("");
 
   const [requestsMode, setRequestsMode] = useState<"received" | "sent">("received");
+  const [requestsStatusFilter, setRequestsStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const [requests, setRequests] = useState<RentalRequestListItem[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [requestsError, setRequestsError] = useState<string | null>(null);
@@ -273,6 +274,11 @@ export function UserProfile() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, accessToken, requestsMode]);
+
+  const filteredRequests = useMemo(() => {
+    if (requestsStatusFilter === "all") return requests;
+    return requests.filter((r) => (r?.status ?? "") === requestsStatusFilter);
+  }, [requests, requestsStatusFilter]);
 
   const showRenterReviews = async (renterUuid: string, renterName: string) => {
     if (!renterUuid) {
@@ -904,7 +910,7 @@ export function UserProfile() {
                 </p>
                 <h1 className="text-4xl font-black text-slate-900 tracking-tight">Solicitudes</h1>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   variant={requestsMode === "received" ? "default" : "secondary"}
                   onClick={() => setRequestsMode("received")}
@@ -929,6 +935,57 @@ export function UserProfile() {
                 >
                   Enviadas
                 </Button>
+
+                <div className="h-11 w-px bg-slate-200 mx-1 hidden md:block" />
+
+                <Button
+                  variant={requestsStatusFilter === "all" ? "default" : "secondary"}
+                  onClick={() => setRequestsStatusFilter("all")}
+                  className={cn(
+                    "h-11 px-5 rounded-xl font-bold",
+                    requestsStatusFilter === "all"
+                      ? "bg-slate-900 hover:bg-slate-800 text-white"
+                      : "bg-slate-50 text-slate-700 hover:bg-slate-100"
+                  )}
+                >
+                  Todas
+                </Button>
+                <Button
+                  variant={requestsStatusFilter === "pending" ? "default" : "secondary"}
+                  onClick={() => setRequestsStatusFilter("pending")}
+                  className={cn(
+                    "h-11 px-5 rounded-xl font-bold",
+                    requestsStatusFilter === "pending"
+                      ? "bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-200"
+                      : "bg-slate-50 text-slate-700 hover:bg-slate-100"
+                  )}
+                >
+                  Pendientes
+                </Button>
+                <Button
+                  variant={requestsStatusFilter === "approved" ? "default" : "secondary"}
+                  onClick={() => setRequestsStatusFilter("approved")}
+                  className={cn(
+                    "h-11 px-5 rounded-xl font-bold",
+                    requestsStatusFilter === "approved"
+                      ? "bg-green-600 hover:bg-green-700 text-white"
+                      : "bg-slate-50 text-slate-700 hover:bg-slate-100"
+                  )}
+                >
+                  Aprobadas
+                </Button>
+                <Button
+                  variant={requestsStatusFilter === "rejected" ? "default" : "secondary"}
+                  onClick={() => setRequestsStatusFilter("rejected")}
+                  className={cn(
+                    "h-11 px-5 rounded-xl font-bold",
+                    requestsStatusFilter === "rejected"
+                      ? "bg-red-600 hover:bg-red-700 text-white"
+                      : "bg-slate-50 text-slate-700 hover:bg-slate-100"
+                  )}
+                >
+                  Rechazadas
+                </Button>
               </div>
             </div>
 
@@ -945,17 +1002,17 @@ export function UserProfile() {
                 </Card>
               )}
 
-              {!requestsLoading && !requestsError && requests.length === 0 && (
+              {!requestsLoading && !requestsError && filteredRequests.length === 0 && (
                 <Card className="border-none shadow-sm bg-white">
                   <CardContent className="p-6 text-slate-600 font-semibold">
-                    No tienes solicitudes {requestsMode === "received" ? "recibidas" : "enviadas"}.
+                    No tienes solicitudes {requestsMode === "received" ? "recibidas" : "enviadas"} para este filtro.
                   </CardContent>
                 </Card>
               )}
 
               {!requestsLoading &&
                 !requestsError &&
-                requests.map((req) => {
+                filteredRequests.map((req) => {
                   const person = (req as any)?.tenant ?? (req as any)?.renter ?? (req as any)?.user ?? null;
                   const renterUuid = String(person?.uuid ?? person?._id ?? person?.id ?? "");
                   const renterFirst = person?.firstName ?? person?.name ?? "";
