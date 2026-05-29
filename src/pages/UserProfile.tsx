@@ -376,7 +376,8 @@ export function UserProfile() {
 
     if (!isConfirmed || !value) return;
     try {
-      await rentalRequestService.act(req.uuid, { action: "counter_propose", pickup: value });
+      const id = rentalRequestService.getIdentifier(req as any);
+      await rentalRequestService.act(id, { action: "counter_propose", pickup: value, _fallbackId: (req as any)._id } as any);
       await alerts.success("Enviado", "Se envió tu propuesta al solicitante.");
       fetchRequestsPage({ page: 1, mode: "replace", kind: "received" });
     } catch (e: any) {
@@ -393,7 +394,8 @@ export function UserProfile() {
     });
     if (!ok) return;
     try {
-      await rentalRequestService.act(req.uuid, { action: "accept_counter" });
+      const id = rentalRequestService.getIdentifier(req as any);
+      await rentalRequestService.act(id, { action: "accept_counter", _fallbackId: (req as any)._id } as any);
       await alerts.success("Aceptado", "Se aceptó la propuesta. Espera aprobación final.");
       fetchRequestsPage({ page: 1, mode: "replace", kind: "sent" });
     } catch (e: any) {
@@ -410,7 +412,8 @@ export function UserProfile() {
     });
     if (!ok) return;
     try {
-      await rentalRequestService.act(req.uuid, { action: "cancel" });
+      const id = rentalRequestService.getIdentifier(req as any);
+      await rentalRequestService.act(id, { action: "cancel", _fallbackId: (req as any)._id } as any);
       await alerts.success("Cancelada", "Tu solicitud fue cancelada.");
       fetchRequestsPage({ page: 1, mode: "replace", kind: "sent" });
     } catch (e: any) {
@@ -427,7 +430,8 @@ export function UserProfile() {
     });
     if (!ok) return;
     try {
-      const result = await rentalRequestService.act(req.uuid, { action: "approve" });
+      const id = rentalRequestService.getIdentifier(req as any);
+      const result = await rentalRequestService.act(id, { action: "approve", _fallbackId: (req as any)._id } as any);
       await alerts.success("Aprobada", "La solicitud fue aprobada. Se generó el contrato.");
       const contractUuid = String(result?.contract?.uuid ?? result?.contractUuid ?? "");
       fetchRequestsPage({ page: 1, mode: "replace", kind: "received" });
@@ -452,7 +456,8 @@ export function UserProfile() {
     });
     if (!isConfirmed) return;
     try {
-      await rentalRequestService.act(req.uuid, { action: "reject", rejectionReason: value || undefined });
+      const id = rentalRequestService.getIdentifier(req as any);
+      await rentalRequestService.act(id, { action: "reject", rejectionReason: value || undefined, _fallbackId: (req as any)._id } as any);
       await alerts.success("Rechazada", "La solicitud fue rechazada.");
       fetchRequestsPage({ page: 1, mode: "replace", kind: "received" });
     } catch (e: any) {

@@ -14,6 +14,7 @@ export interface CreateRentalRequestBody {
 export type RentalRequestStatusValue = "pending" | "approved" | "rejected";
 
 export interface RentalRequestListItem {
+  _id?: string;
   uuid: string;
   toolUuid?: string;
   tool: {
@@ -77,6 +78,8 @@ export interface RentalRequestListItem {
 
 const unwrap = (response: any) => response?.data?.data ?? response?.data;
 
+const isNotFound = (e: any) => e?.response?.status === 404;
+
 export const rentalRequestService = {
   getStatus: async (toolUuid: string): Promise<RentalRequestStatus> => {
     const response = await api.get("/rentals/requests/status", { params: { toolUuid } });
@@ -122,7 +125,20 @@ export const rentalRequestService = {
       | { action: "approve" }
       | { action: "reject"; rejectionReason?: string }
   ) => {
-    const response = await api.patch(`/rentals/requests/${encodeURIComponent(uuid)}`, body);
-    return unwrap(response);
+    try {
+      const response = await api.patch(`/rentals/requests/${encodeURIComponent(uuid)}`, body);
+      return unwrap(response);
+    } catch (e: any) {
+      if (isNotFound(e) && (body as any)?._fallbackId) {
+        const fallbackId = String((body as any)._fallbackId);
+        const cloned = { ...(body as any) };
+        delete cloned._fallbackId;
+        const response = await api.patch(`/rentals/requests/${encodeURIComponent(fallbackId)}`, cloned);
+        return unwrap(response);
+      }
+      throw e;
+    }
   },
+
+  getIdentifier: (req: { uuid?: string; _id?: string }) => String(req?.uuid || req?._id || ""),
 };
