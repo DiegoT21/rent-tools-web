@@ -41,6 +41,7 @@ import { rentalRequestService, RentalRequestListItem } from "@/services/rentalRe
 import { userService } from "@/services/userService";
 import { alerts } from "@/lib/alerts";
 import Swal from "sweetalert2";
+import { contractService } from "@/services/contractService";
 
 function safeParseDate(value: unknown): Date | null {
   if (typeof value === "string" || typeof value === "number") {
@@ -433,7 +434,11 @@ export function UserProfile() {
       const id = rentalRequestService.getIdentifier(req as any);
       const result = await rentalRequestService.act(id, { action: "approve", _fallbackId: (req as any)._id } as any);
       await alerts.success("Aprobada", "La solicitud fue aprobada. Se generó el contrato.");
-      const contractUuid = String(result?.contract?.uuid ?? result?.contractUuid ?? "");
+      let contractUuid = String(result?.contract?.uuid ?? result?.contractUuid ?? "");
+      if (!contractUuid) {
+        const contract = await contractService.getByRequest(String((req as any)?.uuid ?? ""));
+        contractUuid = String(contract?.uuid ?? "");
+      }
       fetchRequestsPage({ page: 1, mode: "replace", kind: "received" });
       if (contractUuid) navigate(`/rentals/contracts/${contractUuid}`);
     } catch (e: any) {
@@ -1058,6 +1063,22 @@ export function UserProfile() {
                             {contractUuid && (
                               <Button
                                 onClick={() => navigate(`/rentals/contracts/${contractUuid}`)}
+                                className="h-11 px-5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold"
+                              >
+                                Ver contrato
+                              </Button>
+                            )}
+                            {!contractUuid && req.status === "approved" && (
+                              <Button
+                                onClick={async () => {
+                                  try {
+                                    const c = await contractService.getByRequest(String((req as any)?.uuid ?? ""));
+                                    if (c?.uuid) navigate(`/rentals/contracts/${c.uuid}`);
+                                    else await alerts.info("Sin contrato", "Aún no se encontró el contrato para esta solicitud.");
+                                  } catch (e: any) {
+                                    await alerts.error("No se pudo abrir", e?.response?.data?.message || "Intenta de nuevo.");
+                                  }
+                                }}
                                 className="h-11 px-5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold"
                               >
                                 Ver contrato
