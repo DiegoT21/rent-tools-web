@@ -172,7 +172,7 @@ export function UserProfile() {
   const [inventorySearch, setInventorySearch] = useState("");
 
   const [requestsMode, setRequestsMode] = useState<"received" | "sent">("received");
-  const [requestsStatusFilter, setRequestsStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
+  const [requestsStatusFilter, setRequestsStatusFilter] = useState<"all" | "pending" | "approved" | "rejected" | "cancelled">("all");
   const [requests, setRequests] = useState<RentalRequestListItem[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [requestsError, setRequestsError] = useState<string | null>(null);
@@ -240,10 +240,11 @@ export function UserProfile() {
           ? await rentalRequestService.getReceived(opts.page)
           : await rentalRequestService.getSent(opts.page);
 
-      setRequests((prev) => (opts.mode === "append" ? [...prev, ...result.data] : result.data));
+      const normalized = (result.data ?? []).map((r: any) => rentalRequestService.normalizeForUi(r));
+      setRequests((prev) => (opts.mode === "append" ? [...prev, ...normalized] : normalized));
       setRequestsPage(Number(result.pagination?.page ?? opts.page));
       setRequestsTotalPages(Number(result.pagination?.totalPages ?? 1));
-      return result.data;
+      return normalized;
     } catch (e: any) {
       setRequests([]);
       setRequestsError(e?.response?.data?.message || "No se pudieron cargar las solicitudes.");
@@ -910,82 +911,41 @@ export function UserProfile() {
                 </p>
                 <h1 className="text-4xl font-black text-slate-900 tracking-tight">Solicitudes</h1>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant={requestsMode === "received" ? "default" : "secondary"}
-                  onClick={() => setRequestsMode("received")}
-                  className={cn(
-                    "h-11 px-6 rounded-xl font-bold",
-                    requestsMode === "received"
-                      ? "bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-200"
-                      : "bg-slate-50 text-slate-700 hover:bg-slate-100"
-                  )}
-                >
-                  Recibidas
-                </Button>
-                <Button
-                  variant={requestsMode === "sent" ? "default" : "secondary"}
-                  onClick={() => setRequestsMode("sent")}
-                  className={cn(
-                    "h-11 px-6 rounded-xl font-bold",
-                    requestsMode === "sent"
-                      ? "bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-200"
-                      : "bg-slate-50 text-slate-700 hover:bg-slate-100"
-                  )}
-                >
-                  Enviadas
-                </Button>
+              <div className="flex flex-wrap gap-2 items-center">
+                <div className="flex rounded-xl overflow-hidden border border-slate-200 bg-white">
+                  <button
+                    type="button"
+                    onClick={() => setRequestsMode("received")}
+                    className={cn(
+                      "h-11 px-5 text-sm font-bold",
+                      requestsMode === "received" ? "bg-orange-500 text-white" : "text-slate-700 hover:bg-slate-50"
+                    )}
+                  >
+                    Recibidas
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRequestsMode("sent")}
+                    className={cn(
+                      "h-11 px-5 text-sm font-bold",
+                      requestsMode === "sent" ? "bg-orange-500 text-white" : "text-slate-700 hover:bg-slate-50"
+                    )}
+                  >
+                    Enviadas
+                  </button>
+                </div>
 
-                <div className="h-11 w-px bg-slate-200 mx-1 hidden md:block" />
-
-                <Button
-                  variant={requestsStatusFilter === "all" ? "default" : "secondary"}
-                  onClick={() => setRequestsStatusFilter("all")}
-                  className={cn(
-                    "h-11 px-5 rounded-xl font-bold",
-                    requestsStatusFilter === "all"
-                      ? "bg-slate-900 hover:bg-slate-800 text-white"
-                      : "bg-slate-50 text-slate-700 hover:bg-slate-100"
-                  )}
+                <select
+                  value={requestsStatusFilter}
+                  onChange={(e) => setRequestsStatusFilter(e.target.value as any)}
+                  className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700"
                 >
-                  Todas
-                </Button>
-                <Button
-                  variant={requestsStatusFilter === "pending" ? "default" : "secondary"}
-                  onClick={() => setRequestsStatusFilter("pending")}
-                  className={cn(
-                    "h-11 px-5 rounded-xl font-bold",
-                    requestsStatusFilter === "pending"
-                      ? "bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-200"
-                      : "bg-slate-50 text-slate-700 hover:bg-slate-100"
-                  )}
-                >
-                  Pendientes
-                </Button>
-                <Button
-                  variant={requestsStatusFilter === "approved" ? "default" : "secondary"}
-                  onClick={() => setRequestsStatusFilter("approved")}
-                  className={cn(
-                    "h-11 px-5 rounded-xl font-bold",
-                    requestsStatusFilter === "approved"
-                      ? "bg-green-600 hover:bg-green-700 text-white"
-                      : "bg-slate-50 text-slate-700 hover:bg-slate-100"
-                  )}
-                >
-                  Aprobadas
-                </Button>
-                <Button
-                  variant={requestsStatusFilter === "rejected" ? "default" : "secondary"}
-                  onClick={() => setRequestsStatusFilter("rejected")}
-                  className={cn(
-                    "h-11 px-5 rounded-xl font-bold",
-                    requestsStatusFilter === "rejected"
-                      ? "bg-red-600 hover:bg-red-700 text-white"
-                      : "bg-slate-50 text-slate-700 hover:bg-slate-100"
-                  )}
-                >
-                  Rechazadas
-                </Button>
+                  <option value="all">Todas</option>
+                  <option value="pending">Pendientes</option>
+                  <option value="approved">Aprobadas</option>
+                  <option value="rejected">Rechazadas</option>
+                  <option value="cancelled">Canceladas</option>
+                </select>
               </div>
             </div>
 

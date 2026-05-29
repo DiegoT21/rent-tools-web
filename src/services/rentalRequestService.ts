@@ -11,12 +11,20 @@ export interface CreateRentalRequestBody {
   message?: string;
 }
 
-export type RentalRequestStatusValue = "pending" | "approved" | "rejected";
+export type RentalRequestStatusValue =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "cancelled"
+  | "pending_owner"
+  | "pending_tenant";
 
 export interface RentalRequestListItem {
   _id?: string;
   uuid: string;
   toolUuid?: string;
+  ownerUuid?: string;
+  tenantUuid?: string;
   tool: {
     uuid: string;
     name: string;
@@ -74,12 +82,29 @@ export interface RentalRequestListItem {
   status: RentalRequestStatusValue;
   rejectionReason?: string;
   createdAt?: string;
+  _source?: "rentalrequests" | "rentals_legacy" | string;
 }
 
 const unwrap = (response: any) => response?.data?.data ?? response?.data;
 
 const isNotFound = (e: any) => e?.response?.status === 404;
 
+const normalizeStatus = (value: unknown): RentalRequestStatusValue => {
+  const s = String(value ?? "").toLowerCase();
+  if (s === "pending_owner" || s === "pending_tenant") return s as any;
+  if (s === "approved" || s === "rejected" || s === "cancelled") return s as any;
+  if (s === "pending") return "pending";
+  return "pending";
+};
+
+const normalizeListPayload = (payload: any) => {
+  const data = payload?.data?.data ?? payload?.data ?? payload;
+  const items = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
+  const pagination = payload?.data?.pagination ?? payload?.pagination ?? null;
+  return { items, pagination };
+};
+
+export const rentalRequestService = {
 export const rentalRequestService = {
   getStatus: async (toolUuid: string): Promise<RentalRequestStatus> => {
     const response = await api.get("/rentals/requests/status", { params: { toolUuid } });
@@ -95,20 +120,14 @@ export const rentalRequestService = {
 
   getReceived: async (page = 1) => {
     const response = await api.get("/rentals/requests/received", { params: { page } });
-    const payload = response?.data;
-    return {
-      data: (Array.isArray(payload?.data) ? payload.data : []) as RentalRequestListItem[],
-      pagination: payload?.pagination ?? null,
-    };
+    const { items, pagination } = normalizeListPayload(response);
+    return { data: items as RentalRequestListItem[], pagination };
   },
 
   getSent: async (page = 1) => {
     const response = await api.get("/rentals/requests/sent", { params: { page } });
-    const payload = response?.data;
-    return {
-      data: (Array.isArray(payload?.data) ? payload.data : []) as RentalRequestListItem[],
-      pagination: payload?.pagination ?? null,
-    };
+    const { items, pagination } = normalizeListPayload(response);
+    return { data: items as RentalRequestListItem[], pagination };
   },
 
   updateStatus: async (uuid: string, body: { status: "approved" } | { status: "rejected"; rejectionReason?: string }) => {
@@ -141,4 +160,40 @@ export const rentalRequestService = {
   },
 
   getIdentifier: (req: { uuid?: string; _id?: string }) => String(req?.uuid || req?._id || ""),
+
+  normalizeForUi: (raw: any): RentalRequestListItem => {
+    const tool = raw?.tool ?? {};
+    const normalized: RentalRequestListItem = {
+      _id: raw?._id,
+      uuid: String(raw?.uuid ?? raw?.requestUuid ?? raw?._id ?? ""),
+      toolUuid: String(raw?.toolUuid ?? tool?.uuid ?? raw?.tool?._id ?? ""),
+      ownerUuid: raw?.ownerUuid ? String(raw.ownerUuid) : undefined,
+      tenantUuid: raw?.tenantUuid ? String(raw.tenantUuid) : undefined,
+      tool: {
+        uuid: String(tool?.uuid ?? tool?._id ?? raw?.toolUuid ?? ""),
+        name: String(tool?.name ?? "Herramienta"),
+        category: tool?.category,
+        pricePerDay: tool?.pricePerDay,
+        imageUrls: Array.isArray(tool?.imageUrls) ? tool.imageUrls : undefined,
+      },
+      tenant: raw?.tenant ?? undefined,
+      renter: raw?.renter ?? undefined,
+      owner: raw?.owner ?? undefined,
+      startDate: raw?.startDate ?? raw?.fromDate,
+      endDate: raw?.endDate ?? raw?.toDate,
+      fromDate: raw?.fromDate ?? undefined,
+      toDate: raw?.toDate ?? undefined,
+      message: raw?.message,
+      pickup: raw?.pickup,
+      pickupProposal: raw?.pickupProposal ?? raw?.pickup,
+      pickupCounterProposal: raw?.pickupCounterProposal ?? undefined,
+      contract: raw?.contract,
+      contractUuid: raw?.contractUuid ?? raw?.contract?.uuid,
+      status: normalizeStatus(raw?.status),
+      rejectionReason: raw?.rejectionReason,
+      createdAt: raw?.createdAt,
+      _source: raw?._source,
+    };
+    return normalized;
+  },
 };
