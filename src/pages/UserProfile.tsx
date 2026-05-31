@@ -1087,6 +1087,24 @@ export function UserProfile() {
                                 Ver contrato
                               </Button>
                             )}
+
+                            {!contractUuid && req.status === "approved" && (
+                              <Button
+                                variant="secondary"
+                                onClick={async () => {
+                                  try {
+                                    const c = await contractService.getByRequest(String((req as any)?.uuid ?? ""));
+                                    if (c?.uuid) navigate(`/rentals/contracts/${c.uuid}`);
+                                    else await alerts.info("Sin contrato", "Aún no se encontró el contrato para esta solicitud.");
+                                  } catch (e: any) {
+                                    await alerts.error("No se pudo abrir", e?.response?.data?.message || "Intenta de nuevo.");
+                                  }
+                                }}
+                                className="h-11 px-5 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800"
+                              >
+                                Ver contrato
+                              </Button>
+                            )}
                           </div>
                         )}
 
