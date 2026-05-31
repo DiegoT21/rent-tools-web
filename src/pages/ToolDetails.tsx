@@ -339,6 +339,7 @@ export function ToolDetails() {
             <input id="rt_msg" class="swal2-input" style="margin:0;height:40px" placeholder="Ej. Lo necesito para un trabajo..." />
           </label>
           <div id="rt_summary" style="margin-top:10px;color:#0f172a;font-size:13px;"></div>
+          <div id="rt_bookings" style="margin-top:8px;color:#64748b;font-size:12px;"></div>
         </div>
       `,
       confirmButtonText: "Enviar solicitud",
@@ -351,12 +352,31 @@ export function ToolDetails() {
         const toEl = document.getElementById("rt_to") as HTMLInputElement | null;
         const pickupTimeEl = document.getElementById("rt_pickup_time") as HTMLInputElement | null;
         const summaryEl = document.getElementById("rt_summary") as HTMLDivElement | null;
+        const bookingsEl = document.getElementById("rt_bookings") as HTMLDivElement | null;
 
         const setPickupBounds = () => {
           // With type="time" there are no date bounds; we just ensure a default time exists.
           if (!pickupTimeEl) return;
           if (!pickupTimeEl.value) pickupTimeEl.value = "09:00";
         };
+
+        const formatRange = (startIso: string, endIso: string) => {
+          const start = String(startIso).slice(0, 10);
+          const end = String(endIso).slice(0, 10);
+          return start === end ? start : `${start} → ${end}`;
+        };
+
+        if (bookingsEl) {
+          if (bookings.length === 0) {
+            bookingsEl.textContent = "";
+          } else {
+            const lines = bookings
+              .slice(0, 6)
+              .map((b) => `• ${formatRange(b.startDate, b.endDate)}`)
+              .join("<br/>");
+            bookingsEl.innerHTML = `<div style="font-weight:600;color:#334155;margin-bottom:4px;">Rangos ocupados:</div>${lines}`;
+          }
+        }
         const compute = () => {
           if (!fromEl || !toEl || !summaryEl) return;
           const from = fromEl.value;
@@ -386,6 +406,10 @@ export function ToolDetails() {
         pickupTimeEl?.addEventListener("change", () => setPickupBounds());
       },
       preConfirm: () => {
+        if (hasPendingRequest) {
+          Swal.showValidationMessage("Ya enviaste una solicitud en trámite para esta herramienta.");
+          return;
+        }
         const fromEl = document.getElementById("rt_from") as HTMLInputElement | null;
         const toEl = document.getElementById("rt_to") as HTMLInputElement | null;
         const msgEl = document.getElementById("rt_msg") as HTMLInputElement | null;
