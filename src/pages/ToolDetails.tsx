@@ -329,7 +329,7 @@ export function ToolDetails() {
           </label>
           <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;margin-bottom:10px;">
             Hora de entrega
-            <input id="rt_pickup_at" type="datetime-local" class="swal2-input" style="margin:0;height:40px" min="${isoToday}T00:00" value="${isoToday}T09:00" />
+            <input id="rt_pickup_time" type="time" class="swal2-input" style="margin:0;height:40px" value="09:00" />
           </label>
           <div style="margin-top:-6px;margin-bottom:10px;color:#64748b;font-size:12px;">
             Nota: la entrega debe ser el mismo día de "Desde" (solo eliges la hora).
@@ -349,22 +349,13 @@ export function ToolDetails() {
       didOpen: () => {
         const fromEl = document.getElementById("rt_from") as HTMLInputElement | null;
         const toEl = document.getElementById("rt_to") as HTMLInputElement | null;
-        const pickupAtEl = document.getElementById("rt_pickup_at") as HTMLInputElement | null;
+        const pickupTimeEl = document.getElementById("rt_pickup_time") as HTMLInputElement | null;
         const summaryEl = document.getElementById("rt_summary") as HTMLDivElement | null;
 
         const setPickupBounds = () => {
-          if (!fromEl || !toEl || !pickupAtEl) return;
-          const from = fromEl.value;
-          if (!from) return;
-          // Entrega siempre el mismo día de "Desde": solo se selecciona hora.
-          pickupAtEl.min = `${from}T00:00`;
-          pickupAtEl.max = `${from}T23:59`;
-          if (pickupAtEl.value) {
-            const candidateIso = new Date(pickupAtEl.value).toISOString();
-            const startIso = new Date(from + "T00:00:00.000Z").toISOString();
-            const endIso = new Date(from + "T23:59:59.999Z").toISOString();
-            if (candidateIso < startIso || candidateIso > endIso) pickupAtEl.value = "";
-          }
+          // With type="time" there are no date bounds; we just ensure a default time exists.
+          if (!pickupTimeEl) return;
+          if (!pickupTimeEl.value) pickupTimeEl.value = "09:00";
         };
         const compute = () => {
           if (!fromEl || !toEl || !summaryEl) return;
@@ -392,18 +383,18 @@ export function ToolDetails() {
         setPickupBounds();
         fromEl?.addEventListener("change", () => setPickupBounds());
         toEl?.addEventListener("change", () => setPickupBounds());
-        pickupAtEl?.addEventListener("change", () => setPickupBounds());
+        pickupTimeEl?.addEventListener("change", () => setPickupBounds());
       },
       preConfirm: () => {
         const fromEl = document.getElementById("rt_from") as HTMLInputElement | null;
         const toEl = document.getElementById("rt_to") as HTMLInputElement | null;
         const msgEl = document.getElementById("rt_msg") as HTMLInputElement | null;
         const pickupLabelEl = document.getElementById("rt_pickup_label") as HTMLInputElement | null;
-        const pickupAtEl = document.getElementById("rt_pickup_at") as HTMLInputElement | null;
+        const pickupTimeEl = document.getElementById("rt_pickup_time") as HTMLInputElement | null;
         const fromDate = fromEl?.value ?? "";
         const toDate = toEl?.value ?? "";
         const pickupLabel = (pickupLabelEl?.value ?? "").trim();
-        const pickupAtRaw = pickupAtEl?.value ?? "";
+        const pickupTime = (pickupTimeEl?.value ?? "").trim();
         if (!fromDate || !toDate) {
           Swal.showValidationMessage("Selecciona las fechas.");
           return;
@@ -420,11 +411,12 @@ export function ToolDetails() {
           Swal.showValidationMessage("Escribe el punto de encuentro.");
           return;
         }
-        if (!pickupAtRaw) {
+        if (!pickupTime) {
           Swal.showValidationMessage("Selecciona la hora de entrega.");
           return;
         }
-        const pickupAt = new Date(pickupAtRaw).toISOString();
+        // pickupAt is always the same date as "Desde" + selected time.
+        const pickupAt = new Date(`${fromDate}T${pickupTime}:00.000Z`).toISOString();
 
         // Estricto: pickupAt debe ser el mismo día de "Desde"
         const pickupDay = pickupAt.slice(0, 10);
