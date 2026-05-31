@@ -7,6 +7,7 @@ import { Timeline } from "@/components/rentals/Timeline";
 import { alerts } from "@/lib/alerts";
 import { useAuthStore } from "@/store/authStore";
 import { contractService, RentalContract } from "@/services/contractService";
+import { mediaService } from "@/services/mediaService";
 
 function shortDate(value?: string) {
   if (!value) return "—";
@@ -75,38 +76,47 @@ export function ContractDetails() {
       await alerts.info("No disponible", "Solo el propietario puede subir evidencias y solo antes de la entrega.");
       return;
     }
-    const { isConfirmed, value } = await Swal.fire({
-      title: "Evidencias (3 fotos)",
-      html: `
-        <div style="text-align:left">
-          <div style="color:#64748b;font-size:13px;margin-bottom:8px;">Pega 3 URLs públicas (una por línea).</div>
-          <textarea id="ev_urls" style="width:100%;height:120px;border:1px solid #e2e8f0;border-radius:12px;padding:10px;"></textarea>
-        </div>
-      `,
-      confirmButtonText: "Guardar",
-      showCancelButton: true,
-      cancelButtonText: "Cancelar",
-      confirmButtonColor: "#f97316",
-      cancelButtonColor: "#0f172a",
-      preConfirm: () => {
-        const el = document.getElementById("ev_urls") as HTMLTextAreaElement | null;
-        const urls = (el?.value ?? "")
-          .split("\n")
-          .map((s) => s.trim())
-          .filter(Boolean);
-        if (urls.length !== 3) {
-          Swal.showValidationMessage("Debes pegar exactamente 3 URLs.");
-          return;
-        }
-        return urls;
-      },
+
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.multiple = true;
+    input.click();
+
+    const files: File[] = await new Promise((resolve) => {
+      input.onchange = () => resolve(Array.from(input.files ?? []));
     });
-    if (!isConfirmed || !value) return;
+
+    if (files.length !== 3) {
+      await alerts.warning("Evidencias", "Debes seleccionar exactamente 3 fotos.");
+      return;
+    }
+
     try {
-      await contractService.uploadEvidenceBeforeHandover(uuid, value);
+      Swal.fire({
+        title: "Subiendo evidencias...",
+        text: "Por favor espera.",
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        didOpen: () => Swal.showLoading(),
+      });
+
+      const signed = await Promise.all(files.map((f) => mediaService.getUploadUrlAndKey(f, false)));
+      for (let i = 0; i < files.length; i++) {
+        await mediaService.uploadToPresignedUrl(signed[i], files[i]);
+      }
+      const urls = signed.map((s) => s.publicUrl).filter(Boolean);
+
+      if (urls.length !== 3) {
+        throw new Error("No se pudieron resolver las 3 URLs públicas.");
+      }
+
+      await contractService.uploadEvidenceBeforeHandover(uuid, urls);
+      Swal.close();
       await alerts.success("Listo", "Evidencias guardadas.");
       refresh();
     } catch (e: any) {
+      Swal.close();
       await alerts.error("No se pudo guardar", e?.response?.data?.message || "Intenta de nuevo.");
     }
   };
@@ -206,6 +216,9 @@ export function ContractDetails() {
 
   const pickup = contract.pickup;
   const pricing = contract.pricing;
+  const evidencePhotos = Array.isArray(contract.ownerEvidence?.photosBeforeHandover)
+    ? contract.ownerEvidence?.photosBeforeHandover
+    : [];
 
   return (
     <div className="max-w-5xl mx-auto py-10 px-4 space-y-6">
@@ -247,6 +260,29 @@ export function ContractDetails() {
                 </div>
                 <div className="text-xs text-slate-500 mt-1">Depósito: ${pricing?.depositAmount ?? 0}</div>
               </div>
+            </div>
+
+            <div className="pt-2">
+              <div className="text-sm font-semibold text-slate-800 mb-2">Evidencias del producto (antes de entregar)</div>
+              {evidencePhotos.length === 0 ? (
+                <div className="text-sm text-slate-600">
+                  {isOwner ? "Aún no has subido evidencias." : "El propietario aún no ha subido evidencias."}
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {evidencePhotos.slice(0, 3).map((src, i) => (
+                    <button
+                      key={src}
+                      type="button"
+                      className="relative aspect-[16/10] rounded-xl overflow-hidden border border-slate-200 bg-slate-100"
+                      onClick={() => Swal.fire({ imageUrl: src, imageAlt: `Evidencia ${i + 1}`, showConfirmButton: false })}
+                      aria-label={`Ver evidencia ${i + 1}`}
+                    >
+                      <img src={src} alt={`Evidencia ${i + 1}`} className="absolute inset-0 w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="pt-2">
