@@ -42,6 +42,7 @@ import { userService } from "@/services/userService";
 import { alerts } from "@/lib/alerts";
 import Swal from "sweetalert2";
 import { contractService } from "@/services/contractService";
+import { rentalsMetricsService, OwnerRentalMetrics } from "@/services/rentalsMetricsService";
 
 function safeParseDate(value: unknown): Date | null {
   if (typeof value === "string" || typeof value === "number") {
@@ -170,6 +171,8 @@ export function UserProfile() {
   const [inventoryTotal, setInventoryTotal] = useState<number>(0);
   const [inventoryTotalPages, setInventoryTotalPages] = useState<number>(1);
   const [inventorySearch, setInventorySearch] = useState("");
+  const [ownerMetrics, setOwnerMetrics] = useState<OwnerRentalMetrics | null>(null);
+  const [ownerMetricsLoading, setOwnerMetricsLoading] = useState(false);
 
   const [requestsMode, setRequestsMode] = useState<"received" | "sent">("received");
   const [requestsTab, setRequestsTab] = useState<"pending" | "approved" | "all">("pending");
@@ -227,6 +230,30 @@ export function UserProfile() {
     if (activeTab !== "inventario" && activeTab !== "perfil") return;
     fetchInventoryPage({ page: 1, mode: "replace" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, accessToken]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!accessToken) return;
+      if (activeTab !== "perfil" && activeTab !== "inventario") return;
+
+      setOwnerMetricsLoading(true);
+      try {
+        const now = new Date();
+        const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+        const data = await rentalsMetricsService.getOwnerMetrics(month);
+        if (!cancelled) setOwnerMetrics(data);
+      } catch {
+        if (!cancelled) setOwnerMetrics(null);
+      } finally {
+        if (!cancelled) setOwnerMetricsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [activeTab, accessToken]);
 
   const fetchRequestsPage = async (opts: {
@@ -559,7 +586,7 @@ export function UserProfile() {
     const alquilados = inventory.filter((t) => (t?.rentalState ?? "").toString() === "rented").length;
 
     // Ingresos: hasta que el backend provea métricas de rentas/pagos, se queda en 0.
-    const ingresosMes = 0;
+    const ingresosMes = ownerMetrics?.incomeMonth ?? 0;
 
     // Publicaciones esta semana (y delta vs semana anterior) si existe createdAt
     const now = new Date();
@@ -590,7 +617,7 @@ export function UserProfile() {
     const utilizacion = totalPublicaciones > 0 ? Math.round((alquilados / totalPublicaciones) * 100) : 0;
     const utilizacionBadge = `${utilizacion}% utilizaciÃ³n`;
 
-    const ingresosBadge = "+0% vs mes pasado";
+    const ingresosBadge = ownerMetricsLoading ? "Calculando..." : `${ownerMetrics?.month ?? ""}`;
 
     return {
       totalPublicaciones,
@@ -600,7 +627,7 @@ export function UserProfile() {
       utilizacionBadge,
       ingresosBadge,
     };
-  }, [inventory]);
+  }, [inventory, inventoryTotal, ownerMetrics, ownerMetricsLoading]);
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 flex gap-8 min-h-[calc(100vh-140px)]">
