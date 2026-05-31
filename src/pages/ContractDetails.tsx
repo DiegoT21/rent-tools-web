@@ -32,7 +32,7 @@ export function ContractDetails() {
   const isTenant = useMemo(() => Boolean(contract?.tenantUuid && currentUserUuid && contract.tenantUuid === currentUserUuid), [contract?.tenantUuid, currentUserUuid]);
 
   const status = String(contract?.status ?? "");
-  const canHold = isTenant && ["signed", "payment_pending"].includes(status);
+  const canHold = isTenant && ["signed", "owner_evidence_pending", "payment_pending"].includes(status);
   const canUploadEvidence = isOwner && ["signed", "owner_evidence_pending", "payment_pending"].includes(status);
   const canSignHandover = (isOwner || isTenant) && status === "ready_for_handover";
   const canSignReturn = (isOwner || isTenant) && status === "in_progress";
@@ -40,6 +40,7 @@ export function ContractDetails() {
   const nextStep = useMemo(() => {
     if (!contract) return { title: "Cargando...", text: "" };
     if (status === "signed") return { title: "Siguiente paso: Evidencias + Hold", text: "El propietario sube 3 fotos y el solicitante autoriza el hold/pago." };
+    if (status === "owner_evidence_pending") return { title: "Siguiente paso: Autorizar hold", text: "El solicitante debe autorizar el hold/pago para habilitar la entrega." };
     if (status === "payment_pending") return { title: "Siguiente paso: Autorizar hold", text: "El solicitante debe autorizar el hold/pago para habilitar la entrega." };
     if (status === "ready_for_handover") return { title: "Siguiente paso: Firmar entrega", text: "Ambas partes deben firmar la entrega (handover) para iniciar el alquiler." };
     if (status === "in_progress") return { title: "Siguiente paso: Firmar devolución", text: "Al finalizar, ambas partes firman la devolución (return) para completar el alquiler." };
@@ -220,6 +221,8 @@ export function ContractDetails() {
     ? contract.ownerEvidence?.photosBeforeHandover
     : [];
 
+  const hasAllEvidence = evidencePhotos.length >= 3;
+
   return (
     <div className="max-w-5xl mx-auto py-10 px-4 space-y-6">
       <div className="flex items-end justify-between gap-4">
@@ -296,8 +299,12 @@ export function ContractDetails() {
             <div className="text-sm font-semibold text-slate-800">Acciones</div>
 
             {isOwner && (
-              <Button className="w-full bg-orange-500 hover:bg-orange-600" onClick={uploadEvidence} disabled={!canUploadEvidence}>
-                Subir evidencias (3 fotos)
+              <Button
+                className="w-full bg-orange-500 hover:bg-orange-600"
+                onClick={uploadEvidence}
+                disabled={!canUploadEvidence || hasAllEvidence}
+              >
+                {hasAllEvidence ? "Evidencias subidas" : "Subir evidencias (3 fotos)"}
               </Button>
             )}
 
