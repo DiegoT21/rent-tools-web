@@ -351,6 +351,21 @@ export function ToolDetails() {
         const toEl = document.getElementById("rt_to") as HTMLInputElement | null;
         const pickupAtEl = document.getElementById("rt_pickup_at") as HTMLInputElement | null;
         const summaryEl = document.getElementById("rt_summary") as HTMLDivElement | null;
+
+        const setPickupBounds = () => {
+          if (!fromEl || !toEl || !pickupAtEl) return;
+          const from = fromEl.value;
+          const to = toEl.value;
+          if (!from || !to) return;
+          pickupAtEl.min = `${from}T00:00`;
+          pickupAtEl.max = `${to}T23:59`;
+          if (pickupAtEl.value) {
+            const candidateIso = new Date(pickupAtEl.value).toISOString();
+            const startIso = new Date(from + "T00:00:00.000Z").toISOString();
+            const endIso = new Date(to + "T23:59:59.999Z").toISOString();
+            if (candidateIso < startIso || candidateIso > endIso) pickupAtEl.value = "";
+          }
+        };
         const compute = () => {
           if (!fromEl || !toEl || !summaryEl) return;
           const from = fromEl.value;
@@ -373,6 +388,11 @@ export function ToolDetails() {
         fromEl?.addEventListener("change", compute);
         toEl?.addEventListener("change", compute);
         compute();
+        // Ensure pickupAt stays inside selected date range
+        setPickupBounds();
+        fromEl?.addEventListener("change", () => setPickupBounds());
+        toEl?.addEventListener("change", () => setPickupBounds());
+        pickupAtEl?.addEventListener("change", () => setPickupBounds());
       },
       preConfirm: () => {
         const fromEl = document.getElementById("rt_from") as HTMLInputElement | null;
