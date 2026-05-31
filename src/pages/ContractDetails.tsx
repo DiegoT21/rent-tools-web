@@ -34,7 +34,10 @@ export function ContractDetails() {
   const status = String(contract?.status ?? "");
   const canHold = isTenant && ["signed", "owner_evidence_pending", "payment_pending"].includes(status);
   const canUploadEvidence = isOwner && ["signed", "owner_evidence_pending", "payment_pending"].includes(status);
-  const canSignHandover = (isOwner || isTenant) && status === "ready_for_handover";
+  const canSignHandover =
+    (isOwner || isTenant) &&
+    status === "ready_for_handover" &&
+    String((contract as any)?.payment?.holdStatus ?? "") === "authorized";
   const canSignReturn = (isOwner || isTenant) && status === "in_progress";
 
   const nextStep = useMemo(() => {
@@ -47,6 +50,17 @@ export function ContractDetails() {
     if (status === "completed") return { title: "Alquiler completado", text: "El contrato ya fue cerrado." };
     return { title: `Estado: ${status}`, text: "Sigue el timeline para continuar." };
   }, [contract, status]);
+
+  const payment = (contract as any)?.payment ?? null;
+  const holdStatus = String(payment?.holdStatus ?? "");
+  const paymentPlan = String(payment?.paymentPlan ?? "");
+  const depositAmount = typeof payment?.depositAmount === "number" ? payment.depositAmount : null;
+  const rentalAmount = typeof payment?.rentalAmount === "number" ? payment.rentalAmount : null;
+  const amountDueNow = typeof payment?.amountDueNow === "number" ? payment.amountDueNow : null;
+  const amountDueLater = typeof payment?.amountDueLater === "number" ? payment.amountDueLater : null;
+  const paidAmount = typeof payment?.paidAmount === "number" ? payment.paidAmount : null;
+  const paidStatus = String(payment?.paidStatus ?? "");
+  const showPaymentBox = isTenant && (holdStatus === "authorized" || status === "ready_for_handover" || paidStatus !== "");
 
   const refresh = async () => {
     if (!uuid) return;
@@ -147,10 +161,29 @@ export function ContractDetails() {
     if (!isConfirmed) return;
     try {
       await contractService.paymentHold(uuid, value as any);
-      await alerts.success("Hold autorizado", "Ya puedes coordinar la entrega y firmar handover.");
+      await alerts.success("Hold autorizado", "Se calcularon montos. Ahora puedes pagar (simulado) y luego firmar handover.");
       refresh();
     } catch (e: any) {
       await alerts.error("No se pudo autorizar", e?.response?.data?.message || "Intenta de nuevo.");
+    }
+  };
+
+  const paySimulated = async (part: "first" | "second") => {
+    if (!uuid) return;
+    if (!isTenant) return;
+    const ok = await alerts.confirm({
+      title: part === "first" ? "Pagar ahora (simulado)" : "Pagar segunda parte (simulado)",
+      text: "Esto es una simulación para pruebas (sin pasarela).",
+      confirmText: "Pagar",
+      cancelText: "Cancelar",
+    });
+    if (!ok) return;
+    try {
+      await contractService.paymentPay(uuid, part);
+      await alerts.success("Pago registrado", "Se actualizó el estado del pago (simulado).");
+      refresh();
+    } catch (e: any) {
+      await alerts.error("No se pudo pagar", e?.response?.data?.message || "Intenta de nuevo.");
     }
   };
 
@@ -264,6 +297,59 @@ export function ContractDetails() {
                 <div className="text-xs text-slate-500 mt-1">Depósito: ${pricing?.depositAmount ?? 0}</div>
               </div>
             </div>
+
+            {showPaymentBox && (
+              <div className="pt-2">
+                <div className="text-sm font-semibold text-slate-800 mb-2">Pago (simulado)</div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <div className="text-xs text-slate-500">Depósito (hold)</div>
+                      <div className="font-semibold text-slate-800">{depositAmount !== null ? `$${depositAmount}` : "—"}</div>
+                      <div className="text-xs text-slate-500 mt-1">Estado hold: {holdStatus || "—"}</div>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <div className="text-xs text-slate-500">Alquiler total</div>
+                      <div className="font-semibold text-slate-800">{rentalAmount !== null ? `$${rentalAmount}` : "—"}</div>
+                      <div className="text-xs text-slate-500 mt-1">Plan: {paymentPlan || "—"}</div>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <div className="text-xs text-slate-500">A pagar ahora</div>
+                      <div className="font-semibold text-slate-800">{amountDueNow !== null ? `$${amountDueNow}` : "—"}</div>
+                      <div className="text-xs text-slate-500 mt-1">Pagado: {paidAmount !== null ? `$${paidAmount}` : "$0"}</div>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 p-3">
+                      <div className="text-xs text-slate-500">A pagar luego</div>
+                      <div className="font-semibold text-slate-800">{amountDueLater !== null ? `$${amountDueLater}` : "$0"}</div>
+                      <div className="text-xs text-slate-500 mt-1">Estado pago: {paidStatus || "—"}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Button
+                      onClick={() => paySimulated("first")}
+                      className="bg-orange-500 hover:bg-orange-600 text-white font-bold h-11"
+                      disabled={holdStatus !== "authorized"}
+                    >
+                      Pagar ahora (simulado)
+                    </Button>
+                    {paymentPlan === "two_payments" && (amountDueLater ?? 0) > 0 && (
+                      <Button
+                        onClick={() => paySimulated("second")}
+                        variant="secondary"
+                        className="bg-white border border-slate-200 text-slate-800 font-bold h-11"
+                        disabled={holdStatus !== "authorized"}
+                      >
+                        Pagar segunda parte (simulado)
+                      </Button>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    Nota: esto no usa Stripe; el backend simula los pagos para pruebas.
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="pt-2">
               <div className="text-sm font-semibold text-slate-800 mb-2">Evidencias del producto (antes de entregar)</div>

@@ -79,6 +79,11 @@ export const contractService = {
     return unwrap(response);
   },
 
+  paymentPay: async (contractUuid: string, part: "first" | "second") => {
+    const response = await api.post(`/rentals/contracts/${encodeURIComponent(contractUuid)}/payment/pay`, { part });
+    return unwrap(response);
+  },
+
   getSignatureToken: async (
     contractUuid: string,
     body: { actor: "tenant" | "owner"; phase: "handover" | "return"; password: string }
