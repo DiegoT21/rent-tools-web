@@ -5,11 +5,14 @@ const mediaBaseUrl =
   (import.meta as any).env?.VITE_S3_PUBLIC_BASE_URL ||
   "";
 
+// Fallback for dev/prod when env isn't set but backend stores S3 keys (e.g. "catalog/...jpg")
+const defaultPublicBaseUrl = "https://renttools-inventario-publico.s3.us-east-2.amazonaws.com";
+
 const isAbsoluteUrl = (value: string) => /^https?:\/\//i.test(value);
 
 const resolveMaybeKeyToUrl = (value: string): string => {
   if (isAbsoluteUrl(value)) return value;
-  const base = String(mediaBaseUrl || "").replace(/\/+$/, "");
+  const base = String(mediaBaseUrl || defaultPublicBaseUrl).replace(/\/+$/, "");
   const path = value.replace(/^\/+/, "");
   return base ? `${base}/${path}` : value;
 };
