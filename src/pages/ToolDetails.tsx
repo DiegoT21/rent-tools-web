@@ -293,9 +293,7 @@ export function ToolDetails() {
     const deposit = typeof (tool as any)?.depositAmount === "number" ? (tool as any).depositAmount : 0;
 
     const today = new Date();
-    const isoToday = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()))
-      .toISOString()
-      .slice(0, 10);
+    const isoToday = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())).toISOString().slice(0, 10);
 
     // Preload bookings (public) to validate occupied days
     let bookings: Array<{ startDate: string; endDate: string }> = [];
@@ -318,11 +316,11 @@ export function ToolDetails() {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
             <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
               Desde
-              <input id="rt_from" type="date" class="swal2-input" style="margin:0;height:40px" value="${isoToday}" />
+              <input id="rt_from" type="date" class="swal2-input" style="margin:0;height:40px" value="${isoToday}" min="${isoToday}" />
             </label>
             <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
               Hasta
-              <input id="rt_to" type="date" class="swal2-input" style="margin:0;height:40px" value="${isoToday}" />
+              <input id="rt_to" type="date" class="swal2-input" style="margin:0;height:40px" value="${isoToday}" min="${isoToday}" />
             </label>
           </div>
           <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;margin-bottom:10px;">
@@ -384,6 +382,10 @@ export function ToolDetails() {
         const pickupAtRaw = pickupAtEl?.value ?? "";
         if (!fromDate || !toDate) {
           Swal.showValidationMessage("Selecciona las fechas.");
+          return;
+        }
+        if (fromDate < isoToday) {
+          Swal.showValidationMessage("La fecha de inicio no puede ser en el pasado.");
           return;
         }
         if (toDate < fromDate) {
