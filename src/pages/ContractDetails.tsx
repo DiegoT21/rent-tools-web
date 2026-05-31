@@ -136,16 +136,16 @@ export function ContractDetails() {
     }
   };
 
-  const doHold = async () => {
+  const doHoldAndPay = async () => {
     if (!uuid) return;
     if (!canHold) {
       await alerts.info("No disponible", "Solo el solicitante puede autorizar el hold y solo cuando corresponda.");
       return;
     }
     const ok = await alerts.confirm({
-      title: "Autorizar hold/garantía",
-      text: "Esto reservará el alquiler y te dejará listo para la entrega.",
-      confirmText: "Autorizar",
+      title: "Autorizar hold y pagar",
+      text: "Esto autoriza el hold/garantía y registra el pago (simulado) de la primera parte.",
+      confirmText: "Continuar",
       cancelText: "Cancelar",
     });
     if (!ok) return;
@@ -161,10 +161,11 @@ export function ContractDetails() {
     if (!isConfirmed) return;
     try {
       await contractService.paymentHold(uuid, value as any);
-      await alerts.success("Hold autorizado", "Se calcularon montos. Ahora puedes pagar (simulado) y luego firmar handover.");
+      await contractService.paymentPay(uuid, "first");
+      await alerts.success("Listo", "Hold autorizado y pago (simulado) registrado.");
       refresh();
     } catch (e: any) {
-      await alerts.error("No se pudo autorizar", e?.response?.data?.message || "Intenta de nuevo.");
+      await alerts.error("No se pudo completar", e?.response?.data?.message || "Intenta de nuevo.");
     }
   };
 
@@ -329,9 +330,9 @@ export function ContractDetails() {
                     <Button
                       onClick={() => paySimulated("first")}
                       className="bg-orange-500 hover:bg-orange-600 text-white font-bold h-11"
-                      disabled={holdStatus !== "authorized"}
+                      disabled={holdStatus !== "authorized" || (paidAmount ?? 0) > 0}
                     >
-                      Pagar ahora (simulado)
+                      {(paidAmount ?? 0) > 0 ? "Pago registrado" : "Pagar ahora (simulado)"}
                     </Button>
                     {paymentPlan === "two_payments" && (amountDueLater ?? 0) > 0 && (
                       <Button
@@ -395,8 +396,8 @@ export function ContractDetails() {
             )}
 
             {isTenant && (
-              <Button className="w-full bg-orange-500 hover:bg-orange-600" onClick={doHold} disabled={!canHold}>
-                Autorizar hold / pago
+              <Button className="w-full bg-orange-500 hover:bg-orange-600" onClick={doHoldAndPay} disabled={!canHold}>
+                Autorizar hold y pagar ahora
               </Button>
             )}
 
