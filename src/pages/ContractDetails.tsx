@@ -218,7 +218,7 @@ export function ContractDetails() {
   const pickup = contract.pickup;
   const pricing = contract.pricing;
   const evidencePhotos = Array.isArray(contract.ownerEvidence?.photosBeforeHandover)
-    ? contract.ownerEvidence?.photosBeforeHandover
+    ? contract.ownerEvidence?.photosBeforeHandover.map((p) => (typeof p === "string" ? mediaService.resolvePublicUrl(p) : p))
     : [];
 
   const hasAllEvidence = evidencePhotos.length >= 3;

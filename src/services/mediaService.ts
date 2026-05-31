@@ -69,5 +69,6 @@ export const mediaService = {
       throw new Error(`Falló la subida (PUT) (HTTP ${res.status}) ${body}`.trim());
     }
   },
-};
 
+  resolvePublicUrl: (value: string): string => resolveMaybeKeyToUrl(value),
+};
