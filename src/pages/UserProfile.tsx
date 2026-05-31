@@ -281,10 +281,7 @@ export function UserProfile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, accessToken, requestsMode, requestsTab]);
 
-  const filteredRequests = useMemo(() => {
-    if (requestsStatusFilter === "all") return requests;
-    return requests.filter((r) => (r?.status ?? "") === requestsStatusFilter);
-  }, [requests, requestsStatusFilter]);
+  // requests are already filtered server-side via requestsTab (pending/approved/all)
 
   const showRenterReviews = async (renterUuid: string, renterName: string) => {
     if (!renterUuid) {
@@ -988,7 +985,7 @@ export function UserProfile() {
                 </Card>
               )}
 
-              {!requestsLoading && !requestsError && filteredRequests.length === 0 && (
+              {!requestsLoading && !requestsError && requests.length === 0 && (
                 <Card className="border-none shadow-sm bg-white">
                   <CardContent className="p-6 text-slate-600 font-semibold">
                     No tienes solicitudes {requestsMode === "received" ? "recibidas" : "enviadas"} para este filtro.
@@ -998,7 +995,7 @@ export function UserProfile() {
 
               {!requestsLoading &&
                 !requestsError &&
-                filteredRequests.map((req) => {
+                requests.map((req) => {
                   const person = (req as any)?.tenant ?? (req as any)?.renter ?? (req as any)?.user ?? null;
                   const renterUuid = String(person?.uuid ?? person?._id ?? person?.id ?? "");
                   const renterFirst = person?.firstName ?? person?.name ?? "";
