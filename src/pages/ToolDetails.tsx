@@ -329,8 +329,11 @@ export function ToolDetails() {
           </label>
           <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;margin-bottom:10px;">
             Hora de entrega
-            <input id="rt_pickup_at" type="datetime-local" class="swal2-input" style="margin:0;height:40px" />
+            <input id="rt_pickup_at" type="datetime-local" class="swal2-input" style="margin:0;height:40px" min="${isoToday}T00:00" value="${isoToday}T09:00" />
           </label>
+          <div style="margin-top:-6px;margin-bottom:10px;color:#64748b;font-size:12px;">
+            Nota: la fecha/hora de entrega debe estar dentro del rango Desde/Hasta.
+          </div>
           <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
             Mensaje (opcional)
             <input id="rt_msg" class="swal2-input" style="margin:0;height:40px" placeholder="Ej. Lo necesito para un trabajo..." />
@@ -346,6 +349,7 @@ export function ToolDetails() {
       didOpen: () => {
         const fromEl = document.getElementById("rt_from") as HTMLInputElement | null;
         const toEl = document.getElementById("rt_to") as HTMLInputElement | null;
+        const pickupAtEl = document.getElementById("rt_pickup_at") as HTMLInputElement | null;
         const summaryEl = document.getElementById("rt_summary") as HTMLDivElement | null;
         const compute = () => {
           if (!fromEl || !toEl || !summaryEl) return;
