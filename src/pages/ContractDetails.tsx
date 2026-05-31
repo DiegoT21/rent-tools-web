@@ -30,6 +30,22 @@ export function ContractDetails() {
   const isOwner = useMemo(() => Boolean(contract?.ownerUuid && currentUserUuid && contract.ownerUuid === currentUserUuid), [contract?.ownerUuid, currentUserUuid]);
   const isTenant = useMemo(() => Boolean(contract?.tenantUuid && currentUserUuid && contract.tenantUuid === currentUserUuid), [contract?.tenantUuid, currentUserUuid]);
 
+  const status = String(contract?.status ?? "");
+  const canHold = isTenant && ["signed", "payment_pending"].includes(status);
+  const canUploadEvidence = isOwner && ["signed", "owner_evidence_pending", "payment_pending"].includes(status);
+  const canSignHandover = (isOwner || isTenant) && status === "ready_for_handover";
+  const canSignReturn = (isOwner || isTenant) && status === "in_progress";
+
+  const nextStep = useMemo(() => {
+    if (!contract) return { title: "Cargando...", text: "" };
+    if (status === "signed") return { title: "Siguiente paso: Evidencias + Hold", text: "El propietario sube 3 fotos y el solicitante autoriza el hold/pago." };
+    if (status === "payment_pending") return { title: "Siguiente paso: Autorizar hold", text: "El solicitante debe autorizar el hold/pago para habilitar la entrega." };
+    if (status === "ready_for_handover") return { title: "Siguiente paso: Firmar entrega", text: "Ambas partes deben firmar la entrega (handover) para iniciar el alquiler." };
+    if (status === "in_progress") return { title: "Siguiente paso: Firmar devolución", text: "Al finalizar, ambas partes firman la devolución (return) para completar el alquiler." };
+    if (status === "completed") return { title: "Alquiler completado", text: "El contrato ya fue cerrado." };
+    return { title: `Estado: ${status}`, text: "Sigue el timeline para continuar." };
+  }, [contract, status]);
+
   const refresh = async () => {
     if (!uuid) return;
     setLoading(true);
@@ -55,6 +71,10 @@ export function ContractDetails() {
 
   const uploadEvidence = async () => {
     if (!uuid) return;
+    if (!canUploadEvidence) {
+      await alerts.info("No disponible", "Solo el propietario puede subir evidencias y solo antes de la entrega.");
+      return;
+    }
     const { isConfirmed, value } = await Swal.fire({
       title: "Evidencias (3 fotos)",
       html: `
@@ -93,6 +113,10 @@ export function ContractDetails() {
 
   const doHold = async () => {
     if (!uuid) return;
+    if (!canHold) {
+      await alerts.info("No disponible", "Solo el solicitante puede autorizar el hold y solo cuando corresponda.");
+      return;
+    }
     const ok = await alerts.confirm({
       title: "Autorizar hold/garantía",
       text: "Esto reservará el alquiler y te dejará listo para la entrega.",
@@ -123,6 +147,14 @@ export function ContractDetails() {
     if (!uuid) return;
     if (!isOwner && !isTenant) {
       await alerts.error("No autorizado", "Este contrato no corresponde a tu usuario.");
+      return;
+    }
+    if (phase === "handover" && !canSignHandover) {
+      await alerts.warning("Aún no", "Primero el solicitante debe autorizar el hold/pago para habilitar la entrega.");
+      return;
+    }
+    if (phase === "return" && !canSignReturn) {
+      await alerts.warning("Aún no", "La devolución solo se firma cuando el contrato está en progreso (in_progress).");
       return;
     }
     const actor = isOwner ? "owner" : "tenant";
@@ -194,6 +226,10 @@ export function ContractDetails() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         <Card className="lg:col-span-2 border-slate-100 shadow-sm">
           <CardContent className="p-6 space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-sm font-bold text-slate-900">{nextStep.title}</div>
+              <div className="text-sm text-slate-600 mt-1">{nextStep.text}</div>
+            </div>
             <div className="text-sm font-semibold text-slate-800">Resumen</div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
               <div className="rounded-xl border border-slate-200 p-3">
@@ -224,21 +260,31 @@ export function ContractDetails() {
             <div className="text-sm font-semibold text-slate-800">Acciones</div>
 
             {isOwner && (
-              <Button className="w-full bg-orange-500 hover:bg-orange-600" onClick={uploadEvidence}>
+              <Button className="w-full bg-orange-500 hover:bg-orange-600" onClick={uploadEvidence} disabled={!canUploadEvidence}>
                 Subir evidencias (3 fotos)
               </Button>
             )}
 
             {isTenant && (
-              <Button className="w-full bg-orange-500 hover:bg-orange-600" onClick={doHold}>
+              <Button className="w-full bg-orange-500 hover:bg-orange-600" onClick={doHold} disabled={!canHold}>
                 Autorizar hold / pago
               </Button>
             )}
 
-            <Button variant="secondary" className="w-full bg-white border border-slate-200" onClick={() => signPhase("handover")}>
+            <Button
+              variant="secondary"
+              className="w-full bg-white border border-slate-200"
+              onClick={() => signPhase("handover")}
+              disabled={!canSignHandover}
+            >
               Firmar entrega (handover)
             </Button>
-            <Button variant="secondary" className="w-full bg-white border border-slate-200" onClick={() => signPhase("return")}>
+            <Button
+              variant="secondary"
+              className="w-full bg-white border border-slate-200"
+              onClick={() => signPhase("return")}
+              disabled={!canSignReturn}
+            >
               Firmar devolución (return)
             </Button>
 
