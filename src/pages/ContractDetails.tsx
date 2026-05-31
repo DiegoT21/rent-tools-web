@@ -18,6 +18,26 @@ function shortDate(value?: string) {
   }
 }
 
+function parseIso(value?: string): Date | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function withinHours(now: Date, target: Date, hours: number) {
+  const diffMs = Math.abs(now.getTime() - target.getTime());
+  return diffMs <= hours * 60 * 60 * 1000;
+}
+
+function buildReturnTarget(endDateIso?: string, pickupAtIso?: string): Date | null {
+  const endDate = parseIso(endDateIso);
+  const pickupAt = parseIso(pickupAtIso);
+  if (!endDate || !pickupAt) return null;
+  const target = new Date(endDate);
+  target.setHours(pickupAt.getHours(), pickupAt.getMinutes(), 0, 0);
+  return target;
+}
+
 export function ContractDetails() {
   const { uuid } = useParams();
   const navigate = useNavigate();
@@ -34,11 +54,20 @@ export function ContractDetails() {
   const status = String(contract?.status ?? "");
   const canHold = isTenant && ["signed", "owner_evidence_pending", "payment_pending"].includes(status);
   const canUploadEvidence = isOwner && ["signed", "owner_evidence_pending", "payment_pending"].includes(status);
+
+  const now = useMemo(() => new Date(), [contract?.updatedAt]); // refresh timing on reloads
+  const pickupAt = useMemo(() => parseIso((contract as any)?.pickup?.pickupAt), [contract]);
+  const returnTarget = useMemo(() => buildReturnTarget((contract as any)?.endDate, (contract as any)?.pickup?.pickupAt), [contract]);
+
+  const handoverWindowOk = useMemo(() => (pickupAt ? withinHours(now, pickupAt, 12) : false), [now, pickupAt]);
+  const returnWindowOk = useMemo(() => (returnTarget ? withinHours(now, returnTarget, 12) : false), [now, returnTarget]);
+
   const canSignHandover =
     (isOwner || isTenant) &&
     status === "ready_for_handover" &&
-    String((contract as any)?.payment?.holdStatus ?? "") === "authorized";
-  const canSignReturn = (isOwner || isTenant) && status === "in_progress";
+    String((contract as any)?.payment?.holdStatus ?? "") === "authorized" &&
+    handoverWindowOk;
+  const canSignReturn = (isOwner || isTenant) && status === "in_progress" && returnWindowOk;
 
   const nextStep = useMemo(() => {
     if (!contract) return { title: "Cargando...", text: "" };
@@ -194,13 +223,25 @@ export function ContractDetails() {
       await alerts.error("No autorizado", "Este contrato no corresponde a tu usuario.");
       return;
     }
-    if (phase === "handover" && !canSignHandover) {
-      await alerts.warning("Aún no", "Primero el solicitante debe autorizar el hold/pago para habilitar la entrega.");
-      return;
+    if (phase === "handover") {
+      if (status !== "ready_for_handover") {
+        await alerts.warning("Aún no", "Primero se debe autorizar el hold/pago para habilitar la entrega.");
+        return;
+      }
+      if (!handoverWindowOk) {
+        await alerts.warning("Fuera de ventana", "Solo puedes firmar dentro de ±12h del pickup.");
+        return;
+      }
     }
-    if (phase === "return" && !canSignReturn) {
-      await alerts.warning("Aún no", "La devolución solo se firma cuando el contrato está en progreso (in_progress).");
-      return;
+    if (phase === "return") {
+      if (status !== "in_progress") {
+        await alerts.warning("Aún no", "La devolución solo se firma cuando el contrato está en progreso (in_progress).");
+        return;
+      }
+      if (!returnWindowOk) {
+        await alerts.warning("Fuera de ventana", "Solo puedes firmar dentro de ±12h de la devolución.");
+        return;
+      }
     }
     const actor = isOwner ? "owner" : "tenant";
     const { isConfirmed, value } = await Swal.fire({
@@ -241,6 +282,11 @@ export function ContractDetails() {
       await alerts.success("Firmado", "Se registró tu firma.");
       refresh();
     } catch (e: any) {
+      const statusCode = e?.response?.status;
+      if (statusCode === 409) {
+        await alerts.warning("No se pudo firmar", e?.response?.data?.message || "Fuera de la ventana de firma.");
+        return;
+      }
       await alerts.error("No se pudo firmar", e?.response?.data?.message || "Intenta de nuevo.");
     }
   };
@@ -409,6 +455,9 @@ export function ContractDetails() {
             >
               Firmar entrega (handover)
             </Button>
+            {!canSignHandover && status === "ready_for_handover" && !handoverWindowOk && (
+              <div className="text-xs text-slate-500 -mt-2">Solo puedes firmar dentro de ±12h del pickup.</div>
+            )}
             <Button
               variant="secondary"
               className="w-full bg-white border border-slate-200"
@@ -417,6 +466,9 @@ export function ContractDetails() {
             >
               Firmar devolución (return)
             </Button>
+            {!canSignReturn && status === "in_progress" && !returnWindowOk && (
+              <div className="text-xs text-slate-500 -mt-2">Solo puedes firmar dentro de ±12h de la devolución.</div>
+            )}
 
             <div className="text-xs text-slate-500 pt-2">La firma genera un token temporal validando tu contraseña.</div>
           </CardContent>
