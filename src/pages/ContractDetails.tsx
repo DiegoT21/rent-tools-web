@@ -128,23 +128,39 @@ export function ContractDetails() {
     const actor = isOwner ? "owner" : "tenant";
     const { isConfirmed, value } = await Swal.fire({
       title: phase === "handover" ? "Firmar entrega" : "Firmar devolución",
-      input: "text",
-      inputLabel: "Signature token",
-      inputPlaceholder: "Token",
+      html: `
+        <div style="text-align:left">
+          <div style="color:#64748b;font-size:13px;margin-bottom:10px;">
+            Para firmar, confirma tu contraseña. Se generará un token temporal para esta fase.
+          </div>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+            Contraseña
+            <input id="rt_pwd" type="password" class="swal2-input" style="margin:0;height:40px" placeholder="Tu contraseña" />
+          </label>
+        </div>
+      `,
       showCancelButton: true,
-      confirmButtonText: "Firmar",
+      confirmButtonText: "Generar y firmar",
       cancelButtonText: "Cancelar",
       confirmButtonColor: "#f97316",
       cancelButtonColor: "#0f172a",
-      preConfirm: (v) => (typeof v === "string" ? v.trim() : ""),
+      preConfirm: () => {
+        const pwd = (document.getElementById("rt_pwd") as HTMLInputElement | null)?.value ?? "";
+        if (!pwd.trim()) {
+          Swal.showValidationMessage("Ingresa tu contraseña.");
+          return;
+        }
+        return pwd.trim();
+      },
     });
-    if (!isConfirmed) return;
-    if (!value) {
-      await alerts.warning("Falta token", "Debes ingresar el signature token.");
-      return;
-    }
+    if (!isConfirmed || !value) return;
     try {
-      await contractService.sign(uuid, { actor, phase, signatureToken: value });
+      const token = await contractService.getSignatureToken(uuid, { actor, phase, password: value });
+      if (!token.signatureToken) {
+        await alerts.error("Sin token", "No se pudo obtener el token de firma.");
+        return;
+      }
+      await contractService.sign(uuid, { actor, phase, signatureToken: token.signatureToken });
       await alerts.success("Firmado", "Se registró tu firma.");
       refresh();
     } catch (e: any) {
@@ -226,13 +242,10 @@ export function ContractDetails() {
               Firmar devolución (return)
             </Button>
 
-            <div className="text-xs text-slate-500 pt-2">
-              Nota: las firmas requieren el `signatureToken` emitido por el backend.
-            </div>
+            <div className="text-xs text-slate-500 pt-2">La firma genera un token temporal validando tu contraseña.</div>
           </CardContent>
         </Card>
       </div>
     </div>
   );
 }
-

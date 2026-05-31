@@ -79,9 +79,20 @@ export const contractService = {
     return unwrap(response);
   },
 
+  getSignatureToken: async (
+    contractUuid: string,
+    body: { actor: "tenant" | "owner"; phase: "handover" | "return"; password: string }
+  ) => {
+    const response = await api.post(`/rentals/contracts/${encodeURIComponent(contractUuid)}/signature-token`, body);
+    const data = unwrap(response);
+    return {
+      signatureToken: String(data?.signatureToken ?? ""),
+      expiresAt: String(data?.expiresAt ?? ""),
+    };
+  },
+
   sign: async (contractUuid: string, body: { actor: "tenant" | "owner"; phase: "handover" | "return"; signatureToken: string }) => {
     const response = await api.post(`/rentals/contracts/${encodeURIComponent(contractUuid)}/sign`, body);
     return unwrap(response);
   },
 };
-
