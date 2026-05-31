@@ -536,12 +536,16 @@ export function UserProfile() {
 
     return filtered.map((tool) => {
       const key = tool?._id || tool?.id || tool?.uuid || tool?.name || crypto.randomUUID();
-      const available = tool?.isAvailable !== false;
-      const status = available ? "Disponible" : "No disponible";
-      const statusColor = available
-        ? "bg-teal-50 text-teal-600 border-teal-100"
-        : "bg-slate-100 text-slate-500 border-slate-200";
-      const borderColor = available ? "border-l-teal-500" : "border-l-slate-400";
+      const rentalState = (tool?.rentalState ?? "").toString();
+      const available = rentalState ? rentalState !== "rented" : tool?.isAvailable !== false;
+      const status = rentalState === "rented" ? "Alquilado" : available ? "Disponible" : "No disponible";
+      const statusColor =
+        rentalState === "rented"
+          ? "bg-orange-50 text-orange-700 border-orange-200"
+          : available
+          ? "bg-teal-50 text-teal-600 border-teal-100"
+          : "bg-slate-100 text-slate-500 border-slate-200";
+      const borderColor = rentalState === "rented" ? "border-l-orange-500" : available ? "border-l-teal-500" : "border-l-slate-400";
       const price = typeof tool?.pricePerDay === "number" ? tool.pricePerDay.toFixed(2) : "--";
       const category = (tool?.category || "Sin categorÃ­a").toString().toUpperCase();
       const images = Array.isArray(tool?.imageUrls) ? tool.imageUrls : Array.isArray(tool?.images) ? tool.images : [];

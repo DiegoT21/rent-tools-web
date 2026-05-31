@@ -14,6 +14,7 @@ import { alerts } from "@/lib/alerts";
 import Swal from "sweetalert2";
 import { rentalRequestService } from "@/services/rentalRequestService";
 import { userService, UserReview } from "@/services/userService";
+import { toolService } from "@/services/toolService";
 
 const DefaultIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -297,6 +298,18 @@ export function ToolDetails() {
       .toISOString()
       .slice(0, 10);
 
+    // Preload bookings (public) to validate occupied days
+    let bookings: Array<{ startDate: string; endDate: string }> = [];
+    try {
+      const now = new Date();
+      const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+      const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 3, 0)).toISOString();
+      bookings = (await toolService.getBookings(uuid, from, to)).map((b) => ({ startDate: b.startDate, endDate: b.endDate }));
+    } catch {
+      bookings = [];
+    }
+    const overlaps = (aStart: Date, aEnd: Date, bStart: Date, bEnd: Date) => aStart <= bEnd && bStart <= aEnd;
+
     const { isConfirmed, value } = await Swal.fire({
       title: "Confirmar solicitud",
       html: `
@@ -387,7 +400,23 @@ export function ToolDetails() {
           return;
         }
         const pickupAt = new Date(pickupAtRaw).toISOString();
-        return { fromDate, toDate, message: (msgEl?.value ?? "").trim() };
+
+        const startIso = new Date(fromDate + "T00:00:00.000Z").toISOString();
+        const endIso = new Date(toDate + "T00:00:00.000Z").toISOString();
+        if (pickupAt < startIso || pickupAt > endIso) {
+          Swal.showValidationMessage("La hora de entrega debe estar entre la fecha inicio y fin.");
+          return;
+        }
+
+        const aStart = new Date(startIso);
+        const aEnd = new Date(endIso);
+        const hasConflict = bookings.some((b) => overlaps(aStart, aEnd, new Date(b.startDate), new Date(b.endDate)));
+        if (hasConflict) {
+          Swal.showValidationMessage("Fechas ocupadas: elige otro rango.");
+          return;
+        }
+
+        return { fromDate, toDate, pickupAt, pickupLabel, message: (msgEl?.value ?? "").trim() };
       },
     });
 
@@ -400,8 +429,8 @@ export function ToolDetails() {
         endDate: new Date(value.toDate + "T00:00:00.000Z").toISOString(),
         message: value.message || undefined,
         pickup: {
-          addressLabel: (document.getElementById("rt_pickup_label") as HTMLInputElement | null)?.value?.trim() || "Por definir",
-          pickupAt: new Date((document.getElementById("rt_pickup_at") as HTMLInputElement | null)?.value ?? "").toISOString(),
+          addressLabel: value.pickupLabel,
+          pickupAt: value.pickupAt,
         },
       });
       setHasPendingRequest(true);

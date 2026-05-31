@@ -19,6 +19,12 @@ export interface PublicTool {
   isAvailable?: boolean;
 }
 
+export interface ToolBookingRange {
+  startDate: string;
+  endDate: string;
+  status: string;
+}
+
 const normalizeArray = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];
   return value.filter((v): v is string => typeof v === "string" && v.length > 0);
@@ -57,6 +63,14 @@ export const toolService = {
     const data = (response as any).data?.data ?? (response as any).data;
     if (data && typeof data === "object") return data as PublicTool;
     return null;
+  },
+
+  getBookings: async (toolUuid: string, fromIso: string, toIso: string): Promise<ToolBookingRange[]> => {
+    const response = await api.get(`/tools/${encodeURIComponent(toolUuid)}/bookings`, {
+      params: { from: fromIso, to: toIso },
+    });
+    const data = (response as any).data?.data ?? (response as any).data;
+    return Array.isArray(data) ? (data as ToolBookingRange[]) : [];
   },
 
   getToolImages: (tool: PublicTool, limit = 3): string[] => {
