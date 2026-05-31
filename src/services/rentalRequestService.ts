@@ -6,9 +6,16 @@ export type RentalRequestStatus =
 
 export interface CreateRentalRequestBody {
   toolUuid: string;
-  fromDate: string; // YYYY-MM-DD
-  toDate: string; // YYYY-MM-DD
+  startDate: string; // ISO
+  endDate: string; // ISO
   message?: string;
+  pickup?: {
+    addressLabel: string;
+    pickupAt: string; // ISO
+    lat?: number;
+    lng?: number;
+    notes?: string;
+  };
 }
 
 export type RentalRequestStatusValue =
@@ -77,6 +84,10 @@ export interface RentalRequestListItem {
     notes?: string;
     pickupAt?: string;
   };
+  dateCounterProposal?: {
+    startDate?: string;
+    endDate?: string;
+  };
   contract?: { uuid?: string };
   contractUuid?: string;
   status: RentalRequestStatusValue;
@@ -141,7 +152,11 @@ export const rentalRequestService = {
   act: async (
     uuid: string,
     body:
-      | { action: "counter_propose"; pickup: { lat?: number; lng?: number; addressLabel: string; notes?: string; pickupAt: string } }
+      | {
+          action: "counter_propose";
+          pickup: { lat?: number; lng?: number; addressLabel: string; notes?: string; pickupAt: string };
+          dates?: { startDate: string; endDate: string };
+        }
       | { action: "accept_counter" }
       | { action: "cancel" }
       | { action: "approve" }
@@ -190,6 +205,7 @@ export const rentalRequestService = {
       pickup: raw?.pickup,
       pickupProposal: raw?.pickupProposal ?? raw?.pickup,
       pickupCounterProposal: raw?.pickupCounterProposal ?? undefined,
+      dateCounterProposal: raw?.dateCounterProposal ?? undefined,
       contract: raw?.contract,
       contractUuid: raw?.contractUuid ?? raw?.contract?.uuid,
       status: normalizeStatus(raw?.status),

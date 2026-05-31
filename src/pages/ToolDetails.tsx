@@ -313,6 +313,14 @@ export function ToolDetails() {
               <input id="rt_to" type="date" class="swal2-input" style="margin:0;height:40px" value="${isoToday}" />
             </label>
           </div>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;margin-bottom:10px;">
+            Punto de encuentro (texto)
+            <input id="rt_pickup_label" class="swal2-input" style="margin:0;height:40px" placeholder="Ej. Multiplaza - entrada principal" />
+          </label>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;margin-bottom:10px;">
+            Hora de entrega
+            <input id="rt_pickup_at" type="datetime-local" class="swal2-input" style="margin:0;height:40px" />
+          </label>
           <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
             Mensaje (opcional)
             <input id="rt_msg" class="swal2-input" style="margin:0;height:40px" placeholder="Ej. Lo necesito para un trabajo..." />
@@ -356,8 +364,12 @@ export function ToolDetails() {
         const fromEl = document.getElementById("rt_from") as HTMLInputElement | null;
         const toEl = document.getElementById("rt_to") as HTMLInputElement | null;
         const msgEl = document.getElementById("rt_msg") as HTMLInputElement | null;
+        const pickupLabelEl = document.getElementById("rt_pickup_label") as HTMLInputElement | null;
+        const pickupAtEl = document.getElementById("rt_pickup_at") as HTMLInputElement | null;
         const fromDate = fromEl?.value ?? "";
         const toDate = toEl?.value ?? "";
+        const pickupLabel = (pickupLabelEl?.value ?? "").trim();
+        const pickupAtRaw = pickupAtEl?.value ?? "";
         if (!fromDate || !toDate) {
           Swal.showValidationMessage("Selecciona las fechas.");
           return;
@@ -366,6 +378,15 @@ export function ToolDetails() {
           Swal.showValidationMessage("La fecha 'Hasta' no puede ser anterior a 'Desde'.");
           return;
         }
+        if (!pickupLabel) {
+          Swal.showValidationMessage("Escribe el punto de encuentro.");
+          return;
+        }
+        if (!pickupAtRaw) {
+          Swal.showValidationMessage("Selecciona la hora de entrega.");
+          return;
+        }
+        const pickupAt = new Date(pickupAtRaw).toISOString();
         return { fromDate, toDate, message: (msgEl?.value ?? "").trim() };
       },
     });
@@ -375,14 +396,22 @@ export function ToolDetails() {
     try {
       await rentalRequestService.create({
         toolUuid: uuid,
-        fromDate: value.fromDate,
-        toDate: value.toDate,
+        startDate: new Date(value.fromDate + "T00:00:00.000Z").toISOString(),
+        endDate: new Date(value.toDate + "T00:00:00.000Z").toISOString(),
         message: value.message || undefined,
+        pickup: {
+          addressLabel: (document.getElementById("rt_pickup_label") as HTMLInputElement | null)?.value?.trim() || "Por definir",
+          pickupAt: new Date((document.getElementById("rt_pickup_at") as HTMLInputElement | null)?.value ?? "").toISOString(),
+        },
       });
       setHasPendingRequest(true);
       await alerts.success("Solicitud enviada", "El propietario la verá en su sección de solicitudes.");
     } catch (e: any) {
       const status = e?.response?.status;
+      if (status === 400) {
+        await alerts.error("No se pudo enviar", e?.response?.data?.message || "Solicitud inválida.");
+        return;
+      }
       if (status === 409) {
         await alerts.error("Fechas no disponibles", "Ese rango de fechas entra en conflicto con otra solicitud/reserva.");
         return;

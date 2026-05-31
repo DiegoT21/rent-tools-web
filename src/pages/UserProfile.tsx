@@ -348,6 +348,16 @@ export function UserProfile() {
             Hora de entrega
             <input id="cp_at" type="datetime-local" class="swal2-input" style="margin:0;height:40px" />
           </label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+              Nueva fecha inicio (opcional)
+              <input id="cp_start" type="date" class="swal2-input" style="margin:0;height:40px" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+              Nueva fecha fin (opcional)
+              <input id="cp_end" type="date" class="swal2-input" style="margin:0;height:40px" />
+            </label>
+          </div>
           <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
             Notas (opcional)
             <input id="cp_notes" class="swal2-input" style="margin:0;height:40px" placeholder="Ej. Frente al banco X" />
@@ -364,6 +374,8 @@ export function UserProfile() {
         const latRaw = (document.getElementById("cp_lat") as HTMLInputElement | null)?.value?.trim() ?? "";
         const lngRaw = (document.getElementById("cp_lng") as HTMLInputElement | null)?.value?.trim() ?? "";
         const atRaw = (document.getElementById("cp_at") as HTMLInputElement | null)?.value ?? "";
+        const startRaw = (document.getElementById("cp_start") as HTMLInputElement | null)?.value ?? "";
+        const endRaw = (document.getElementById("cp_end") as HTMLInputElement | null)?.value ?? "";
         const notes = (document.getElementById("cp_notes") as HTMLInputElement | null)?.value?.trim() ?? "";
         if (!addr) {
           Swal.showValidationMessage("El lugar es requerido.");
@@ -373,6 +385,15 @@ export function UserProfile() {
           Swal.showValidationMessage("La hora de entrega es requerida.");
           return;
         }
+        if ((startRaw && !endRaw) || (!startRaw && endRaw)) {
+          Swal.showValidationMessage("Si cambias fechas, debes indicar inicio y fin.");
+          return;
+        }
+        if (startRaw && endRaw && endRaw < startRaw) {
+          Swal.showValidationMessage("La fecha fin no puede ser anterior a la fecha inicio.");
+          return;
+        }
+
         const pickupAt = new Date(atRaw).toISOString();
         const lat = latRaw ? Number(latRaw) : undefined;
         const lng = lngRaw ? Number(lngRaw) : undefined;
@@ -380,14 +401,21 @@ export function UserProfile() {
           Swal.showValidationMessage("Lat/Lng inválidos.");
           return;
         }
-        return { addressLabel: addr, pickupAt, lat, lng, notes: notes || undefined };
+        const dates =
+          startRaw && endRaw
+            ? { startDate: new Date(startRaw + "T00:00:00.000Z").toISOString(), endDate: new Date(endRaw + "T00:00:00.000Z").toISOString() }
+            : null;
+        return { pickup: { addressLabel: addr, pickupAt, lat, lng, notes: notes || undefined }, dates };
       },
     });
 
     if (!isConfirmed || !value) return;
     try {
       const id = rentalRequestService.getIdentifier(req as any);
-      await rentalRequestService.act(id, { action: "counter_propose", pickup: value, _fallbackId: (req as any)._id } as any);
+      await rentalRequestService.act(
+        id,
+        { action: "counter_propose", pickup: value.pickup, dates: value.dates ?? undefined, _fallbackId: (req as any)._id } as any
+      );
       await alerts.success("Enviado", "Se envió tu propuesta al solicitante.");
       fetchRequestsPage({ page: 1, mode: "replace", kind: "received", tab: requestsTab });
     } catch (e: any) {
@@ -396,6 +424,10 @@ export function UserProfile() {
   };
 
   const acceptCounter = async (req: RentalRequestListItem) => {
+    if (String((req as any)?.status ?? "") !== "pending_tenant") {
+      await alerts.info("Sin contraoferta", "No hay un ajuste pendiente para aceptar.");
+      return;
+    }
     const ok = await alerts.confirm({
       title: "Aceptar cambio",
       text: "¿Aceptas la propuesta del propietario?",
@@ -442,6 +474,15 @@ export function UserProfile() {
     try {
       const id = rentalRequestService.getIdentifier(req as any);
       const result = await rentalRequestService.act(id, { action: "approve", _fallbackId: (req as any)._id } as any);
+      const updatedStatus = String(result?.request?.status ?? result?.status ?? "");
+      if (updatedStatus === "pending_tenant") {
+        await alerts.info(
+          "Ajuste automático propuesto",
+          "La fecha inicial ya pasó. Se propuso un ajuste automático. Esperando confirmación del solicitante."
+        );
+        fetchRequestsPage({ page: 1, mode: "replace", kind: "received", tab: requestsTab });
+        return;
+      }
       await alerts.success("Aprobada", "La solicitud fue aprobada. Se generó el contrato.");
       let contractUuid = String(result?.contract?.uuid ?? result?.contractUuid ?? "");
       if (!contractUuid) {
