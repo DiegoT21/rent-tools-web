@@ -332,7 +332,7 @@ export function ToolDetails() {
             <input id="rt_pickup_at" type="datetime-local" class="swal2-input" style="margin:0;height:40px" min="${isoToday}T00:00" value="${isoToday}T09:00" />
           </label>
           <div style="margin-top:-6px;margin-bottom:10px;color:#64748b;font-size:12px;">
-            Nota: la fecha/hora de entrega debe estar dentro del rango Desde/Hasta.
+            Nota: la entrega debe ser el mismo día de "Desde" (solo eliges la hora).
           </div>
           <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
             Mensaje (opcional)
@@ -355,14 +355,14 @@ export function ToolDetails() {
         const setPickupBounds = () => {
           if (!fromEl || !toEl || !pickupAtEl) return;
           const from = fromEl.value;
-          const to = toEl.value;
-          if (!from || !to) return;
+          if (!from) return;
+          // Entrega siempre el mismo día de "Desde": solo se selecciona hora.
           pickupAtEl.min = `${from}T00:00`;
-          pickupAtEl.max = `${to}T23:59`;
+          pickupAtEl.max = `${from}T23:59`;
           if (pickupAtEl.value) {
             const candidateIso = new Date(pickupAtEl.value).toISOString();
             const startIso = new Date(from + "T00:00:00.000Z").toISOString();
-            const endIso = new Date(to + "T23:59:59.999Z").toISOString();
+            const endIso = new Date(from + "T23:59:59.999Z").toISOString();
             if (candidateIso < startIso || candidateIso > endIso) pickupAtEl.value = "";
           }
         };
@@ -426,10 +426,10 @@ export function ToolDetails() {
         }
         const pickupAt = new Date(pickupAtRaw).toISOString();
 
-        const startIso = new Date(fromDate + "T00:00:00.000Z").toISOString();
-        const endIso = new Date(toDate + "T00:00:00.000Z").toISOString();
-        if (pickupAt < startIso || pickupAt > endIso) {
-          Swal.showValidationMessage("La hora de entrega debe estar entre la fecha inicio y fin.");
+        // Estricto: pickupAt debe ser el mismo día de "Desde"
+        const pickupDay = pickupAt.slice(0, 10);
+        if (pickupDay !== fromDate) {
+          Swal.showValidationMessage("La entrega debe ser el mismo día de la fecha de inicio (Desde).");
           return;
         }
 
