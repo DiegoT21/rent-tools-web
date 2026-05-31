@@ -556,7 +556,7 @@ export function UserProfile() {
 
   const metrics = useMemo(() => {
     const totalPublicaciones = inventoryTotal || inventory.length;
-    const alquilados = inventory.filter((t) => t?.isAvailable === false).length;
+    const alquilados = inventory.filter((t) => (t?.rentalState ?? "").toString() === "rented").length;
 
     // Ingresos: hasta que el backend provea métricas de rentas/pagos, se queda en 0.
     const ingresosMes = 0;
