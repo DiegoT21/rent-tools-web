@@ -461,7 +461,13 @@ export function ToolDetails() {
         return;
       }
       if (status === 409) {
-        await alerts.error("Fechas no disponibles", "Ese rango de fechas entra en conflicto con otra solicitud/reserva.");
+        const msg = String(e?.response?.data?.message ?? "");
+        if (msg.toLowerCase().includes("solicitud") && msg.toLowerCase().includes("trámite")) {
+          setHasPendingRequest(true);
+          await alerts.info("Solicitud ya enviada", "Ya enviaste una solicitud, espera respuesta del dueño.");
+          return;
+        }
+        await alerts.error("Fechas ocupadas", "La herramienta no está disponible en esas fechas. Elige otras.");
         return;
       }
       await alerts.error("No se pudo enviar", e?.response?.data?.message || "Ocurrió un error al enviar la solicitud.");
