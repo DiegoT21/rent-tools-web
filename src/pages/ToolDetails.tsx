@@ -14,7 +14,6 @@ import { alerts } from "@/lib/alerts";
 import Swal from "sweetalert2";
 import { rentalRequestService } from "@/services/rentalRequestService";
 import { userService, UserReview } from "@/services/userService";
-import { toolService } from "@/services/toolService";
 
 const DefaultIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
