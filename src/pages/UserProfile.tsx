@@ -1076,13 +1076,22 @@ export function UserProfile() {
                   const toolName = req.tool?.name ?? "Herramienta";
                   const contractUuid = String((req as any)?.contract?.uuid ?? (req as any)?.contractUuid ?? "");
                   const statusLabel =
-                    req.status === "approved" ? "Aprobada" : req.status === "rejected" ? "Rechazada" : "Pendiente";
+                    req.status === "approved"
+                      ? "Aprobada"
+                      : req.status === "rejected"
+                      ? "Rechazada"
+                      : req.status === "pending_tenant"
+                      ? "Esperando solicitante"
+                      : "Pendiente";
                   const statusClass =
                     req.status === "approved"
                       ? "bg-green-50 text-green-700 border-green-200"
                       : req.status === "rejected"
                       ? "bg-red-50 text-red-700 border-red-200"
                       : "bg-orange-50 text-orange-700 border-orange-200";
+
+                  const canOwnerAct = req.status === "pending" || req.status === "pending_owner";
+                  const canTenantAct = req.status === "pending_tenant";
 
                   return (
                     <Card key={req.uuid} className="border-none shadow-sm bg-white overflow-hidden">
@@ -1128,7 +1137,7 @@ export function UserProfile() {
                             <Button
                               variant="secondary"
                               onClick={() => counterPropose(req)}
-                              disabled={req.status !== "pending"}
+                              disabled={!canOwnerAct}
                               className="h-11 px-5 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50"
                             >
                               Proponer cambio
@@ -1136,7 +1145,7 @@ export function UserProfile() {
 
                             <Button
                               onClick={() => approveRequest(req)}
-                              disabled={req.status !== "pending"}
+                              disabled={!canOwnerAct}
                               className="h-11 px-5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold"
                             >
                               Aprobar
@@ -1144,7 +1153,7 @@ export function UserProfile() {
                             <Button
                               variant="secondary"
                               onClick={() => rejectRequest(req)}
-                              disabled={req.status !== "pending"}
+                              disabled={!canOwnerAct}
                               className="h-11 px-5 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50"
                             >
                               Rechazar
@@ -1185,7 +1194,7 @@ export function UserProfile() {
                             <Button
                               variant="secondary"
                               onClick={() => acceptCounter(req)}
-                              disabled={req.status !== "pending"}
+                              disabled={!canTenantAct}
                               className="h-11 px-5 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50"
                             >
                               Aceptar cambio
@@ -1193,7 +1202,7 @@ export function UserProfile() {
                             <Button
                               variant="secondary"
                               onClick={() => cancelRequest(req)}
-                              disabled={req.status !== "pending"}
+                              disabled={req.status === "approved" || req.status === "rejected"}
                               className="h-11 px-5 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50"
                             >
                               Cancelar
