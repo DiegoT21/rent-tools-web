@@ -425,6 +425,8 @@ export function ToolDetails() {
           return;
         }
 
+        const startIso = new Date(fromDate + "T00:00:00.000Z").toISOString();
+        const endIso = new Date(toDate + "T00:00:00.000Z").toISOString();
         const aStart = new Date(startIso);
         const aEnd = new Date(endIso);
         const hasConflict = bookings.some((b) => overlaps(aStart, aEnd, new Date(b.startDate), new Date(b.endDate)));
