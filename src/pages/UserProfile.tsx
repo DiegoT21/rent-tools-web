@@ -172,7 +172,7 @@ export function UserProfile() {
   const [inventorySearch, setInventorySearch] = useState("");
 
   const [requestsMode, setRequestsMode] = useState<"received" | "sent">("received");
-  const [requestsStatusFilter, setRequestsStatusFilter] = useState<"all" | "pending" | "approved" | "rejected" | "cancelled">("all");
+  const [requestsTab, setRequestsTab] = useState<"pending" | "approved" | "all">("pending");
   const [requests, setRequests] = useState<RentalRequestListItem[]>([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [requestsError, setRequestsError] = useState<string | null>(null);
@@ -229,7 +229,12 @@ export function UserProfile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, accessToken]);
 
-  const fetchRequestsPage = async (opts: { page: number; mode: "replace" | "append"; kind: "received" | "sent" }) => {
+  const fetchRequestsPage = async (opts: {
+    page: number;
+    mode: "replace" | "append";
+    kind: "received" | "sent";
+    tab: "pending" | "approved" | "all";
+  }) => {
     if (!accessToken) return;
     setRequestsLoading(true);
     setRequestsError(null);
@@ -237,8 +242,8 @@ export function UserProfile() {
     try {
       const result =
         opts.kind === "received"
-          ? await rentalRequestService.getReceived(opts.page)
-          : await rentalRequestService.getSent(opts.page);
+          ? await rentalRequestService.getReceived(opts.page, opts.tab)
+          : await rentalRequestService.getSent(opts.page, opts.tab);
 
       const normalized = (result.data ?? []).map((r: any) => rentalRequestService.normalizeForUi(r));
       setRequests((prev) => (opts.mode === "append" ? [...prev, ...normalized] : normalized));
@@ -260,11 +265,11 @@ export function UserProfile() {
     if (!accessToken) return;
     if (activeTab !== "solicitudes") return;
     (async () => {
-      const current = await fetchRequestsPage({ page: 1, mode: "replace", kind: requestsMode });
+      const current = await fetchRequestsPage({ page: 1, mode: "replace", kind: requestsMode, tab: requestsTab });
       // Si el usuario no tiene recibidas pero sí enviadas, cambiamos automáticamente a "enviadas"
       if (requestsMode === "received") {
         try {
-          const sent = await rentalRequestService.getSent(1);
+          const sent = await rentalRequestService.getSent(1, requestsTab);
           if ((sent.data?.length ?? 0) > 0 && (current?.length ?? 0) === 0) {
             setRequestsMode("sent");
           }
@@ -274,7 +279,7 @@ export function UserProfile() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, accessToken, requestsMode]);
+  }, [activeTab, accessToken, requestsMode, requestsTab]);
 
   const filteredRequests = useMemo(() => {
     if (requestsStatusFilter === "all") return requests;
@@ -387,7 +392,7 @@ export function UserProfile() {
       const id = rentalRequestService.getIdentifier(req as any);
       await rentalRequestService.act(id, { action: "counter_propose", pickup: value, _fallbackId: (req as any)._id } as any);
       await alerts.success("Enviado", "Se envió tu propuesta al solicitante.");
-      fetchRequestsPage({ page: 1, mode: "replace", kind: "received" });
+      fetchRequestsPage({ page: 1, mode: "replace", kind: "received", tab: requestsTab });
     } catch (e: any) {
       await alerts.error("No se pudo enviar", e?.response?.data?.message || "Intenta de nuevo.");
     }
@@ -405,7 +410,7 @@ export function UserProfile() {
       const id = rentalRequestService.getIdentifier(req as any);
       await rentalRequestService.act(id, { action: "accept_counter", _fallbackId: (req as any)._id } as any);
       await alerts.success("Aceptado", "Se aceptó la propuesta. Espera aprobación final.");
-      fetchRequestsPage({ page: 1, mode: "replace", kind: "sent" });
+      fetchRequestsPage({ page: 1, mode: "replace", kind: "sent", tab: requestsTab });
     } catch (e: any) {
       await alerts.error("No se pudo aceptar", e?.response?.data?.message || "Intenta de nuevo.");
     }
@@ -446,7 +451,7 @@ export function UserProfile() {
         const contract = await contractService.getByRequest(String((req as any)?.uuid ?? ""));
         contractUuid = String(contract?.uuid ?? "");
       }
-      fetchRequestsPage({ page: 1, mode: "replace", kind: "received" });
+      fetchRequestsPage({ page: 1, mode: "replace", kind: "received", tab: requestsTab });
       if (contractUuid) {
         const go = await alerts.confirm({
           title: "Contrato generado",
@@ -479,7 +484,7 @@ export function UserProfile() {
       const id = rentalRequestService.getIdentifier(req as any);
       await rentalRequestService.act(id, { action: "reject", rejectionReason: value || undefined, _fallbackId: (req as any)._id } as any);
       await alerts.success("Rechazada", "La solicitud fue rechazada.");
-      fetchRequestsPage({ page: 1, mode: "replace", kind: "received" });
+      fetchRequestsPage({ page: 1, mode: "replace", kind: "received", tab: requestsTab });
     } catch (e: any) {
       await alerts.error("No se pudo rechazar", e?.response?.data?.message || "Intenta de nuevo.");
     }
@@ -935,17 +940,38 @@ export function UserProfile() {
                   </button>
                 </div>
 
-                <select
-                  value={requestsStatusFilter}
-                  onChange={(e) => setRequestsStatusFilter(e.target.value as any)}
-                  className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700"
-                >
-                  <option value="all">Todas</option>
-                  <option value="pending">Pendientes</option>
-                  <option value="approved">Aprobadas</option>
-                  <option value="rejected">Rechazadas</option>
-                  <option value="cancelled">Canceladas</option>
-                </select>
+                <div className="flex rounded-xl overflow-hidden border border-slate-200 bg-white">
+                  <button
+                    type="button"
+                    onClick={() => setRequestsTab("pending")}
+                    className={cn(
+                      "h-11 px-4 text-sm font-bold",
+                      requestsTab === "pending" ? "bg-orange-500 text-white" : "text-slate-700 hover:bg-slate-50"
+                    )}
+                  >
+                    Pendientes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRequestsTab("approved")}
+                    className={cn(
+                      "h-11 px-4 text-sm font-bold",
+                      requestsTab === "approved" ? "bg-orange-500 text-white" : "text-slate-700 hover:bg-slate-50"
+                    )}
+                  >
+                    Aprobadas
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRequestsTab("all")}
+                    className={cn(
+                      "h-11 px-4 text-sm font-bold",
+                      requestsTab === "all" ? "bg-orange-500 text-white" : "text-slate-700 hover:bg-slate-50"
+                    )}
+                  >
+                    Todas
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1122,7 +1148,7 @@ export function UserProfile() {
                 <Button
                   variant="secondary"
                   disabled={requestsLoading}
-                  onClick={() => fetchRequestsPage({ page: requestsPage + 1, mode: "append", kind: requestsMode })}
+                  onClick={() => fetchRequestsPage({ page: requestsPage + 1, mode: "append", kind: requestsMode, tab: requestsTab })}
                   className="bg-orange-50 text-primary font-bold h-12 px-8 rounded-xl hover:bg-orange-100 transition-colors"
                 >
                   {requestsLoading ? "Cargando..." : "Cargar más"}

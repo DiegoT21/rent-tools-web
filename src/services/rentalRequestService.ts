@@ -117,14 +117,18 @@ export const rentalRequestService = {
     return unwrap(response);
   },
 
-  getReceived: async (page = 1) => {
-    const response = await api.get("/rentals/requests/received", { params: { page } });
+  getReceived: async (page = 1, status: "pending" | "approved" | "all" = "pending") => {
+    const params: any = { page };
+    if (status && status !== "pending") params.status = status;
+    const response = await api.get("/rentals/requests/received", { params });
     const { items, pagination } = normalizeListPayload(response);
     return { data: items as RentalRequestListItem[], pagination };
   },
 
-  getSent: async (page = 1) => {
-    const response = await api.get("/rentals/requests/sent", { params: { page } });
+  getSent: async (page = 1, status: "pending" | "approved" | "all" = "pending") => {
+    const params: any = { page };
+    if (status && status !== "pending") params.status = status;
+    const response = await api.get("/rentals/requests/sent", { params });
     const { items, pagination } = normalizeListPayload(response);
     return { data: items as RentalRequestListItem[], pagination };
   },
