@@ -3,6 +3,7 @@ import { Search, Bell, User, MapPin, ShieldCheck, ShieldAlert } from "lucide-rea
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/useAuthStore";
+import { UserAvatar } from "@/components/UserAvatar";
 
 export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () => void, isSidebarOpen?: boolean }) {
   const navigate = useNavigate();
@@ -81,8 +82,13 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
                 </span>
               )}
             </div>
-            <Link to="/profile" className="flex h-10 w-10 items-center justify-center rounded-full bg-[#eff6ff] text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors">
-              <span className="font-bold">{user.firstName.charAt(0)}{user.lastName?.charAt(0)}</span>
+            <Link to="/profile" className="flex h-10 w-10 items-center justify-center rounded-full bg-[#eff6ff] text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors overflow-hidden">
+              <UserAvatar
+                firstName={user.firstName}
+                lastName={user.lastName}
+                profileImageUrl={user.profileImageUrl}
+                textClassName="text-blue-600"
+              />
             </Link>
           </div>
         ) : (

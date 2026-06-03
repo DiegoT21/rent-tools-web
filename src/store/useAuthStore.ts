@@ -8,6 +8,8 @@ interface User {
   email: string;
   isVerified: boolean;
   kycStatus: string;
+  profileImageUrl?: string | null;
+  profileImageFileKey?: string | null;
 }
 
 interface AuthState {

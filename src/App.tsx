@@ -8,6 +8,8 @@ import { RegisterStepTwo } from './pages/RegisterStepTwo'
 import { RegisterStepThree } from './pages/RegisterStepThree'
 import { CreateListing } from './pages/CreateListing'
 import { UserProfile } from './pages/UserProfile'
+import { Checkout } from './pages/Checkout'
+import { DeliveryProtocol } from './pages/DeliveryProtocol'
 
 function App() {
   return (
@@ -32,6 +34,16 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/register/step-2" element={<RegisterStepTwo />} />
         <Route path="/register/step-3" element={<RegisterStepThree />} />
+        <Route path="/checkout" element={
+          <RootLayout>
+            <Checkout />
+          </RootLayout>
+        } />
+        <Route path="/delivery" element={
+          <RootLayout>
+            <DeliveryProtocol />
+          </RootLayout>
+        } />
       </Routes>
     </BrowserRouter>
   )
