@@ -1,10 +1,11 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Search, Bell, User, MapPin, ShieldCheck, ShieldAlert } from "lucide-react";
+import { Search, User, MapPin, ShieldCheck, ShieldAlert } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/useAuthStore";
 import { alerts } from "@/lib/alerts";
 import { UserAvatar } from "@/components/UserAvatar";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 
 export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () => void, isSidebarOpen?: boolean }) {
   const navigate = useNavigate();
@@ -65,9 +66,7 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
         >
           Publicar
         </Button>
-        <button className="flex h-9 w-9 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 transition-colors">
-          <Bell className="h-5 w-5" />
-        </button>
+        {user ? <NotificationBell /> : null}
         
         {user ? (
           <div className="flex items-center gap-3 ml-2">

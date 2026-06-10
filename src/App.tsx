@@ -1,15 +1,30 @@
-import React from 'react'
+import React, { Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { RootLayout } from './components/layout/RootLayout'
 import { Home } from './pages/Home'
 import { Login } from './pages/Login'
 import { Register } from './pages/Register'
-import { RegisterStepTwo } from './pages/RegisterStepTwo'
-import { RegisterStepThree } from './pages/RegisterStepThree'
 import { CreateListing } from './pages/CreateListing'
 import { UserProfile } from './pages/UserProfile'
 import { ToolDetails } from './pages/ToolDetails'
 import { ContractDetails } from './pages/ContractDetails'
+import { Checkout } from './pages/Checkout'
+import { DeliveryProtocol } from './pages/DeliveryProtocol'
+
+const RegisterStepTwo = lazy(() =>
+  import('./pages/RegisterStepTwo').then((m) => ({ default: m.RegisterStepTwo }))
+)
+const RegisterStepThree = lazy(() =>
+  import('./pages/RegisterStepThree').then((m) => ({ default: m.RegisterStepThree }))
+)
+
+function PageLoader() {
+  return (
+    <div className="min-h-screen bg-[#f8f9fb] flex items-center justify-center text-slate-500 font-medium">
+      Cargando...
+    </div>
+  )
+}
 
 function App() {
   return (
@@ -42,8 +57,16 @@ function App() {
         } />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/register/step-2" element={<RegisterStepTwo />} />
-        <Route path="/register/step-3" element={<RegisterStepThree />} />
+        <Route path="/register/step-2" element={
+          <Suspense fallback={<PageLoader />}>
+            <RegisterStepTwo />
+          </Suspense>
+        } />
+        <Route path="/register/step-3" element={
+          <Suspense fallback={<PageLoader />}>
+            <RegisterStepThree />
+          </Suspense>
+        } />
         <Route path="/checkout" element={
           <RootLayout>
             <Checkout />

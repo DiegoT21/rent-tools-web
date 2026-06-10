@@ -11,6 +11,7 @@ import "leaflet/dist/leaflet.css";
 import { useAuthStore } from "@/store/authStore";
 import { useNavigate } from "react-router-dom";
 import { alerts } from "@/lib/alerts";
+import { buildPickupAtIso } from "@/lib/rentalDates";
 import Swal from "sweetalert2";
 import { rentalRequestService } from "@/services/rentalRequestService";
 import { userService, UserReview } from "@/services/userService";
@@ -446,7 +447,7 @@ export function ToolDetails() {
           return;
         }
         // pickupAt is always the same date as "Desde" + selected time.
-        const pickupAt = new Date(`${fromDate}T${pickupTime}:00.000Z`).toISOString();
+        const pickupAt = buildPickupAtIso(fromDate, pickupTime);
 
         // Estricto: pickupAt debe ser el mismo día de "Desde"
         const pickupDay = pickupAt.slice(0, 10);

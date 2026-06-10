@@ -139,3 +139,16 @@
     @apply font-sans;
   }
 }
+
+/* SweetAlert2 por encima de Radix Dialog y sin bloqueo por inert */
+.swal2-container {
+  z-index: 999999 !important;
+  pointer-events: auto !important;
+}
+
+.swal2-container .swal2-popup,
+.swal2-container .swal2-actions,
+.swal2-container .swal2-confirm,
+.swal2-container .swal2-cancel {
+  pointer-events: auto !important;
+}

@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Package, MapPin, Image as ImageIcon, ShieldCheck, Wrench, Upload, CloudUpload, Loader2 } from "lucide-react";
+import { Package, MapPin, Image as ImageIcon, ShieldCheck, Wrench, Upload, CloudUpload, Loader2, Camera } from "lucide-react";
 import { LocationPicker } from "@/components/LocationPicker";
+import { PhotoCaptureDialog, dataUrlToFile } from "@/components/ui/PhotoCaptureDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { api } from "@/lib/api";
+import { uploadFileToStorage } from "@/lib/mediaUpload";
 import { useAuthStore } from "@/store/authStore";
 import { alerts } from "@/lib/alerts";
 
@@ -40,6 +42,7 @@ export function CreateListing() {
   const [selectedMediaFiles, setSelectedMediaFiles] = useState<File[]>([]);
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+  const [cameraDialogOpen, setCameraDialogOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -110,9 +113,7 @@ export function CreateListing() {
     );
   };
 
-  const handleMediaFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
-    const newFiles = Array.from(e.target.files);
+  const appendMediaFiles = (newFiles: File[]) => {
     setSelectedMediaFiles((prev) => {
       const merged = [...prev, ...newFiles];
       const seen = new Set<string>();
@@ -127,62 +128,26 @@ export function CreateListing() {
 
       return deduped.slice(0, 12);
     });
+  };
+
+  const handleMediaFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const newFiles = Array.from(e.target.files);
+    appendMediaFiles(newFiles);
 
     // Permite volver a seleccionar el mismo archivo en el próximo click
     e.target.value = "";
   };
 
+  const handleCameraCapture = async (imageSrc: string, file?: File) => {
+    const capturedFile =
+      file ?? (await dataUrlToFile(imageSrc, `herramienta-${Date.now()}.jpg`));
+    appendMediaFiles([capturedFile]);
+  };
+
   const handleInvoiceFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0]) return;
     setInvoiceFile(e.target.files[0]);
-  };
-
-  const getUploadUrlAndKey = async (file: File, isPrivate: boolean) => {
-    const response = await api.post("/media/upload-url", {
-      fileName: file.name,
-      contentType: file.type || "application/octet-stream",
-      isPrivate,
-    });
-
-    const data = (response as any).data?.data ?? (response as any).data;
-    const uploadUrl = data?.uploadUrl ?? data?.url ?? data?.signedUrl;
-    const fileKey = data?.fileKey ?? data?.key;
-    const method = (data?.method ?? (data?.fields ? "POST" : "PUT")) as "PUT" | "POST";
-    const fields = (data?.fields ?? null) as Record<string, string> | null;
-
-    if (!uploadUrl || !fileKey) {
-      throw new Error("Respuesta inválida de /media/upload-url (faltan uploadUrl o fileKey).");
-    }
-
-    return { uploadUrl: String(uploadUrl), fileKey: String(fileKey), method, fields };
-  };
-
-  const uploadToPresignedUrl = async (signed: { uploadUrl: string; method: "PUT" | "POST"; fields: Record<string, string> | null }, file: File) => {
-    if (signed.method === "POST" && signed.fields) {
-      const form = new FormData();
-      for (const [k, v] of Object.entries(signed.fields)) form.append(k, v);
-      form.append("file", file);
-
-      const res = await fetch(signed.uploadUrl, { method: "POST", body: form });
-      if (!res.ok) {
-        const body = await res.text().catch(() => "");
-        throw new Error(`Falló la subida a S3 (POST) (HTTP ${res.status}) ${body}`.trim());
-      }
-      return;
-    }
-
-    const res = await fetch(signed.uploadUrl, {
-      method: "PUT",
-      headers: {
-        "Content-Type": file.type || "application/octet-stream",
-      },
-      body: file,
-    });
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`Falló la subida a S3 (PUT) (HTTP ${res.status}) ${body}`.trim());
-    }
   };
 
   const handleSubmit = async () => {
@@ -217,31 +182,28 @@ export function CreateListing() {
         return;
       }
 
-      setUploadProgress("Generando URLs de subida...");
+      setUploadProgress("Subiendo fotos y comprobante...");
 
-      // Backend espera 3 imÃ¡genes (mÃ­nimo 3). Tomamos las primeras 3.
       const mediaToUpload = selectedMediaFiles.slice(0, 3);
-      const mediaSigned = await Promise.all(mediaToUpload.map((f) => getUploadUrlAndKey(f, false)));
-      const invoiceSigned = await getUploadUrlAndKey(invoiceFile, true);
-
-      setUploadProgress(`Subiendo ${mediaToUpload.length} fotos...`);
+      const mediaFileKeys: string[] = [];
       for (let i = 0; i < mediaToUpload.length; i++) {
-        await uploadToPresignedUrl(mediaSigned[i], mediaToUpload[i]);
+        const fileKey = await uploadFileToStorage(mediaToUpload[i], false, "catalog");
+        mediaFileKeys.push(fileKey);
         setUploadProgress(`Subiendo fotos... (${i + 1}/${mediaToUpload.length})`);
       }
 
       setUploadProgress("Subiendo factura/comprobante...");
-      await uploadToPresignedUrl(invoiceSigned, invoiceFile);
+      const invoiceFileKey = await uploadFileToStorage(invoiceFile, true, "evidence");
 
       setUploadProgress("Publicando herramienta...");
 
       const payload = {
         ...formData,
         pricePerDay: Number(formData.pricePerDay),
-        owner: user.id || user._id, // Dependiendo de cómo venga el usuario del store
+        owner: user.id || user._id,
         meetingLocations: meetingPayload,
-        fileKeys: mediaSigned.map((m) => m.fileKey),
-        invoiceFileKey: invoiceSigned.fileKey,
+        fileKeys: mediaFileKeys,
+        invoiceFileKey,
         isAvailable: true
       };
 
@@ -253,7 +215,11 @@ export function CreateListing() {
       }
     } catch (error: any) {
       console.error("Error al publicar la herramienta:", error);
-      await alerts.error("No se pudo publicar", error.response?.data?.message || "Ocurrió un error al publicar la herramienta.");
+      const message =
+        error.response?.data?.message ||
+        error.message ||
+        "Ocurrió un error al publicar la herramienta.";
+      await alerts.error("No se pudo publicar", message);
     } finally {
       setLoading(false);
       setUploadProgress(null);
@@ -431,6 +397,17 @@ export function CreateListing() {
             accept="image/*"
             onChange={handleMediaFilesChange}
           />
+          <div className="mt-4 flex justify-center">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-xl border-[#e86f00] text-[#e86f00] hover:bg-orange-50"
+              onClick={() => setCameraDialogOpen(true)}
+            >
+              <Camera className="mr-2 h-4 w-4" />
+              Tomar foto con cámara
+            </Button>
+          </div>
           {selectedMediaFiles.length > 0 && (
             <div className="mt-5 space-y-3">
               <div className="flex items-center justify-between text-sm text-slate-600">
@@ -536,6 +513,16 @@ export function CreateListing() {
           )}
         </Button>
       </div>
+
+      <PhotoCaptureDialog
+        open={cameraDialogOpen}
+        onOpenChange={setCameraDialogOpen}
+        onCapture={handleCameraCapture}
+        overlayType="general"
+        hint="Encuadra la herramienta"
+        title="Foto de la herramienta"
+        description="Elige cámara web, cámara del dispositivo (Windows, Apple, Android) o galería."
+      />
     </div>
   );
 }

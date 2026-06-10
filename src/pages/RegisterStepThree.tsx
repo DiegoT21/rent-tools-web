@@ -12,13 +12,20 @@ import { Button } from "../components/ui/button";
 import { WebcamCapture } from "../components/ui/WebcamCapture";
 import { useAuthStore } from "../store/useAuthStore";
 import { alerts } from "@/lib/alerts";
+import {
+  clearRegistrationDocument,
+  getRegistrationDocument,
+  verifyIdentity,
+} from "@/services/verificationService";
+import { validateSelfieImage } from "@/lib/faceVerification";
 
 
 export function RegisterStepThree() {
   const location = useLocation();
   const navigate = useNavigate();
   const { accessToken: storeToken } = useAuthStore();
-  const documentImage = location.state?.documentImage || null;
+  const documentImage =
+    location.state?.documentImage || getRegistrationDocument() || null;
   const accessToken = location.state?.accessToken || storeToken;
 
   // Protección total: Validar sesión y que venga del Paso 2
@@ -32,6 +39,17 @@ export function RegisterStepThree() {
   }, [accessToken, documentImage, navigate]);
 
   const [selfieImage, setSelfieImage] = useState<string | null>(null);
+  const [selfieWarning, setSelfieWarning] = useState<string | null>(null);
+
+  const handleSelfieCapture = async (imageSrc: string) => {
+    setSelfieWarning(null);
+    const validation = await validateSelfieImage(imageSrc);
+    if (!validation.valid) {
+      setSelfieWarning(validation.message);
+      return;
+    }
+    setSelfieImage(imageSrc);
+  };
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,37 +69,32 @@ export function RegisterStepThree() {
     setError(null);
 
     try {
-      const response = await fetch('/api/verification/verify-identity', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(accessToken && { 'Authorization': `Bearer ${accessToken}` }),
-        },
-        body: JSON.stringify({
-          documentImage: documentImage,
-          selfieImage: selfieImage
-        }),
-      });
+      const result = await verifyIdentity(documentImage, selfieImage);
 
-      const data = await response.json();
+      if (result.verified) {
+        clearRegistrationDocument();
+        await alerts.success(
+          "Registro completado",
+          result.message || "Identidad verificada con éxito."
+        );
 
-      if (response.ok && data.verified) {
-        console.log("Similitud de rostros exitosa", data);
-        await alerts.success("Registro completado", "Identidad verificada con éxito.");
-        
-        // Guardar token y obtener perfil si hay accessToken
         if (accessToken) {
           useAuthStore.getState().setToken(accessToken);
           await useAuthStore.getState().fetchProfile();
         }
-        
+
         navigate("/");
       } else {
-        setError(data.message || "La prueba de vida no fue exitosa. Intente en un lugar con mejor iluminación.");
+        setError(
+          result.message ||
+            "La selfie no coincide con la foto de tu cédula. Debes ser la misma persona que aparece en el documento."
+        );
       }
     } catch (err) {
-      console.error("Error al verificar liveness", err);
-      setError("Ocurrió un error al verificar su identidad. Intente nuevamente.");
+      console.error("Error al verificar identidad", err);
+      setError(
+        "Ocurrió un error al verificar su identidad. Intente nuevamente con mejor iluminación."
+      );
     } finally {
       setIsLoading(false);
     }
@@ -100,9 +113,9 @@ export function RegisterStepThree() {
         <main className="mt-6 flex-1 flex flex-col items-center">
           <div className="w-full text-center space-y-4 mb-10">
             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#e86f00]">Paso 3 de 3</span>
-            <h1 className="text-[2.5rem] font-black tracking-tight text-slate-950">Prueba de Vida</h1>
+            <h1 className="text-[2.5rem] font-black tracking-tight text-slate-950">Verificación facial</h1>
             <p className="text-slate-500 text-base max-w-2xl mx-auto">
-              Necesitamos confirmar que eres tú. Tómate una selfie para compararla con tu documento oficial.
+              Tómate una selfie. Compararemos tu rostro con la foto de tu cédula del paso anterior. Si no coinciden, no podrás completar el registro.
             </p>
           </div>
 
@@ -124,7 +137,7 @@ export function RegisterStepThree() {
                   <div className="w-full max-w-md mx-auto">
                     <WebcamCapture 
                       overlayType="face" 
-                      onCapture={(img) => setSelfieImage(img)} 
+                      onCapture={(img) => { void handleSelfieCapture(img); }} 
                     />
                   </div>
 
@@ -148,7 +161,10 @@ export function RegisterStepThree() {
                     </div>
                   </div>
                   <button 
-                    onClick={() => setSelfieImage(null)}
+                    onClick={() => {
+                      setSelfieImage(null);
+                      setSelfieWarning(null);
+                    }}
                     className="w-full text-center text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors"
                   >
                     Volver a tomar foto
@@ -187,10 +203,16 @@ export function RegisterStepThree() {
                       : "bg-slate-300 cursor-not-allowed"
                   }`}
                 >
-                  {isLoading ? "Verificando..." : "Finalizar Registro"} <ArrowRight size={16} />
+                  {isLoading ? "Comparando rostros..." : "Finalizar Registro"} <ArrowRight size={16} />
                 </Button>
               </div>
             </div>
+
+            {selfieWarning && (
+              <div className="w-full p-4 text-sm text-amber-700 bg-amber-50 rounded-xl font-medium border border-amber-100 text-center">
+                {selfieWarning}
+              </div>
+            )}
 
             {error && (
               <div className="w-full p-4 mt-4 text-sm text-red-600 bg-red-50 rounded-xl font-medium border border-red-100 text-center">

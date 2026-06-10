@@ -12,11 +12,16 @@ import {
 } from "../components/ui/select";
 import { WebcamCapture } from "../components/ui/WebcamCapture";
 import { useAuthStore } from "../store/useAuthStore";
+import { detectFaceInImage } from "@/lib/faceVerification";
+import {
+  getRegistrationDocument,
+  saveRegistrationDocument,
+} from "@/services/verificationService";
 
 export function RegisterStepTwo() {
   const location = useLocation();
   const navigate = useNavigate();
-const { user, accessToken: storeToken } = useAuthStore();
+const { accessToken: storeToken } = useAuthStore();
 
   const accessToken = location.state?.accessToken || storeToken;
 
@@ -27,7 +32,9 @@ const { user, accessToken: storeToken } = useAuthStore();
     }
   }, [accessToken, navigate]);
 
-  const [documentImage, setDocumentImage] = React.useState<string | null>(null);
+  const [documentImage, setDocumentImage] = React.useState<string | null>(() =>
+    getRegistrationDocument()
+  );
   const [useManualForm, setUseManualForm] = React.useState(false);
 
   // State for manual form
@@ -41,18 +48,7 @@ const { user, accessToken: storeToken } = useAuthStore();
 
   const handleNext = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError(null);
-    setIsLoading(true);
-
-    try {
-      console.log(`Bypass Manual: Cédula aceptada (Validación deshabilitada)`);
-      navigate("/register/step-3");
-    } catch (err) {
-      console.error('Error al validar la cédula', err);
-      setError("Ocurrió un error al validar su identidad. Intente nuevamente.");
-    } finally {
-      setIsLoading(false);
-    }
+    setError("El registro manual no está disponible. Debes tomar una foto de tu cédula.");
   };
 
   const handleProcessImage = async (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -63,10 +59,16 @@ const { user, accessToken: storeToken } = useAuthStore();
     setIsLoading(true);
 
     try {
-      console.log(`Paso 2 completado: Imagen capturada localmente`);
+      const faceCheck = await detectFaceInImage(documentImage);
+      if (!faceCheck.found) {
+        setError(faceCheck.message);
+        return;
+      }
+
+      saveRegistrationDocument(documentImage);
       navigate("/register/step-3", { state: { documentImage, accessToken } });
     } catch (err) {
-      console.error('Error al procesar la imagen de la cédula', err);
+      console.error("Error al procesar la imagen de la cédula", err);
       setError("Ocurrió un error al procesar la imagen. Intenta nuevamente.");
     } finally {
       setIsLoading(false);
@@ -173,7 +175,7 @@ const { user, accessToken: storeToken } = useAuthStore();
                           disabled={isLoading}
                           className="h-14 w-full rounded-2xl bg-[#e86f00] text-base font-black text-white hover:bg-[#d46500] shadow-lg shadow-orange-500/20 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
                         >
-                          {isLoading ? "Procesando documento..." : (
+                          {isLoading ? "Analizando documento..." : (
                             <>Continuar <ArrowRight className="ml-2 h-5 w-5" /></>
                           )}
                         </Button>

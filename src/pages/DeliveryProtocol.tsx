@@ -32,7 +32,7 @@ export const DeliveryProtocol = () => {
     }
   };
 
-  const handleCapture = (file: File, imgSrc: string) => {
+  const handleCapture = (imgSrc: string) => {
     if (photos.length < 3) {
       setPhotos([...photos, imgSrc]);
     }
@@ -89,10 +89,10 @@ export const DeliveryProtocol = () => {
           </CardHeader>
           <CardContent>
             <div className="mb-4">
-              <WebcamCapture 
+              <WebcamCapture
                 onCapture={handleCapture}
-                overlay="Alinea el equipo en el centro"
-                buttonText="Tomar Foto"
+                overlayType="general"
+                hint="Alinea el equipo en el centro"
               />
             </div>
             {photos.length > 0 && (

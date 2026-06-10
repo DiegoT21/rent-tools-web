@@ -44,7 +44,10 @@ import Swal from "sweetalert2";
 import { contractService } from "@/services/contractService";
 import { rentalsMetricsService, OwnerRentalMetrics } from "@/services/rentalsMetricsService";
 import { authService } from "@/services/authService";
+import { getInventoryAvailabilityLabel } from "@/lib/rentalAvailability";
+import { notifyRentalRequestsUpdated } from "@/hooks/useRentalNotifications";
 import { UserAvatar } from "@/components/UserAvatar";
+import { PhotoCaptureDialog, dataUrlToFile } from "@/components/ui/PhotoCaptureDialog";
 import { Loader2 } from "lucide-react";
 
 function safeParseDate(value: unknown): Date | null {
@@ -174,6 +177,7 @@ export function UserProfile() {
   const [inventoryTotal, setInventoryTotal] = useState<number>(0);
   const [inventoryTotalPages, setInventoryTotalPages] = useState<number>(1);
   const [inventorySearch, setInventorySearch] = useState("");
+  const [activeRentals, setActiveRentals] = useState<RentalRequestListItem[]>([]);
   const [ownerMetrics, setOwnerMetrics] = useState<OwnerRentalMetrics | null>(null);
   const [ownerMetricsLoading, setOwnerMetricsLoading] = useState(false);
 
@@ -185,7 +189,7 @@ export function UserProfile() {
   const [requestsPage, setRequestsPage] = useState(1);
   const [requestsTotalPages, setRequestsTotalPages] = useState(1);
   const [avatarUploading, setAvatarUploading] = useState(false);
-  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
 
   // Redirigir a login si no hay usuario (protección de ruta)
   useEffect(() => {
@@ -197,11 +201,7 @@ export function UserProfile() {
     authService.getProfile().catch(() => undefined);
   }, [accessToken, hasHydrated, navigate]);
 
-  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-
+  const uploadAvatarFile = async (file: File) => {
     if (!file.type.startsWith("image/")) {
       alert("Selecciona un archivo de imagen (JPG, PNG o WebP).");
       return;
@@ -218,7 +218,12 @@ export function UserProfile() {
     }
   };
 
-  const openAvatarPicker = () => avatarInputRef.current?.click();
+  const handleAvatarCapture = async (imageSrc: string, file?: File) => {
+    const uploadFile = file ?? (await dataUrlToFile(imageSrc, "avatar.jpg"));
+    await uploadAvatarFile(uploadFile);
+  };
+
+  const openAvatarPicker = () => setAvatarDialogOpen(true);
 
   const handleLogout = () => {
     clearSession();
@@ -227,6 +232,19 @@ export function UserProfile() {
 
   const setActiveTab = (tab: string) => {
     setSearchParams({ tab });
+  };
+
+  const fetchActiveRentals = async () => {
+    if (!accessToken) return;
+    try {
+      const result = await rentalRequestService.getReceived(1, "approved");
+      const normalized = (result.data ?? []).map((item: any) =>
+        rentalRequestService.normalizeForUi(item)
+      );
+      setActiveRentals(normalized);
+    } catch {
+      setActiveRentals([]);
+    }
   };
 
   const fetchInventoryPage = async (opts: { page: number; mode: "replace" | "append" }) => {
@@ -260,8 +278,19 @@ export function UserProfile() {
     if (!accessToken) return;
     if (activeTab !== "inventario" && activeTab !== "perfil") return;
     fetchInventoryPage({ page: 1, mode: "replace" });
+    fetchActiveRentals();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, accessToken]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    const onUpdated = () => {
+      void fetchActiveRentals();
+    };
+    window.addEventListener("rental-requests-updated", onUpdated);
+    return () => window.removeEventListener("rental-requests-updated", onUpdated);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -614,6 +643,7 @@ export function UserProfile() {
           "La fecha inicial ya pasó. Se propuso un ajuste automático. Esperando confirmación del solicitante."
         );
         fetchRequestsPage({ page: 1, mode: "replace", kind: "received", tab: requestsTab });
+        notifyRentalRequestsUpdated();
         return;
       }
       await alerts.success("Aprobada", "La solicitud fue aprobada. Se generó el contrato.");
@@ -623,6 +653,9 @@ export function UserProfile() {
         contractUuid = String(contract?.uuid ?? "");
       }
       fetchRequestsPage({ page: 1, mode: "replace", kind: "received", tab: requestsTab });
+      fetchActiveRentals();
+      fetchInventoryPage({ page: 1, mode: "replace" });
+      notifyRentalRequestsUpdated();
       if (contractUuid) {
         const go = await alerts.confirm({
           title: "Contrato generado",
@@ -656,6 +689,7 @@ export function UserProfile() {
       await rentalRequestService.act(id, { action: "reject", rejectionReason: value || undefined, _fallbackId: (req as any)._id } as any);
       await alerts.success("Rechazada", "La solicitud fue rechazada.");
       fetchRequestsPage({ page: 1, mode: "replace", kind: "received", tab: requestsTab });
+      notifyRentalRequestsUpdated();
     } catch (e: any) {
       await alerts.error("No se pudo rechazar", e?.response?.data?.message || "Intenta de nuevo.");
     }
@@ -669,23 +703,21 @@ export function UserProfile() {
 
     return filtered.map((tool) => {
       const key = tool?._id || tool?.id || tool?.uuid || tool?.name || crypto.randomUUID();
-      const rentalState = (tool?.rentalState ?? "").toString();
-      const available = rentalState ? rentalState !== "rented" : tool?.isAvailable !== false;
-      const status = rentalState === "rented" ? "Alquilado" : available ? "Disponible" : "No disponible";
-      const statusColor =
-        rentalState === "rented"
-          ? "bg-orange-50 text-orange-700 border-orange-200"
-          : available
-          ? "bg-teal-50 text-teal-600 border-teal-100"
-          : "bg-slate-100 text-slate-500 border-slate-200";
-      const borderColor = rentalState === "rented" ? "border-l-orange-500" : available ? "border-l-teal-500" : "border-l-slate-400";
+      const availability = getInventoryAvailabilityLabel(tool, activeRentals);
       const price = typeof tool?.pricePerDay === "number" ? tool.pricePerDay.toFixed(2) : "--";
-      const category = (tool?.category || "Sin categorÃ­a").toString().toUpperCase();
+      const category = (tool?.category || "Sin categoría").toString().toUpperCase();
       const images = Array.isArray(tool?.imageUrls) ? tool.imageUrls : Array.isArray(tool?.images) ? tool.images : [];
 
-      return { key, tool, available, status, statusColor, borderColor, price, category, images };
+      return {
+        key,
+        tool,
+        ...availability,
+        price,
+        category,
+        images,
+      };
     });
-  }, [inventory, inventorySearch]);
+  }, [inventory, inventorySearch, activeRentals]);
 
   const deleteTool = async (tool: any) => {
     const toolUuid = String(tool?.uuid ?? tool?.id ?? tool?._id ?? "");
@@ -719,7 +751,9 @@ export function UserProfile() {
 
   const metrics = useMemo(() => {
     const totalPublicaciones = inventoryTotal || inventory.length;
-    const alquilados = inventory.filter((t) => (t?.rentalState ?? "").toString() === "rented").length;
+    const alquilados = inventory.filter((tool) =>
+      getInventoryAvailabilityLabel(tool, activeRentals).status === "En renta"
+    ).length;
 
     // Ingresos: hasta que el backend provea métricas de rentas/pagos, se queda en 0.
     const ingresosMes = ownerMetrics?.incomeMonth ?? 0;
@@ -763,7 +797,7 @@ export function UserProfile() {
       utilizacionBadge,
       ingresosBadge,
     };
-  }, [inventory, inventoryTotal, ownerMetrics, ownerMetricsLoading]);
+  }, [inventory, inventoryTotal, ownerMetrics, ownerMetricsLoading, activeRentals]);
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 flex gap-8 min-h-[calc(100vh-140px)]">
@@ -847,13 +881,6 @@ export function UserProfile() {
                 <div className="flex items-start justify-between">
                   <div className="flex gap-6">
                     <div className="relative">
-                      <input
-                        ref={avatarInputRef}
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp"
-                        className="hidden"
-                        onChange={handleAvatarChange}
-                      />
                       <button
                         type="button"
                         onClick={openAvatarPicker}
@@ -1101,14 +1128,14 @@ export function UserProfile() {
                           {item.status}
                         </Badge>
                       </div>
-                      <Progress value={item.available ? 100 : 30} className="h-1.5 bg-slate-100" />
+                      <Progress value={item.available ? 100 : item.status === "En renta" ? 15 : 30} className="h-1.5 bg-slate-100" />
                     </div>
 
                     <div className="text-center md:text-right px-8 border-x border-slate-50">
                       <p className="text-2xl font-black text-slate-900">${item.price}<span className="text-xs text-slate-400 font-bold"> /día</span></p>
                       <p className="text-[10px] font-bold text-primary uppercase tracking-tight flex items-center justify-center md:justify-end gap-1">
                         <ArrowUpRight className="h-3 w-3" />
-                        Publicada
+                        {item.footnote}
                       </p>
                     </div>
 
@@ -1440,6 +1467,15 @@ export function UserProfile() {
           </div>
         )}
       </main>
+
+      <PhotoCaptureDialog
+        open={avatarDialogOpen}
+        onOpenChange={setAvatarDialogOpen}
+        onCapture={handleAvatarCapture}
+        overlayType="face"
+        title="Foto de perfil"
+        description="Elige si quieres usar la cámara web, la cámara de tu dispositivo (Windows, Apple, Android) o subir una imagen existente."
+      />
     </div>
   );
 }

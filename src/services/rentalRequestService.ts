@@ -10,6 +10,7 @@ export interface CreateRentalRequestBody {
   endDate: string; // YYYY-MM-DD
   message?: string;
   pickup?: {
+    label?: string;
     lat?: number;
     lng?: number;
     addressLabel: string;

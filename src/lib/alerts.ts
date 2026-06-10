@@ -1,13 +1,32 @@
 import Swal from "sweetalert2";
 
 const brand = {
-  confirm: "#f97316", // orange-500
-  cancel: "#0f172a", // slate-900
+  confirm: "#f97316",
+  cancel: "#0f172a",
 };
+
+/** Radix Dialog marca el resto del DOM como inert; SweetAlert queda bloqueado sin esto. */
+function unlockSwalInteraction() {
+  const container = Swal.getContainer();
+  if (!container) return;
+  container.style.zIndex = "999999";
+  container.inert = false;
+  container.querySelectorAll<HTMLElement>("[inert]").forEach((el) => {
+    el.inert = false;
+  });
+}
+
+const baseConfig = {
+  confirmButtonText: "OK",
+  returnFocus: false,
+  heightAuto: false,
+  didOpen: unlockSwalInteraction,
+} as const;
 
 export const alerts = {
   success: (title: string, text?: string) =>
     Swal.fire({
+      ...baseConfig,
       icon: "success",
       title,
       text,
@@ -16,6 +35,7 @@ export const alerts = {
 
   error: (title: string, text?: string) =>
     Swal.fire({
+      ...baseConfig,
       icon: "error",
       title,
       text,
@@ -24,6 +44,7 @@ export const alerts = {
 
   info: (title: string, text?: string) =>
     Swal.fire({
+      ...baseConfig,
       icon: "info",
       title,
       text,
@@ -32,6 +53,7 @@ export const alerts = {
 
   warning: (title: string, text?: string) =>
     Swal.fire({
+      ...baseConfig,
       icon: "warning",
       title,
       text,
@@ -47,10 +69,12 @@ export const alerts = {
       showConfirmButton: false,
       timer: 2400,
       timerProgressBar: true,
+      returnFocus: false,
     }),
 
   confirm: async (opts: { title: string; text?: string; confirmText?: string; cancelText?: string }) => {
     const result = await Swal.fire({
+      ...baseConfig,
       icon: "question",
       title: opts.title,
       text: opts.text,
