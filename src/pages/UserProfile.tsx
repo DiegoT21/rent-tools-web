@@ -37,6 +37,12 @@ import { CreateListing } from "./CreateListing";
 import { useAuthStore } from "@/store/authStore";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { rentalRequestService, RentalRequestListItem } from "@/services/rentalRequestService";
+import { userService } from "@/services/userService";
+import { alerts } from "@/lib/alerts";
+import Swal from "sweetalert2";
+import { contractService } from "@/services/contractService";
+import { rentalsMetricsService, OwnerRentalMetrics } from "@/services/rentalsMetricsService";
 import { authService } from "@/services/authService";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Loader2 } from "lucide-react";
@@ -160,7 +166,7 @@ export function UserProfile() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "perfil";
   const navigate = useNavigate();
-  const { user, accessToken, clearSession } = useAuthStore();
+  const { user, accessToken, clearSession, hasHydrated } = useAuthStore();
   const [inventory, setInventory] = useState<any[]>([]);
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [inventoryError, setInventoryError] = useState<string | null>(null);
@@ -168,17 +174,28 @@ export function UserProfile() {
   const [inventoryTotal, setInventoryTotal] = useState<number>(0);
   const [inventoryTotalPages, setInventoryTotalPages] = useState<number>(1);
   const [inventorySearch, setInventorySearch] = useState("");
+  const [ownerMetrics, setOwnerMetrics] = useState<OwnerRentalMetrics | null>(null);
+  const [ownerMetricsLoading, setOwnerMetricsLoading] = useState(false);
+
+  const [requestsMode, setRequestsMode] = useState<"received" | "sent">("received");
+  const [requestsTab, setRequestsTab] = useState<"pending" | "approved" | "all">("pending");
+  const [requests, setRequests] = useState<RentalRequestListItem[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [requestsError, setRequestsError] = useState<string | null>(null);
+  const [requestsPage, setRequestsPage] = useState(1);
+  const [requestsTotalPages, setRequestsTotalPages] = useState(1);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Redirigir a login si no hay usuario (protección de ruta)
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!accessToken) {
       navigate("/login");
       return;
     }
     authService.getProfile().catch(() => undefined);
-  }, [accessToken, navigate]);
+  }, [accessToken, hasHydrated, navigate]);
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -246,6 +263,404 @@ export function UserProfile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, accessToken]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!accessToken) return;
+      if (activeTab !== "perfil" && activeTab !== "inventario") return;
+
+      setOwnerMetricsLoading(true);
+      try {
+        const now = new Date();
+        const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+        const data = await rentalsMetricsService.getOwnerMetrics(month);
+        if (!cancelled) setOwnerMetrics(data);
+      } catch {
+        if (!cancelled) setOwnerMetrics(null);
+      } finally {
+        if (!cancelled) setOwnerMetricsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, accessToken]);
+
+  const fetchRequestsPage = async (opts: {
+    page: number;
+    mode: "replace" | "append";
+    kind: "received" | "sent";
+    tab: "pending" | "approved" | "all";
+  }) => {
+    if (!accessToken) return;
+    setRequestsLoading(true);
+    setRequestsError(null);
+
+    try {
+      const result =
+        opts.kind === "received"
+          ? await rentalRequestService.getReceived(opts.page, opts.tab)
+          : await rentalRequestService.getSent(opts.page, opts.tab);
+
+      const normalized = (result.data ?? []).map((r: any) => rentalRequestService.normalizeForUi(r));
+      setRequests((prev) => (opts.mode === "append" ? [...prev, ...normalized] : normalized));
+      setRequestsPage(Number(result.pagination?.page ?? opts.page));
+      setRequestsTotalPages(Number(result.pagination?.totalPages ?? 1));
+      return normalized;
+    } catch (e: any) {
+      setRequests([]);
+      setRequestsError(e?.response?.data?.message || "No se pudieron cargar las solicitudes.");
+      setRequestsPage(1);
+      setRequestsTotalPages(1);
+      return [];
+    } finally {
+      setRequestsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!accessToken) return;
+    if (activeTab !== "solicitudes") return;
+    (async () => {
+      const current = await fetchRequestsPage({ page: 1, mode: "replace", kind: requestsMode, tab: requestsTab });
+      // Si el usuario no tiene recibidas pero sí enviadas, cambiamos automáticamente a "enviadas"
+      if (requestsMode === "received") {
+        try {
+          const sent = await rentalRequestService.getSent(1, requestsTab);
+          if ((sent.data?.length ?? 0) > 0 && (current?.length ?? 0) === 0) {
+            setRequestsMode("sent");
+          }
+        } catch {
+          // ignore
+        }
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, accessToken, requestsMode, requestsTab]);
+
+  // requests are already filtered server-side via requestsTab (pending/approved/all)
+
+  const showRenterReviews = async (renterUuid: string, renterName: string) => {
+    if (!renterUuid) {
+      await alerts.warning("Sin identificador", "No se pudo obtener el id del solicitante para cargar sus reviews.");
+      return;
+    }
+    try {
+      const data = await userService.getReviews(renterUuid);
+      const summary = data.summary ?? { count: 0, averageRating: 0 };
+      const reviews = Array.isArray(data.reviews) ? data.reviews : [];
+      const rows = reviews
+        .slice(0, 6)
+        .map((r) => {
+          const rating = typeof r.rating === "number" ? r.rating : 0;
+          const comment = (r.comment ?? "").toString();
+          return `<div style="padding:10px 0;border-top:1px solid #e2e8f0;">
+            <div style="font-weight:700;color:#0f172a;">${rating.toFixed(1)} / 5</div>
+            <div style="color:#334155;font-size:13px;white-space:pre-line;">${comment || "Sin comentario"}</div>
+          </div>`;
+        })
+        .join("");
+
+      await Swal.fire({
+        title: `Reviews de ${renterName}`,
+        html: `
+          <div style="text-align:left">
+            <div style="margin-bottom:10px;color:#0f172a;">
+              <b>${summary.averageRating?.toFixed?.(1) ?? summary.averageRating}</b> promedio · <b>${summary.count}</b> review(s)
+            </div>
+            <div style="max-height:320px;overflow:auto;border:1px solid #e2e8f0;border-radius:12px;padding:0 12px;">
+              ${rows || `<div style="padding:14px 0;color:#64748b;">Este usuario aún no tiene reviews.</div>`}
+            </div>
+          </div>
+        `,
+        confirmButtonText: "Listo",
+        confirmButtonColor: "#f97316",
+      });
+    } catch (e: any) {
+      await alerts.error("No se pudieron cargar los reviews", e?.response?.data?.message || "Intenta de nuevo.");
+    }
+  };
+
+  const showRequestSummary = async (req: RentalRequestListItem) => {
+    const formatDate = (value?: string) => {
+      if (!value) return "—";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "—";
+      return new Intl.DateTimeFormat("es-PA", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }).format(date);
+    };
+    const startText = formatDate(req.startDate);
+    const endText = formatDate(req.endDate);
+    const pickupLabel = req.pickupProposal?.label || req.pickup?.label || "Punto de encuentro";
+    const pickupText = req.pickupProposal?.addressLabel || req.pickup?.addressLabel || req.pickupProposal?.notes || req.pickupProposal?.pickupAt || "Por definir";
+    const pickupAtValue = req.pickupProposal?.pickupAt || req.pickup?.pickupAt;
+    const pickupDateText = pickupAtValue ? formatDate(pickupAtValue) : startText;
+    const pickupAtText = pickupAtValue
+      ? new Intl.DateTimeFormat("es-PA", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        }).format(new Date(pickupAtValue))
+      : "—";
+    const subtotal = Number(req.pricingSummary?.subtotal ?? 0) || 0;
+    const hold = Number(req.pricingSummary?.hold ?? 0) || 0;
+    const total = Number(req.pricingSummary?.totalEstimated ?? subtotal + hold) || subtotal + hold;
+
+    await Swal.fire({
+      title: "Resumen de solicitud",
+      html: `
+        <div style="text-align:left;display:grid;gap:12px">
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;">
+            <div style="font-size:12px;font-weight:700;color:#94a3b8;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">Fechas</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div>
+                <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;">Fecha de entrega</div>
+                <div style="font-size:15px;font-weight:800;color:#0f172a;">${pickupDateText}</div>
+              </div>
+              <div>
+                <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;">Fecha de devolución</div>
+                <div style="font-size:15px;font-weight:800;color:#0f172a;">${endText}</div>
+              </div>
+            </div>
+          </div>
+          <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:14px;padding:14px 16px;">
+            <div style="font-size:12px;font-weight:700;color:#fb923c;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">Punto elegido</div>
+            <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:4px;">${pickupLabel}</div>
+            <div style="font-size:13px;line-height:1.45;color:#475569;">${pickupText}</div>
+            <div style="margin-top:8px;font-size:13px;color:#64748b;"><b>Hora de entrega:</b> ${pickupAtText}</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;">
+              <div style="font-size:12px;font-weight:700;color:#94a3b8;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">Subtotal</div>
+              <div style="font-size:18px;font-weight:800;color:#0f172a;">$${subtotal}</div>
+            </div>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;">
+              <div style="font-size:12px;font-weight:700;color:#94a3b8;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">Hold / depósito</div>
+              <div style="font-size:18px;font-weight:800;color:#0f172a;">$${hold}</div>
+            </div>
+          </div>
+          <div style="background:#0f172a;border-radius:16px;padding:16px;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <span style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.8;">Total estimado</span>
+            <span style="font-size:24px;font-weight:900;">$${total}</span>
+          </div>
+        </div>
+      `,
+      confirmButtonText: "Listo",
+      confirmButtonColor: "#f97316",
+    });
+  };
+
+  const counterPropose = async (req: RentalRequestListItem) => {
+    const { isConfirmed, value } = await Swal.fire({
+      title: "Proponer cambio (pickup)",
+      html: `
+        <div style="text-align:left">
+          <div style="color:#64748b;font-size:13px;margin-bottom:8px;">Propón un punto y hora aproximados.</div>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;margin-bottom:10px;">
+            Lugar (texto)
+            <input id="cp_addr" class="swal2-input" style="margin:0;height:40px" placeholder="Ej. Albrook Mall - entrada norte" />
+          </label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+              Lat (opcional)
+              <input id="cp_lat" class="swal2-input" style="margin:0;height:40px" placeholder="8.99" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+              Lng (opcional)
+              <input id="cp_lng" class="swal2-input" style="margin:0;height:40px" placeholder="-79.56" />
+            </label>
+          </div>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;margin-bottom:10px;">
+            Hora de entrega
+            <input id="cp_at" type="datetime-local" class="swal2-input" style="margin:0;height:40px" />
+          </label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+              Nueva fecha inicio (opcional)
+              <input id="cp_start" type="date" class="swal2-input" style="margin:0;height:40px" />
+            </label>
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+              Nueva fecha fin (opcional)
+              <input id="cp_end" type="date" class="swal2-input" style="margin:0;height:40px" />
+            </label>
+          </div>
+          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+            Notas (opcional)
+            <input id="cp_notes" class="swal2-input" style="margin:0;height:40px" placeholder="Ej. Frente al banco X" />
+          </label>
+        </div>
+      `,
+      confirmButtonText: "Enviar cambio",
+      showCancelButton: true,
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#f97316",
+      cancelButtonColor: "#0f172a",
+      preConfirm: () => {
+        const addr = (document.getElementById("cp_addr") as HTMLInputElement | null)?.value?.trim() ?? "";
+        const latRaw = (document.getElementById("cp_lat") as HTMLInputElement | null)?.value?.trim() ?? "";
+        const lngRaw = (document.getElementById("cp_lng") as HTMLInputElement | null)?.value?.trim() ?? "";
+        const atRaw = (document.getElementById("cp_at") as HTMLInputElement | null)?.value ?? "";
+        const startRaw = (document.getElementById("cp_start") as HTMLInputElement | null)?.value ?? "";
+        const endRaw = (document.getElementById("cp_end") as HTMLInputElement | null)?.value ?? "";
+        const notes = (document.getElementById("cp_notes") as HTMLInputElement | null)?.value?.trim() ?? "";
+        if (!addr) {
+          Swal.showValidationMessage("El lugar es requerido.");
+          return;
+        }
+        if (!atRaw) {
+          Swal.showValidationMessage("La hora de entrega es requerida.");
+          return;
+        }
+        if ((startRaw && !endRaw) || (!startRaw && endRaw)) {
+          Swal.showValidationMessage("Si cambias fechas, debes indicar inicio y fin.");
+          return;
+        }
+        if (startRaw && endRaw && endRaw < startRaw) {
+          Swal.showValidationMessage("La fecha fin no puede ser anterior a la fecha inicio.");
+          return;
+        }
+
+        const pickupAt = new Date(atRaw).toISOString();
+        const lat = latRaw ? Number(latRaw) : undefined;
+        const lng = lngRaw ? Number(lngRaw) : undefined;
+        if ((latRaw && Number.isNaN(lat)) || (lngRaw && Number.isNaN(lng))) {
+          Swal.showValidationMessage("Lat/Lng inválidos.");
+          return;
+        }
+        const dates =
+          startRaw && endRaw
+            ? { startDate: new Date(startRaw + "T00:00:00.000Z").toISOString(), endDate: new Date(endRaw + "T00:00:00.000Z").toISOString() }
+            : null;
+        return { pickup: { addressLabel: addr, pickupAt, lat, lng, notes: notes || undefined }, dates };
+      },
+    });
+
+    if (!isConfirmed || !value) return;
+    try {
+      const id = rentalRequestService.getIdentifier(req as any);
+      await rentalRequestService.act(
+        id,
+        { action: "counter_propose", pickup: value.pickup, dates: value.dates ?? undefined, _fallbackId: (req as any)._id } as any
+      );
+      await alerts.success("Enviado", "Se envió tu propuesta al solicitante.");
+      fetchRequestsPage({ page: 1, mode: "replace", kind: "received", tab: requestsTab });
+    } catch (e: any) {
+      await alerts.error("No se pudo enviar", e?.response?.data?.message || "Intenta de nuevo.");
+    }
+  };
+
+  const acceptCounter = async (req: RentalRequestListItem) => {
+    if (String((req as any)?.status ?? "") !== "pending_tenant") {
+      await alerts.info("Sin contraoferta", "No hay un ajuste pendiente para aceptar.");
+      return;
+    }
+    const ok = await alerts.confirm({
+      title: "Aceptar cambio",
+      text: "¿Aceptas la propuesta del propietario?",
+      confirmText: "Aceptar",
+      cancelText: "Cancelar",
+    });
+    if (!ok) return;
+    try {
+      const id = rentalRequestService.getIdentifier(req as any);
+      await rentalRequestService.act(id, { action: "accept_counter", _fallbackId: (req as any)._id } as any);
+      await alerts.success("Aceptado", "Se aceptó la propuesta. Espera aprobación final.");
+      fetchRequestsPage({ page: 1, mode: "replace", kind: "sent", tab: requestsTab });
+    } catch (e: any) {
+      await alerts.error("No se pudo aceptar", e?.response?.data?.message || "Intenta de nuevo.");
+    }
+  };
+
+  const cancelRequest = async (req: RentalRequestListItem) => {
+    const ok = await alerts.confirm({
+      title: "Cancelar solicitud",
+      text: "¿Seguro que deseas cancelar esta solicitud?",
+      confirmText: "Cancelar solicitud",
+      cancelText: "Volver",
+    });
+    if (!ok) return;
+    try {
+      const id = rentalRequestService.getIdentifier(req as any);
+      await rentalRequestService.act(id, { action: "cancel", _fallbackId: (req as any)._id } as any);
+      await alerts.success("Cancelada", "Tu solicitud fue cancelada.");
+      fetchRequestsPage({ page: 1, mode: "replace", kind: "sent" });
+    } catch (e: any) {
+      await alerts.error("No se pudo cancelar", e?.response?.data?.message || "Intenta de nuevo.");
+    }
+  };
+
+  const approveRequest = async (req: RentalRequestListItem) => {
+    const ok = await alerts.confirm({
+      title: "Aprobar solicitud",
+      text: `¿Aprobar la solicitud de ${req.renter?.firstName ?? "usuario"} para "${req.tool?.name ?? "herramienta"}"?`,
+      confirmText: "Aprobar",
+      cancelText: "Cancelar",
+    });
+    if (!ok) return;
+    try {
+      const id = rentalRequestService.getIdentifier(req as any);
+      const result = await rentalRequestService.act(id, { action: "approve", _fallbackId: (req as any)._id } as any);
+      const updatedStatus = String(result?.request?.status ?? result?.status ?? "");
+      if (updatedStatus === "pending_tenant") {
+        await alerts.info(
+          "Ajuste automático propuesto",
+          "La fecha inicial ya pasó. Se propuso un ajuste automático. Esperando confirmación del solicitante."
+        );
+        fetchRequestsPage({ page: 1, mode: "replace", kind: "received", tab: requestsTab });
+        return;
+      }
+      await alerts.success("Aprobada", "La solicitud fue aprobada. Se generó el contrato.");
+      let contractUuid = String(result?.contract?.uuid ?? result?.contractUuid ?? "");
+      if (!contractUuid) {
+        const contract = await contractService.getByRequest(String((req as any)?.uuid ?? ""));
+        contractUuid = String(contract?.uuid ?? "");
+      }
+      fetchRequestsPage({ page: 1, mode: "replace", kind: "received", tab: requestsTab });
+      if (contractUuid) {
+        const go = await alerts.confirm({
+          title: "Contrato generado",
+          text: "La solicitud fue aprobada. ¿Quieres abrir el contrato ahora?",
+          confirmText: "Ver contrato",
+          cancelText: "Más tarde",
+        });
+        if (go) navigate(`/rentals/contracts/${contractUuid}`);
+      }
+    } catch (e: any) {
+      await alerts.error("No se pudo aprobar", e?.response?.data?.message || "Intenta de nuevo.");
+    }
+  };
+
+  const rejectRequest = async (req: RentalRequestListItem) => {
+    const { isConfirmed, value } = await Swal.fire({
+      title: "Rechazar solicitud",
+      input: "text",
+      inputLabel: "Motivo (opcional)",
+      inputPlaceholder: "Ej. No disponible en esas fechas",
+      showCancelButton: true,
+      confirmButtonText: "Rechazar",
+      cancelButtonText: "Cancelar",
+      confirmButtonColor: "#f97316",
+      cancelButtonColor: "#0f172a",
+      preConfirm: (val) => (typeof val === "string" ? val.trim() : ""),
+    });
+    if (!isConfirmed) return;
+    try {
+      const id = rentalRequestService.getIdentifier(req as any);
+      await rentalRequestService.act(id, { action: "reject", rejectionReason: value || undefined, _fallbackId: (req as any)._id } as any);
+      await alerts.success("Rechazada", "La solicitud fue rechazada.");
+      fetchRequestsPage({ page: 1, mode: "replace", kind: "received", tab: requestsTab });
+    } catch (e: any) {
+      await alerts.error("No se pudo rechazar", e?.response?.data?.message || "Intenta de nuevo.");
+    }
+  };
+
   const inventoryCards = useMemo(() => {
     const query = inventorySearch.trim().toLowerCase();
     const filtered = query
@@ -254,12 +669,16 @@ export function UserProfile() {
 
     return filtered.map((tool) => {
       const key = tool?._id || tool?.id || tool?.uuid || tool?.name || crypto.randomUUID();
-      const available = tool?.isAvailable !== false;
-      const status = available ? "Disponible" : "No disponible";
-      const statusColor = available
-        ? "bg-teal-50 text-teal-600 border-teal-100"
-        : "bg-slate-100 text-slate-500 border-slate-200";
-      const borderColor = available ? "border-l-teal-500" : "border-l-slate-400";
+      const rentalState = (tool?.rentalState ?? "").toString();
+      const available = rentalState ? rentalState !== "rented" : tool?.isAvailable !== false;
+      const status = rentalState === "rented" ? "Alquilado" : available ? "Disponible" : "No disponible";
+      const statusColor =
+        rentalState === "rented"
+          ? "bg-orange-50 text-orange-700 border-orange-200"
+          : available
+          ? "bg-teal-50 text-teal-600 border-teal-100"
+          : "bg-slate-100 text-slate-500 border-slate-200";
+      const borderColor = rentalState === "rented" ? "border-l-orange-500" : available ? "border-l-teal-500" : "border-l-slate-400";
       const price = typeof tool?.pricePerDay === "number" ? tool.pricePerDay.toFixed(2) : "--";
       const category = (tool?.category || "Sin categorÃ­a").toString().toUpperCase();
       const images = Array.isArray(tool?.imageUrls) ? tool.imageUrls : Array.isArray(tool?.images) ? tool.images : [];
@@ -268,12 +687,42 @@ export function UserProfile() {
     });
   }, [inventory, inventorySearch]);
 
+  const deleteTool = async (tool: any) => {
+    const toolUuid = String(tool?.uuid ?? tool?.id ?? tool?._id ?? "");
+    if (!toolUuid) {
+      await alerts.error("No se pudo borrar", "No se encontró el identificador de la herramienta.");
+      return;
+    }
+
+    const ok = await alerts.confirm({
+      title: "¿Seguro que quieres borrar esta herramienta?",
+      text: "Esta acción no se puede deshacer.",
+      confirmText: "Sí, borrar",
+      cancelText: "Cancelar",
+    });
+    if (!ok) return;
+
+    try {
+      await api.delete(`/tools/${encodeURIComponent(toolUuid)}`);
+      await alerts.success("Herramienta eliminada", "La herramienta fue eliminada exitosamente.");
+      await fetchInventoryPage({ page: 1, mode: "replace" });
+    } catch (e: any) {
+      const status = e?.response?.status;
+      const message = e?.response?.data?.message || "No se pudo eliminar la herramienta.";
+      if (status === 409) {
+        await alerts.warning("No se puede borrar", message || "La herramienta está alquilada o tiene un contrato activo.");
+        return;
+      }
+      await alerts.error("No se pudo borrar", message);
+    }
+  };
+
   const metrics = useMemo(() => {
     const totalPublicaciones = inventoryTotal || inventory.length;
-    const alquilados = inventory.filter((t) => t?.isAvailable === false).length;
+    const alquilados = inventory.filter((t) => (t?.rentalState ?? "").toString() === "rented").length;
 
     // Ingresos: hasta que el backend provea métricas de rentas/pagos, se queda en 0.
-    const ingresosMes = 0;
+    const ingresosMes = ownerMetrics?.incomeMonth ?? 0;
 
     // Publicaciones esta semana (y delta vs semana anterior) si existe createdAt
     const now = new Date();
@@ -304,7 +753,7 @@ export function UserProfile() {
     const utilizacion = totalPublicaciones > 0 ? Math.round((alquilados / totalPublicaciones) * 100) : 0;
     const utilizacionBadge = `${utilizacion}% utilizaciÃ³n`;
 
-    const ingresosBadge = "+0% vs mes pasado";
+    const ingresosBadge = ownerMetricsLoading ? "Calculando..." : `${ownerMetrics?.month ?? ""}`;
 
     return {
       totalPublicaciones,
@@ -314,7 +763,7 @@ export function UserProfile() {
       utilizacionBadge,
       ingresosBadge,
     };
-  }, [inventory]);
+  }, [inventory, inventoryTotal, ownerMetrics, ownerMetricsLoading]);
 
   return (
     <div className="max-w-7xl mx-auto py-8 px-4 flex gap-8 min-h-[calc(100vh-140px)]">
@@ -670,7 +1119,12 @@ export function UserProfile() {
                       <Button variant="ghost" size="icon" className="rounded-full text-slate-400 hover:bg-slate-50">
                         {item.available ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
                       </Button>
-                      <Button variant="ghost" size="icon" className="rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50"
+                        onClick={() => deleteTool(item.tool)}
+                      >
                         <Trash2 className="h-5 w-5" />
                       </Button>
                     </div>
@@ -688,6 +1142,282 @@ export function UserProfile() {
                   className="bg-orange-50 text-primary font-bold h-12 px-8 rounded-xl hover:bg-orange-100 transition-colors"
                 >
                   {inventoryLoading ? "Cargando..." : "Cargar más herramientas"}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === "solicitudes" && (
+          <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="space-y-1">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  Cuenta <span className="text-[8px]">●</span> Solicitudes
+                </p>
+                <h1 className="text-4xl font-black text-slate-900 tracking-tight">Solicitudes</h1>
+              </div>
+              <div className="flex flex-wrap gap-2 items-center">
+                <div className="flex rounded-xl overflow-hidden border border-slate-200 bg-white">
+                  <button
+                    type="button"
+                    onClick={() => setRequestsMode("received")}
+                    className={cn(
+                      "h-11 px-5 text-sm font-bold",
+                      requestsMode === "received" ? "bg-orange-500 text-white" : "text-slate-700 hover:bg-slate-50"
+                    )}
+                  >
+                    Recibidas
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRequestsMode("sent")}
+                    className={cn(
+                      "h-11 px-5 text-sm font-bold",
+                      requestsMode === "sent" ? "bg-orange-500 text-white" : "text-slate-700 hover:bg-slate-50"
+                    )}
+                  >
+                    Enviadas
+                  </button>
+                </div>
+
+                <div className="flex rounded-xl overflow-hidden border border-slate-200 bg-white">
+                  <button
+                    type="button"
+                    onClick={() => setRequestsTab("pending")}
+                    className={cn(
+                      "h-11 px-4 text-sm font-bold",
+                      requestsTab === "pending" ? "bg-orange-500 text-white" : "text-slate-700 hover:bg-slate-50"
+                    )}
+                  >
+                    Pendientes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRequestsTab("approved")}
+                    className={cn(
+                      "h-11 px-4 text-sm font-bold",
+                      requestsTab === "approved" ? "bg-orange-500 text-white" : "text-slate-700 hover:bg-slate-50"
+                    )}
+                  >
+                    Aprobadas
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRequestsTab("all")}
+                    className={cn(
+                      "h-11 px-4 text-sm font-bold",
+                      requestsTab === "all" ? "bg-orange-500 text-white" : "text-slate-700 hover:bg-slate-50"
+                    )}
+                  >
+                    Todas
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {requestsLoading && (
+                <Card className="border-none shadow-sm bg-white">
+                  <CardContent className="p-6 text-slate-600 font-semibold">Cargando solicitudes...</CardContent>
+                </Card>
+              )}
+
+              {!requestsLoading && requestsError && (
+                <Card className="border-none shadow-sm bg-white border border-red-100">
+                  <CardContent className="p-6 text-red-600 font-semibold">{requestsError}</CardContent>
+                </Card>
+              )}
+
+              {!requestsLoading && !requestsError && requests.length === 0 && (
+                <Card className="border-none shadow-sm bg-white">
+                  <CardContent className="p-6 text-slate-600 font-semibold">
+                    No tienes solicitudes {requestsMode === "received" ? "recibidas" : "enviadas"} para este filtro.
+                  </CardContent>
+                </Card>
+              )}
+
+              {!requestsLoading &&
+                !requestsError &&
+                requests.map((req) => {
+                  const person = (req as any)?.tenant ?? (req as any)?.renter ?? (req as any)?.user ?? null;
+                  const renterUuid = String(person?.uuid ?? person?._id ?? person?.id ?? "");
+                  const renterFirst = person?.firstName ?? person?.name ?? "";
+                  const renterLast = person?.lastName ?? "";
+                  const renterName = `${String(renterFirst || "Usuario")} ${String(renterLast || "")}`.trim();
+                  const toolName = req.tool?.name ?? "Herramienta";
+                  const contractUuid = String((req as any)?.contract?.uuid ?? (req as any)?.contractUuid ?? "");
+                  const statusLabel =
+                    req.status === "approved"
+                      ? "Aprobada"
+                      : req.status === "rejected"
+                      ? "Rechazada"
+                      : req.status === "pending_tenant"
+                      ? "Esperando solicitante"
+                      : "Pendiente";
+                  const statusClass =
+                    req.status === "approved"
+                      ? "bg-green-50 text-green-700 border-green-200"
+                      : req.status === "rejected"
+                      ? "bg-red-50 text-red-700 border-red-200"
+                      : "bg-orange-50 text-orange-700 border-orange-200";
+
+                  const canOwnerAct = req.status === "pending" || req.status === "pending_owner";
+                  const canTenantAct = req.status === "pending_tenant";
+
+                  return (
+                    <Card key={req.uuid} className="border-none shadow-sm bg-white overflow-hidden">
+                      <CardContent className="p-6 flex flex-col md:flex-row md:items-center gap-5">
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className={cn("rounded-full px-3 py-0.5 font-bold text-[10px]", statusClass)}>
+                              {statusLabel}
+                            </Badge>
+                            <div className="text-[10px] font-black text-slate-400 tracking-widest uppercase">
+                              {(req as any).fromDate ?? (req as any).startDate ?? "—"} → {(req as any).toDate ?? (req as any).endDate ?? "—"}
+                            </div>
+                          </div>
+                          <div className="text-xl font-bold text-slate-900">{toolName}</div>
+                          <div className="text-sm text-slate-600">
+                            {requestsMode === "received" ? (
+                              <span>
+                                Solicitante: <span className="font-semibold">{renterName}</span>
+                              </span>
+                            ) : (
+                              <span>
+                                Estado: <span className="font-semibold">{statusLabel}</span>
+                              </span>
+                            )}
+                          </div>
+                          {req.message && <div className="text-sm text-slate-500 line-clamp-2">“{req.message}”</div>}
+                          {req.status === "rejected" && req.rejectionReason && (
+                            <div className="text-sm text-red-600">Motivo: {req.rejectionReason}</div>
+                          )}
+                        </div>
+
+                        {requestsMode === "received" && (
+                          <div className="flex gap-2 shrink-0">
+                            <Button
+                              variant="secondary"
+                              onClick={() => showRenterReviews(renterUuid, renterName)}
+                              disabled={!renterUuid}
+                              className="h-11 px-5 rounded-xl bg-slate-50 text-slate-700 font-bold hover:bg-slate-100"
+                            >
+                              Ver reviews
+                            </Button>
+
+                            <Button
+                              variant="secondary"
+                              onClick={() => showRequestSummary(req)}
+                              className="h-11 px-5 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50"
+                            >
+                              Ver resumen
+                            </Button>
+
+                            <Button
+                              onClick={() => approveRequest(req)}
+                              disabled={!canOwnerAct}
+                              className="h-11 px-5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold"
+                            >
+                              Aprobar
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              onClick={() => rejectRequest(req)}
+                              disabled={!canOwnerAct}
+                              className="h-11 px-5 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50"
+                            >
+                              Rechazar
+                            </Button>
+
+                            {contractUuid && (
+                              <Button
+                                variant="secondary"
+                                onClick={() => navigate(`/rentals/contracts/${contractUuid}`)}
+                                className="h-11 px-5 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800"
+                              >
+                                Ver contrato
+                              </Button>
+                            )}
+
+                            {!contractUuid && req.status === "approved" && (
+                              <Button
+                                variant="secondary"
+                                onClick={async () => {
+                                  try {
+                                    const c = await contractService.getByRequest(String((req as any)?.uuid ?? ""));
+                                    if (c?.uuid) navigate(`/rentals/contracts/${c.uuid}`);
+                                    else await alerts.info("Sin contrato", "Aún no se encontró el contrato para esta solicitud.");
+                                  } catch (e: any) {
+                                    await alerts.error("No se pudo abrir", e?.response?.data?.message || "Intenta de nuevo.");
+                                  }
+                                }}
+                                className="h-11 px-5 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800"
+                              >
+                                Ver contrato
+                              </Button>
+                            )}
+                          </div>
+                        )}
+
+                        {requestsMode === "sent" && (
+                          <div className="flex gap-2 shrink-0">
+                            <Button
+                              variant="secondary"
+                              onClick={() => showRequestSummary(req)}
+                              className="h-11 px-5 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50"
+                            >
+                              Ver resumen
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              onClick={() => cancelRequest(req)}
+                              disabled={req.status === "approved" || req.status === "rejected"}
+                              className="h-11 px-5 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50"
+                            >
+                              Cancelar
+                            </Button>
+                            {contractUuid && (
+                              <Button
+                                onClick={() => navigate(`/rentals/contracts/${contractUuid}`)}
+                                className="h-11 px-5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold"
+                              >
+                                Ver contrato
+                              </Button>
+                            )}
+                            {!contractUuid && req.status === "approved" && (
+                              <Button
+                                onClick={async () => {
+                                  try {
+                                    const c = await contractService.getByRequest(String((req as any)?.uuid ?? ""));
+                                    if (c?.uuid) navigate(`/rentals/contracts/${c.uuid}`);
+                                    else await alerts.info("Sin contrato", "Aún no se encontró el contrato para esta solicitud.");
+                                  } catch (e: any) {
+                                    await alerts.error("No se pudo abrir", e?.response?.data?.message || "Intenta de nuevo.");
+                                  }
+                                }}
+                                className="h-11 px-5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold"
+                              >
+                                Ver contrato
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+            </div>
+
+            <div className="flex justify-center pt-4">
+              {requestsPage < requestsTotalPages && (
+                <Button
+                  variant="secondary"
+                  disabled={requestsLoading}
+                  onClick={() => fetchRequestsPage({ page: requestsPage + 1, mode: "append", kind: requestsMode, tab: requestsTab })}
+                  className="bg-orange-50 text-primary font-bold h-12 px-8 rounded-xl hover:bg-orange-100 transition-colors"
+                >
+                  {requestsLoading ? "Cargando..." : "Cargar más"}
                 </Button>
               )}
             </div>

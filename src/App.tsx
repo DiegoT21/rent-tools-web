@@ -8,8 +8,8 @@ import { RegisterStepTwo } from './pages/RegisterStepTwo'
 import { RegisterStepThree } from './pages/RegisterStepThree'
 import { CreateListing } from './pages/CreateListing'
 import { UserProfile } from './pages/UserProfile'
-import { Checkout } from './pages/Checkout'
-import { DeliveryProtocol } from './pages/DeliveryProtocol'
+import { ToolDetails } from './pages/ToolDetails'
+import { ContractDetails } from './pages/ContractDetails'
 
 function App() {
   return (
@@ -23,6 +23,16 @@ function App() {
         <Route path="/create-listing" element={
           <RootLayout>
             <CreateListing />
+          </RootLayout>
+        } />
+        <Route path="/tools/:uuid" element={
+          <RootLayout>
+            <ToolDetails />
+          </RootLayout>
+        } />
+        <Route path="/rentals/contracts/:uuid" element={
+          <RootLayout>
+            <ContractDetails />
           </RootLayout>
         } />
         <Route path="/profile" element={

@@ -5,6 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Search, MapPin } from "lucide-react";
+import { api } from "@/lib/api";
 
 // Fix for default marker icon in Leaflet + React
 
@@ -21,6 +22,9 @@ L.Marker.prototype.options.icon = DefaultIcon;
 const DEFAULT_CENTER: [number, number] = [8.9824, -79.5199]; // Ciudad de Panamá
 
 interface LocationPickerProps {
+  title?: string;
+  description?: string;
+  searchPlaceholder?: string;
   onLocationSelect: (location: { address: string; lat: number; lng: number }) => void;
 }
 
@@ -43,31 +47,48 @@ function ChangeView({ center }: { center: [number, number] }) {
   return null;
 }
 
-export const LocationPicker: React.FC<LocationPickerProps> = ({ onLocationSelect }) => {
+export const LocationPicker: React.FC<LocationPickerProps> = ({
+  title = "Dirección de Entrega y Devolución",
+  description = "O haz clic en el mapa para ajustar la ubicación exacta.",
+  searchPlaceholder = "Buscar dirección (ej. Paseo de la Reforma, CDMX)",
+  onLocationSelect,
+}) => {
   const [position, setPosition] = useState<[number, number]>(DEFAULT_CENTER);
   const [address, setAddress] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  // Reverse Geocoding using Nominatim
-  const reverseGeocode = async (lat: number, lng: number) => {
+  const reverseGeocode = useCallback(async (lat: number, lng: number) => {
     try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`);
-      const data = await response.json();
-      if (data && data.display_name) {
-        setAddress(data.display_name);
-        setSearchQuery(data.display_name);
+      const response = await api.get("/geo/reverse", {
+        params: { lat, lng },
+      });
+
+      const resolvedAddress = response.data?.data?.address || response.data?.address;
+      if (resolvedAddress) {
+        setAddress(resolvedAddress);
+        setSearchQuery(resolvedAddress);
         onLocationSelect({
-          address: data.display_name,
+          address: resolvedAddress,
           lat,
-          lng
+          lng,
         });
+        return;
       }
     } catch (error) {
-      console.error("Error in reverse geocoding:", error);
+      console.error("Error in backend reverse geocoding:", error);
     }
-  };
+
+    const fallbackAddress = `Lat ${lat.toFixed(6)}, Lng ${lng.toFixed(6)}`;
+    setAddress(fallbackAddress);
+    setSearchQuery(fallbackAddress);
+    onLocationSelect({
+      address: fallbackAddress,
+      lat,
+      lng,
+    });
+  }, [onLocationSelect]);
 
   // Forward Geocoding (Search) using Nominatim
   const handleSearch = async (query: string) => {
@@ -103,16 +124,16 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ onLocationSelect
     const newPos: [number, number] = [latlng.lat, latlng.lng];
     setPosition(newPos);
     reverseGeocode(latlng.lat, latlng.lng);
-  }, [onLocationSelect]);
+  }, [reverseGeocode]);
 
   return (
     <div className="space-y-4">
       <div className="relative space-y-2">
-        <Label htmlFor="address-search" className="text-slate-600 font-semibold">Dirección de Entrega y Devolución</Label>
+        <Label htmlFor="address-search" className="text-slate-600 font-semibold">{title}</Label>
         <div className="relative">
           <Input
             id="address-search"
-            placeholder="Buscar dirección (ej. Paseo de la Reforma, CDMX)"
+            placeholder={searchPlaceholder}
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -145,7 +166,10 @@ export const LocationPicker: React.FC<LocationPickerProps> = ({ onLocationSelect
       </div>
 
       <div className="text-sm text-slate-500">
-        O haz clic en el mapa para ajustar la ubicación exacta.
+        {description}
+      </div>
+      <div className="text-xs text-slate-500">
+        Si eliges el pin directamente, guardamos la ubicación y usamos la dirección buscada más reciente o las coordenadas como referencia.
       </div>
 
       <div className="relative rounded-xl overflow-hidden h-[350px] border border-slate-200 shadow-inner z-[1]">
