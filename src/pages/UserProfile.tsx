@@ -35,7 +35,7 @@ import { Progress } from "@/components/ui/progress";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { CreateListing } from "./CreateListing";
 import { useAuthStore } from "@/store/authStore";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { rentalRequestService, RentalRequestListItem } from "@/services/rentalRequestService";
 import { userService } from "@/services/userService";
@@ -43,6 +43,9 @@ import { alerts } from "@/lib/alerts";
 import Swal from "sweetalert2";
 import { contractService } from "@/services/contractService";
 import { rentalsMetricsService, OwnerRentalMetrics } from "@/services/rentalsMetricsService";
+import { authService } from "@/services/authService";
+import { UserAvatar } from "@/components/UserAvatar";
+import { Loader2 } from "lucide-react";
 
 function safeParseDate(value: unknown): Date | null {
   if (typeof value === "string" || typeof value === "number") {
@@ -181,14 +184,41 @@ export function UserProfile() {
   const [requestsError, setRequestsError] = useState<string | null>(null);
   const [requestsPage, setRequestsPage] = useState(1);
   const [requestsTotalPages, setRequestsTotalPages] = useState(1);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Redirigir a login si no hay usuario (protección de ruta)
   useEffect(() => {
     if (!hasHydrated) return;
     if (!accessToken) {
       navigate("/login");
+      return;
     }
+    authService.getProfile().catch(() => undefined);
   }, [accessToken, hasHydrated, navigate]);
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Selecciona un archivo de imagen (JPG, PNG o WebP).");
+      return;
+    }
+
+    setAvatarUploading(true);
+    try {
+      await authService.updateProfileImage(file);
+    } catch (error: any) {
+      console.error("Error al actualizar avatar:", error);
+      alert(error.response?.data?.message || error.message || "No se pudo actualizar la foto de perfil.");
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const openAvatarPicker = () => avatarInputRef.current?.click();
 
   const handleLogout = () => {
     clearSession();
@@ -817,13 +847,35 @@ export function UserProfile() {
                 <div className="flex items-start justify-between">
                   <div className="flex gap-6">
                     <div className="relative">
-                      <div className="h-28 w-28 rounded-full bg-slate-200 overflow-hidden border-4 border-white shadow-md">
-                        <img 
-                          src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=1760&auto=format&fit=crop" 
-                          alt="Avatar" 
-                          className="h-full w-full object-cover"
+                      <input
+                        ref={avatarInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        onChange={handleAvatarChange}
+                      />
+                      <button
+                        type="button"
+                        onClick={openAvatarPicker}
+                        disabled={avatarUploading}
+                        className="h-28 w-28 rounded-full bg-slate-200 overflow-hidden border-4 border-white shadow-md relative group disabled:opacity-70"
+                        aria-label="Cambiar foto de perfil"
+                      >
+                        <UserAvatar
+                          firstName={user?.firstName}
+                          lastName={user?.lastName}
+                          profileImageUrl={user?.profileImageUrl}
+                          className="h-full w-full"
+                          textClassName="text-3xl text-slate-600"
                         />
-                      </div>
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          {avatarUploading ? (
+                            <Loader2 className="h-6 w-6 text-white animate-spin" />
+                          ) : (
+                            <Edit3 className="h-6 w-6 text-white" />
+                          )}
+                        </div>
+                      </button>
                     </div>
                     <div className="space-y-3 pt-2">
                       <div className="space-y-1">
@@ -858,8 +910,17 @@ export function UserProfile() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" className="rounded-full gap-2 font-bold px-6 text-slate-700">
-                      <Edit3 className="h-4 w-4" />
+                    <Button
+                      variant="outline"
+                      className="rounded-full gap-2 font-bold px-6 text-slate-700"
+                      onClick={openAvatarPicker}
+                      disabled={avatarUploading}
+                    >
+                      {avatarUploading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Edit3 className="h-4 w-4" />
+                      )}
                       Editar Perfil
                     </Button>
                     <Button variant="ghost" size="icon" className="rounded-full text-slate-400">

@@ -44,6 +44,16 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/register/step-2" element={<RegisterStepTwo />} />
         <Route path="/register/step-3" element={<RegisterStepThree />} />
+        <Route path="/checkout" element={
+          <RootLayout>
+            <Checkout />
+          </RootLayout>
+        } />
+        <Route path="/delivery" element={
+          <RootLayout>
+            <DeliveryProtocol />
+          </RootLayout>
+        } />
       </Routes>
     </BrowserRouter>
   )
