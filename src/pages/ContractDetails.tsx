@@ -56,8 +56,9 @@ export function ContractDetails() {
   const canUploadEvidence = isOwner && ["signed", "owner_evidence_pending", "payment_pending"].includes(status);
 
   const now = useMemo(() => new Date(), [contract?.updatedAt]); // refresh timing on reloads
-  const pickupAt = useMemo(() => parseIso((contract as any)?.pickup?.pickupAt), [contract]);
-  const returnTarget = useMemo(() => buildReturnTarget((contract as any)?.endDate, (contract as any)?.pickup?.pickupAt), [contract]);
+  const pickupInfo = useMemo(() => (contract as any)?.pickupProposal ?? (contract as any)?.pickup ?? {}, [contract]);
+  const pickupAt = useMemo(() => parseIso(pickupInfo?.pickupAt), [pickupInfo?.pickupAt]);
+  const returnTarget = useMemo(() => buildReturnTarget((contract as any)?.endDate, pickupInfo?.pickupAt), [contract, pickupInfo?.pickupAt]);
 
   const handoverWindowOk = useMemo(() => (pickupAt ? withinHours(now, pickupAt, 12) : false), [now, pickupAt]);
   const returnWindowOk = useMemo(() => (returnTarget ? withinHours(now, returnTarget, 12) : false), [now, returnTarget]);
@@ -90,6 +91,9 @@ export function ContractDetails() {
   const paidAmount = typeof payment?.paidAmount === "number" ? payment.paidAmount : null;
   const paidStatus = String(payment?.paidStatus ?? "");
   const showPaymentBox = isTenant && (holdStatus === "authorized" || status === "ready_for_handover" || paidStatus !== "");
+  const pickupLabel = String(pickupInfo?.label ?? pickupInfo?.addressLabel ?? "Punto de encuentro");
+  const pickupAddress = String(pickupInfo?.addressLabel ?? pickupInfo?.label ?? "—");
+  const pickupAtText = pickupInfo?.pickupAt ? new Date(pickupInfo.pickupAt).toLocaleString("es-PA") : "—";
 
   const refresh = async () => {
     if (!uuid) return;
@@ -329,9 +333,10 @@ export function ContractDetails() {
             <div className="text-sm font-semibold text-slate-800">Resumen</div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
               <div className="rounded-xl border border-slate-200 p-3">
-                <div className="text-xs text-slate-500">Punto de encuentro</div>
-                <div className="font-semibold text-slate-800">{pickup?.addressLabel ?? "—"}</div>
-                {pickup?.pickupAt && <div className="text-xs text-slate-500 mt-1">{new Date(pickup.pickupAt).toLocaleString()}</div>}
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">Punto elegido</div>
+                <div className="font-semibold text-slate-800 mt-1">{pickupLabel}</div>
+                <div className="text-sm text-slate-600 mt-1">{pickupAddress}</div>
+                <div className="text-xs text-slate-500 mt-2">Hora de entrega: {pickupAtText}</div>
               </div>
               <div className="rounded-xl border border-slate-200 p-3">
                 <div className="text-xs text-slate-500">Costo estimado</div>

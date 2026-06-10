@@ -3,6 +3,7 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
 @import "leaflet/dist/leaflet.css";
+@import "react-day-picker/dist/style.css";
 @import "sweetalert2/dist/sweetalert2.min.css";
 
 /* Fix for Leaflet marker icons in some bundlers */

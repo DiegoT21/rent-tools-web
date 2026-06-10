@@ -17,6 +17,13 @@ export interface PublicTool {
   coverUrl?: string;
   thumbnailUrl?: string;
   isAvailable?: boolean;
+  meetingLocations?: Array<{
+    label?: string;
+    address?: string;
+    lat?: number;
+    lng?: number;
+    notes?: string;
+  }>;
 }
 
 export interface ToolBookingRange {

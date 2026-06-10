@@ -6,15 +6,15 @@ export type RentalRequestStatus =
 
 export interface CreateRentalRequestBody {
   toolUuid: string;
-  startDate: string; // ISO
-  endDate: string; // ISO
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
   message?: string;
   pickup?: {
-    addressLabel: string;
-    pickupAt: string; // ISO
     lat?: number;
     lng?: number;
+    addressLabel: string;
     notes?: string;
+    pickupAt: string; // ISO
   };
 }
 
@@ -71,13 +71,20 @@ export interface RentalRequestListItem {
     pickupAt?: string;
   };
   pickupProposal?: {
+    label?: string;
     lat?: number;
     lng?: number;
     addressLabel?: string;
     notes?: string;
     pickupAt?: string;
   };
+  pricingSummary?: {
+    subtotal?: number;
+    hold?: number;
+    totalEstimated?: number;
+  };
   pickupCounterProposal?: {
+    label?: string;
     lat?: number;
     lng?: number;
     addressLabel?: string;
@@ -204,6 +211,7 @@ export const rentalRequestService = {
       message: raw?.message,
       pickup: raw?.pickup,
       pickupProposal: raw?.pickupProposal ?? raw?.pickup,
+      pricingSummary: raw?.pricingSummary ?? raw?.pricing ?? undefined,
       pickupCounterProposal: raw?.pickupCounterProposal ?? undefined,
       dateCounterProposal: raw?.dateCounterProposal ?? undefined,
       contract: raw?.contract,

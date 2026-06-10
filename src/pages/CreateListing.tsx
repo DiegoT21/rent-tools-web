@@ -28,7 +28,15 @@ export function CreateListing() {
   const user = useAuthStore((state) => state.user);
   console.log("Usuario actual en el store:", user);
   const [loading, setLoading] = useState(false);
-  const [location, setLocation] = useState<{ address: string; lat: number; lng: number } | null>(null);
+  const [meetingLocations, setMeetingLocations] = useState<Array<{
+    label: string;
+    address: string;
+    lat: number | null;
+    lng: number | null;
+  }>>([
+    { label: "", address: "", lat: null, lng: null },
+    { label: "", address: "", lat: null, lng: null },
+  ]);
   const [selectedMediaFiles, setSelectedMediaFiles] = useState<File[]>([]);
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
@@ -43,12 +51,30 @@ export function CreateListing() {
     usageLevel: "" as ToolUsageLevel | "",
   });
 
+  const resetForm = () => {
+    setMeetingLocations([
+      { label: "", address: "", lat: null, lng: null },
+      { label: "", address: "", lat: null, lng: null },
+    ]);
+    setSelectedMediaFiles([]);
+    setInvoiceFile(null);
+    setFormData({
+      name: "",
+      brand: "",
+      category: "",
+      description: "",
+      pricePerDay: "",
+      serialNumber: "",
+      usageLevel: "",
+    });
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
     // Map id to the correct formData key
     const key = id === "tool-name" ? "name" :
       id === "price" ? "pricePerDay" :
-        id === "serial" ? "serialNumber" : id;
+      id === "serial" ? "serialNumber" : id;
 
     setFormData(prev => ({ ...prev, [key]: value }));
   };
@@ -57,8 +83,31 @@ export function CreateListing() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleLocationSelect = (selectedLocation: { address: string; lat: number; lng: number }) => {
-    setLocation(selectedLocation);
+  const handleMeetingLocationChange = (index: number, field: "label" | "address" | "lat" | "lng", value: string) => {
+    setMeetingLocations((prev) =>
+      prev.map((item, currentIndex) => {
+        if (currentIndex !== index) return item;
+        if (field === "lat" || field === "lng") {
+          return { ...item, [field]: value === "" ? null : Number(value) };
+        }
+        return { ...item, [field]: value };
+      })
+    );
+  };
+
+  const handleMeetingLocationSelect = (index: number, selectedLocation: { address: string; lat: number; lng: number }) => {
+    setMeetingLocations((prev) =>
+      prev.map((item, currentIndex) =>
+        currentIndex === index
+          ? {
+              ...item,
+              address: selectedLocation.address,
+              lat: selectedLocation.lat,
+              lng: selectedLocation.lng,
+            }
+          : item
+      )
+    );
   };
 
   const handleMediaFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,8 +191,16 @@ export function CreateListing() {
       return;
     }
 
-    if (!location) {
-      await alerts.warning("Falta ubicación", "Por favor establece una ubicación en el mapa.");
+    const meetingPayload = meetingLocations.map((entry, index) => ({
+      label: entry.label.trim() || `Punto ${index + 1}`,
+      address: entry.address.trim(),
+      lat: typeof entry.lat === "number" ? entry.lat : Number.NaN,
+      lng: typeof entry.lng === "number" ? entry.lng : Number.NaN,
+    }));
+
+    const hasInvalidMeetingLocation = meetingPayload.some((entry) => !entry.address || Number.isNaN(entry.lat) || Number.isNaN(entry.lng));
+    if (hasInvalidMeetingLocation || meetingPayload.length !== 2) {
+      await alerts.warning("Faltan ubicaciones", "Debes completar exactamente las 2 ubicaciones de encuentro usando el mapa de cada punto.");
       return;
     }
 
@@ -181,10 +238,8 @@ export function CreateListing() {
       const payload = {
         ...formData,
         pricePerDay: Number(formData.pricePerDay),
-        address: location.address,
-        latitude: location.lat,
-        longitude: location.lng,
         owner: user.id || user._id, // Dependiendo de cómo venga el usuario del store
+        meetingLocations: meetingPayload,
         fileKeys: mediaSigned.map((m) => m.fileKey),
         invoiceFileKey: invoiceSigned.fileKey,
         isAvailable: true
@@ -194,6 +249,7 @@ export function CreateListing() {
 
       if (response.data) {
         await alerts.success("Publicado", "Herramienta publicada exitosamente.");
+        resetForm();
       }
     } catch (error: any) {
       console.error("Error al publicar la herramienta:", error);
@@ -296,8 +352,53 @@ export function CreateListing() {
             </div>
           </div>
 
-          <div className="pt-6 border-t border-slate-100">
-            <LocationPicker onLocationSelect={handleLocationSelect} />
+          <div className="pt-6 border-t border-slate-100 space-y-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800">Puntos de encuentro</h3>
+                <p className="text-sm text-slate-500">Completa exactamente 2 ubicaciones. Cada punto usa su propio mapa para pinnear y autocompletar la dirección.</p>
+              </div>
+              <span className="text-xs font-bold uppercase tracking-wider text-primary bg-orange-50 px-3 py-2 rounded-full border border-orange-100">
+                2 obligatorias
+              </span>
+            </div>
+
+            <div className="grid gap-4">
+              {meetingLocations.map((entry, index) => (
+                <div key={index} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-bold text-slate-800">Punto {index + 1}</h4>
+                    <span className="text-xs text-slate-500">Etiqueta y mapa</span>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-slate-600 font-semibold">Nombre del punto</Label>
+                    <Input
+                      value={entry.label}
+                      onChange={(e) => handleMeetingLocationChange(index, "label", e.target.value)}
+                      placeholder="Ej. Pasillo Celeste Mall"
+                      className="bg-white border-transparent rounded-lg h-12 focus-visible:ring-primary/20"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-slate-600 font-semibold">Dirección exacta</Label>
+                    <Input
+                      value={entry.address}
+                      onChange={(e) => handleMeetingLocationChange(index, "address", e.target.value)}
+                      placeholder="Se llena al pinnear el mapa o puedes editarla"
+                      className="bg-white border-transparent rounded-lg h-12 focus-visible:ring-primary/20"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <LocationPicker
+                      title={`Mapa del punto ${index + 1}`}
+                      description="Haz clic en el mapa o busca una dirección para fijar el pin. La dirección se completa automáticamente."
+                      searchPlaceholder="Buscar dirección exacta"
+                      onLocationSelect={(selectedLocation) => handleMeetingLocationSelect(index, selectedLocation)}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>

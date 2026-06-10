@@ -14,6 +14,7 @@ import { alerts } from "@/lib/alerts";
 import Swal from "sweetalert2";
 import { rentalRequestService } from "@/services/rentalRequestService";
 import { userService, UserReview } from "@/services/userService";
+import { RentalRequestDialog } from "@/components/rentals/RentalRequestDialog";
 
 const DefaultIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -134,6 +135,7 @@ export function ToolDetails() {
   const [ownerReviews, setOwnerReviews] = useState<UserReview[]>([]);
   const [ownerSummary, setOwnerSummary] = useState<{ count: number; averageRating: number } | null>(null);
   const [showOwnerReviews, setShowOwnerReviews] = useState(false);
+  const [requestDialogOpen, setRequestDialogOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -164,6 +166,7 @@ export function ToolDetails() {
   const lat = typeof (tool as any)?.latitude === "number" ? (tool as any).latitude : null;
   const lng = typeof (tool as any)?.longitude === "number" ? (tool as any).longitude : null;
   const address = typeof (tool as any)?.address === "string" ? (tool as any).address : null;
+  const meetingLocations = Array.isArray((tool as any)?.meetingLocations) ? (tool as any).meetingLocations.slice(0, 3) : [];
   const brand = typeof (tool as any)?.brand === "string" ? (tool as any).brand : null;
   const description = typeof (tool as any)?.description === "string" ? (tool as any).description : null;
   const usageLevelRaw = typeof (tool as any)?.usageLevel === "string" ? (tool as any).usageLevel : null;
@@ -178,7 +181,7 @@ export function ToolDetails() {
     };
     return map[value] ?? usageLevelRaw;
   }, [usageLevelRaw]);
-  const depositAmount = typeof (tool as any)?.depositAmount === "number" ? (tool as any).depositAmount : null;
+  const depositRecommendation = "25% del alquiler";
   const ownerUuid = typeof (tool as any)?.owner?.uuid === "string" ? (tool as any).owner.uuid : null;
   const ownerName =
     typeof (tool as any)?.owner?.firstName === "string"
@@ -288,6 +291,9 @@ export function ToolDetails() {
       await alerts.info("Solicitud pendiente", "Ya enviaste una solicitud para esta publicación. Está en revisión.");
       return;
     }
+
+    setRequestDialogOpen(true);
+    return;
 
     const pricePerDay = typeof tool.pricePerDay === "number" ? tool.pricePerDay : 0;
     const deposit = typeof (tool as any)?.depositAmount === "number" ? (tool as any).depositAmount : 0;
@@ -548,10 +554,11 @@ export function ToolDetails() {
                   <div className="font-semibold text-slate-800">{usageLevel ?? "—"}</div>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-white p-3">
-                  <div className="text-xs text-slate-500">Depósito</div>
+                  <div className="text-xs text-slate-500">Depósito recomendado</div>
                   <div className="font-semibold text-slate-800">
-                    {typeof depositAmount === "number" ? `$${depositAmount}` : "—"}
+                    {depositRecommendation}
                   </div>
+                  <div className="text-[11px] text-slate-500 mt-1">Se recalcula al pedir el alquiler.</div>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-white p-3">
                   <div className="text-xs text-slate-500">Categoría</div>
@@ -600,6 +607,28 @@ export function ToolDetails() {
                     {lat !== null && lng !== null && <ToolLocationMap lat={lat} lng={lng} />}
                   </div>
                 )}
+              </div>
+            )}
+
+            {meetingLocations.length > 0 && (
+              <div className="pt-1">
+                <div className="text-sm font-semibold text-slate-800 mb-2">Puntos de encuentro</div>
+                <div className="grid gap-2">
+                  {meetingLocations.map((location: any, index: number) => (
+                    <div key={`${location.label ?? location.address ?? index}-${index}`} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="font-semibold text-slate-900">{location.label ?? `Punto ${index + 1}`}</div>
+                          <div className="text-sm text-slate-600">{location.address ?? "Dirección no disponible"}</div>
+                          {location.notes ? <div className="mt-1 text-xs text-slate-500">{location.notes}</div> : null}
+                        </div>
+                        <span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-primary border border-orange-100">
+                          Opción {index + 1}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -711,6 +740,27 @@ export function ToolDetails() {
                 Verifica disponibilidad y coordina entrega con el propietario.
               </div>
             </div>
+
+            {tool && uuid ? (
+              <RentalRequestDialog
+                open={requestDialogOpen}
+                onOpenChange={setRequestDialogOpen}
+                tool={tool}
+                toolUuid={uuid}
+                meetingLocations={meetingLocations}
+                onCreated={async () => {
+                  try {
+                    setRequestStatusLoading(true);
+                    const status = await rentalRequestService.getStatus(uuid);
+                    setHasPendingRequest(status.hasPending);
+                  } catch {
+                    setHasPendingRequest(true);
+                  } finally {
+                    setRequestStatusLoading(false);
+                  }
+                }}
+              />
+            ) : null}
           </CardContent>
         </Card>
       </div>

@@ -163,7 +163,7 @@ export function UserProfile() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "perfil";
   const navigate = useNavigate();
-  const { user, accessToken, clearSession } = useAuthStore();
+  const { user, accessToken, clearSession, hasHydrated } = useAuthStore();
   const [inventory, setInventory] = useState<any[]>([]);
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [inventoryError, setInventoryError] = useState<string | null>(null);
@@ -184,10 +184,11 @@ export function UserProfile() {
 
   // Redirigir a login si no hay usuario (protección de ruta)
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!accessToken) {
       navigate("/login");
     }
-  }, [accessToken, navigate]);
+  }, [accessToken, hasHydrated, navigate]);
 
   const handleLogout = () => {
     clearSession();
@@ -349,6 +350,81 @@ export function UserProfile() {
     } catch (e: any) {
       await alerts.error("No se pudieron cargar los reviews", e?.response?.data?.message || "Intenta de nuevo.");
     }
+  };
+
+  const showRequestSummary = async (req: RentalRequestListItem) => {
+    const formatDate = (value?: string) => {
+      if (!value) return "—";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "—";
+      return new Intl.DateTimeFormat("es-PA", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }).format(date);
+    };
+    const startText = formatDate(req.startDate);
+    const endText = formatDate(req.endDate);
+    const pickupLabel = req.pickupProposal?.label || req.pickup?.label || "Punto de encuentro";
+    const pickupText = req.pickupProposal?.addressLabel || req.pickup?.addressLabel || req.pickupProposal?.notes || req.pickupProposal?.pickupAt || "Por definir";
+    const pickupAtValue = req.pickupProposal?.pickupAt || req.pickup?.pickupAt;
+    const pickupDateText = pickupAtValue ? formatDate(pickupAtValue) : startText;
+    const pickupAtText = pickupAtValue
+      ? new Intl.DateTimeFormat("es-PA", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        }).format(new Date(pickupAtValue))
+      : "—";
+    const subtotal = Number(req.pricingSummary?.subtotal ?? 0) || 0;
+    const hold = Number(req.pricingSummary?.hold ?? 0) || 0;
+    const total = Number(req.pricingSummary?.totalEstimated ?? subtotal + hold) || subtotal + hold;
+
+    await Swal.fire({
+      title: "Resumen de solicitud",
+      html: `
+        <div style="text-align:left;display:grid;gap:12px">
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;">
+            <div style="font-size:12px;font-weight:700;color:#94a3b8;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">Fechas</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <div>
+                <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;">Fecha de entrega</div>
+                <div style="font-size:15px;font-weight:800;color:#0f172a;">${pickupDateText}</div>
+              </div>
+              <div>
+                <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;">Fecha de devolución</div>
+                <div style="font-size:15px;font-weight:800;color:#0f172a;">${endText}</div>
+              </div>
+            </div>
+          </div>
+          <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:14px;padding:14px 16px;">
+            <div style="font-size:12px;font-weight:700;color:#fb923c;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">Punto elegido</div>
+            <div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:4px;">${pickupLabel}</div>
+            <div style="font-size:13px;line-height:1.45;color:#475569;">${pickupText}</div>
+            <div style="margin-top:8px;font-size:13px;color:#64748b;"><b>Hora de entrega:</b> ${pickupAtText}</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;">
+              <div style="font-size:12px;font-weight:700;color:#94a3b8;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">Subtotal</div>
+              <div style="font-size:18px;font-weight:800;color:#0f172a;">$${subtotal}</div>
+            </div>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;">
+              <div style="font-size:12px;font-weight:700;color:#94a3b8;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">Hold / depósito</div>
+              <div style="font-size:18px;font-weight:800;color:#0f172a;">$${hold}</div>
+            </div>
+          </div>
+          <div style="background:#0f172a;border-radius:16px;padding:16px;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <span style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;opacity:.8;">Total estimado</span>
+            <span style="font-size:24px;font-weight:900;">$${total}</span>
+          </div>
+        </div>
+      `,
+      confirmButtonText: "Listo",
+      confirmButtonColor: "#f97316",
+    });
   };
 
   const counterPropose = async (req: RentalRequestListItem) => {
@@ -580,6 +656,36 @@ export function UserProfile() {
       return { key, tool, available, status, statusColor, borderColor, price, category, images };
     });
   }, [inventory, inventorySearch]);
+
+  const deleteTool = async (tool: any) => {
+    const toolUuid = String(tool?.uuid ?? tool?.id ?? tool?._id ?? "");
+    if (!toolUuid) {
+      await alerts.error("No se pudo borrar", "No se encontró el identificador de la herramienta.");
+      return;
+    }
+
+    const ok = await alerts.confirm({
+      title: "¿Seguro que quieres borrar esta herramienta?",
+      text: "Esta acción no se puede deshacer.",
+      confirmText: "Sí, borrar",
+      cancelText: "Cancelar",
+    });
+    if (!ok) return;
+
+    try {
+      await api.delete(`/tools/${encodeURIComponent(toolUuid)}`);
+      await alerts.success("Herramienta eliminada", "La herramienta fue eliminada exitosamente.");
+      await fetchInventoryPage({ page: 1, mode: "replace" });
+    } catch (e: any) {
+      const status = e?.response?.status;
+      const message = e?.response?.data?.message || "No se pudo eliminar la herramienta.";
+      if (status === 409) {
+        await alerts.warning("No se puede borrar", message || "La herramienta está alquilada o tiene un contrato activo.");
+        return;
+      }
+      await alerts.error("No se pudo borrar", message);
+    }
+  };
 
   const metrics = useMemo(() => {
     const totalPublicaciones = inventoryTotal || inventory.length;
@@ -952,7 +1058,12 @@ export function UserProfile() {
                       <Button variant="ghost" size="icon" className="rounded-full text-slate-400 hover:bg-slate-50">
                         {item.available ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
                       </Button>
-                      <Button variant="ghost" size="icon" className="rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50"
+                        onClick={() => deleteTool(item.tool)}
+                      >
                         <Trash2 className="h-5 w-5" />
                       </Button>
                     </div>
@@ -1136,11 +1247,10 @@ export function UserProfile() {
 
                             <Button
                               variant="secondary"
-                              onClick={() => counterPropose(req)}
-                              disabled={!canOwnerAct}
+                              onClick={() => showRequestSummary(req)}
                               className="h-11 px-5 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50"
                             >
-                              Proponer cambio
+                              Ver resumen
                             </Button>
 
                             <Button
@@ -1193,11 +1303,10 @@ export function UserProfile() {
                           <div className="flex gap-2 shrink-0">
                             <Button
                               variant="secondary"
-                              onClick={() => acceptCounter(req)}
-                              disabled={!canTenantAct}
+                              onClick={() => showRequestSummary(req)}
                               className="h-11 px-5 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50"
                             >
-                              Aceptar cambio
+                              Ver resumen
                             </Button>
                             <Button
                               variant="secondary"
