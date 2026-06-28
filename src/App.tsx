@@ -11,6 +11,7 @@ import { ContractDetails } from './pages/ContractDetails'
 import { Checkout } from './pages/Checkout'
 import { DeliveryProtocol } from './pages/DeliveryProtocol'
 
+<<<<<<< Updated upstream
 const RegisterStepTwo = lazy(() =>
   import('./pages/RegisterStepTwo').then((m) => ({ default: m.RegisterStepTwo }))
 )
@@ -25,6 +26,8 @@ function PageLoader() {
     </div>
   )
 }
+=======
+>>>>>>> Stashed changes
 
 function App() {
   return (
