@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, MapPin, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -131,6 +131,8 @@ export function ToolDetails() {
   const [imageIndex, setImageIndex] = useState(0);
   const [requestStatusLoading, setRequestStatusLoading] = useState(false);
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
+  const [activeRequestStatus, setActiveRequestStatus] = useState<string | null>(null);
+  const [activeRequestExpiresAt, setActiveRequestExpiresAt] = useState<string | null>(null);
   const [ownerReviewsLoading, setOwnerReviewsLoading] = useState(false);
   const [ownerReviewsError, setOwnerReviewsError] = useState<string | null>(null);
   const [ownerReviews, setOwnerReviews] = useState<UserReview[]>([]);
@@ -188,6 +190,10 @@ export function ToolDetails() {
     typeof (tool as any)?.owner?.firstName === "string"
       ? `${(tool as any).owner.firstName}${typeof (tool as any).owner.lastName === "string" ? ` ${(tool as any).owner.lastName}` : ""}`.trim()
       : null;
+  const canRequestRental =
+    Boolean(user) &&
+    (user as any)?.isVerified === true &&
+    String((user as any)?.kycStatus ?? "").toLowerCase() === "approved";
   const currentUserUuid =
     typeof (user as any)?.uuid === "string"
       ? (user as any).uuid
@@ -196,6 +202,49 @@ export function ToolDetails() {
       : typeof (user as any)?.id === "string"
       ? (user as any).id
       : null;
+
+  const refreshRequestStatus = useCallback(async () => {
+    if (!uuid) return;
+    const isLoggedIn = Boolean(accessToken) || Boolean(user);
+    if (!isLoggedIn) {
+      setHasPendingRequest(false);
+      setActiveRequestStatus(null);
+      return;
+    }
+
+    setRequestStatusLoading(true);
+    try {
+      const status = await rentalRequestService.getStatus(uuid);
+      const expiresAt = typeof (status as any).expiresAt === "string" ? String((status as any).expiresAt) : null;
+      const isExpired = expiresAt ? new Date(expiresAt).getTime() <= Date.now() : false;
+      const active = Boolean(status.hasActive ?? status.hasPending) && !isExpired;
+      setHasPendingRequest(active);
+      setActiveRequestStatus((status as any).status ?? null);
+      setActiveRequestExpiresAt(expiresAt);
+    } catch {
+      setHasPendingRequest(false);
+      setActiveRequestStatus(null);
+      setActiveRequestExpiresAt(null);
+    } finally {
+      setRequestStatusLoading(false);
+    }
+  }, [uuid, accessToken, user]);
+
+  useEffect(() => {
+    if (!activeRequestExpiresAt) return;
+    const expiresAtMs = new Date(activeRequestExpiresAt).getTime();
+    if (!expiresAtMs || Number.isNaN(expiresAtMs)) return;
+    const remaining = expiresAtMs - Date.now();
+    if (remaining <= 0) {
+      setHasPendingRequest(false);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      setHasPendingRequest(false);
+      void refreshRequestStatus();
+    }, remaining + 1000);
+    return () => window.clearTimeout(timer);
+  }, [activeRequestExpiresAt, refreshRequestStatus]);
 
   useEffect(() => {
     setImageIndex(0);
@@ -250,36 +299,39 @@ export function ToolDetails() {
   };
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      if (!uuid) return;
-      const isLoggedIn = Boolean(accessToken) || Boolean(user);
-      if (!isLoggedIn) {
-        setHasPendingRequest(false);
-        return;
-      }
+    void refreshRequestStatus();
+  }, [refreshRequestStatus]);
 
-      setRequestStatusLoading(true);
-      try {
-        const status = await rentalRequestService.getStatus(uuid);
-        if (!cancelled) setHasPendingRequest(status.hasPending);
-      } catch {
-        if (!cancelled) setHasPendingRequest(false);
-      } finally {
-        if (!cancelled) setRequestStatusLoading(false);
-      }
-    })();
+  useEffect(() => {
+    const onFocus = () => void refreshRequestStatus();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void refreshRequestStatus();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    const interval = window.setInterval(() => void refreshRequestStatus(), 60_000);
+    window.addEventListener("rental-requests-updated", onFocus);
+    window.addEventListener("rental-requests-seen", onFocus);
 
     return () => {
-      cancelled = true;
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("rental-requests-updated", onFocus);
+      window.removeEventListener("rental-requests-seen", onFocus);
+      window.clearInterval(interval);
     };
-  }, [uuid, accessToken, user]);
+  }, [refreshRequestStatus]);
 
   const handleRequestRental = async () => {
     const isLoggedIn = Boolean(accessToken) || Boolean(user);
     if (!isLoggedIn) {
       await alerts.info("Inicia sesión", "Para solicitar un alquiler necesitas iniciar sesión.");
       navigate("/login", { state: { returnTo: `/tools/${uuid ?? ""}` } });
+      return;
+    }
+
+    if (!canRequestRental) {
+      await alerts.warning("KYC requerido", "Debes completar y aprobar tu KYC para solicitar alquiler.");
       return;
     }
 
@@ -517,6 +569,17 @@ export function ToolDetails() {
     return <div className="max-w-5xl mx-auto py-10 px-4 text-slate-600">Publicación no encontrada.</div>;
   }
 
+  if (tool.isAvailable === false) {
+    return (
+      <div className="max-w-5xl mx-auto py-20 px-4 flex flex-col items-center gap-4 text-center">
+        <div className="text-5xl">🔒</div>
+        <h2 className="text-2xl font-black text-slate-800">Herramienta no disponible</h2>
+        <p className="text-slate-500 max-w-md">Esta herramienta fue pausada temporalmente por su propietario y no está disponible para alquilar en este momento.</p>
+        <button onClick={() => navigate(-1)} className="mt-4 text-sm font-semibold text-primary hover:underline">← Volver</button>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-5xl mx-auto py-10 px-4">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
@@ -734,11 +797,23 @@ export function ToolDetails() {
             )}
 
             <div className="pt-3">
-              <Button className="w-full h-11" onClick={handleRequestRental} disabled={requestStatusLoading || hasPendingRequest}>
-                {hasPendingRequest ? "Solicitud enviada" : requestStatusLoading ? "Verificando..." : "Solicitar alquiler"}
+              <Button
+                className="w-full h-11"
+                onClick={handleRequestRental}
+                disabled={requestStatusLoading || hasPendingRequest || !canRequestRental}
+              >
+                {hasPendingRequest
+                  ? "Solicitud en trámite"
+                  : requestStatusLoading
+                    ? "Verificando..."
+                    : "Solicitar alquiler"}
               </Button>
               <div className="mt-2 text-xs text-slate-500">
-                Verifica disponibilidad y coordina entrega con el propietario.
+                {hasPendingRequest
+                  ? "Solicitud en trámite. Espera la respuesta del propietario."
+                  : !canRequestRental
+                  ? "Debes completar y aprobar tu KYC para solicitar alquiler."
+                  : "Verifica disponibilidad y coordina entrega con el propietario."}
               </div>
             </div>
 

@@ -17,6 +17,12 @@ export interface PublicTool {
   coverUrl?: string;
   thumbnailUrl?: string;
   isAvailable?: boolean;
+  pricingSummary?: {
+    totalDays?: number;
+    subtotal?: number;
+    hold?: number;
+    totalEstimated?: number;
+  };
   meetingLocations?: Array<{
     label?: string;
     address?: string;
@@ -70,6 +76,13 @@ export const toolService = {
     const data = (response as any).data?.data ?? (response as any).data;
     if (data && typeof data === "object") return data as PublicTool;
     return null;
+  },
+
+  getPopularTools: async (days = 7, limit = 8): Promise<PublicTool[]> => {
+    const response = await api.get("/tools/popular", { params: { days, limit } });
+    const data = (response as any).data?.data ?? (response as any).data;
+    if (Array.isArray(data)) return data;
+    return [];
   },
 
   getBookings: async (toolUuid: string, fromIso: string, toIso: string): Promise<ToolBookingRange[]> => {

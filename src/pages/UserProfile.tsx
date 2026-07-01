@@ -45,7 +45,7 @@ import { contractService } from "@/services/contractService";
 import { rentalsMetricsService, OwnerRentalMetrics } from "@/services/rentalsMetricsService";
 import { authService } from "@/services/authService";
 import { getInventoryAvailabilityLabel } from "@/lib/rentalAvailability";
-import { notifyRentalRequestsUpdated } from "@/hooks/useRentalNotifications";
+import { markRentalRequestsSeen, notifyRentalRequestsUpdated } from "@/hooks/useRentalNotifications";
 import { UserAvatar } from "@/components/UserAvatar";
 import { PhotoCaptureDialog, dataUrlToFile } from "@/components/ui/PhotoCaptureDialog";
 import { Loader2 } from "lucide-react";
@@ -56,6 +56,60 @@ function safeParseDate(value: unknown): Date | null {
     return Number.isNaN(date.getTime()) ? null : date;
   }
   return null;
+}
+
+function formatDateOnly(value?: string) {
+  if (!value) return "—";
+  const normalized = String(value).slice(0, 10);
+  const [year, month, day] = normalized.split("-").map(Number);
+  if (!year || !month || !day) return "—";
+  return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`;
+}
+
+function isRequestPending(value?: string) {
+  const status = String(value ?? "").toLowerCase();
+  return status === "pending" || status === "pending_owner" || status === "pending_tenant";
+}
+
+function isRequestExpired(req: RentalRequestListItem) {
+  if (!isRequestPending(req.status)) return false;
+  const expiresAt = req.expiresAt ? new Date(req.expiresAt).getTime() : 0;
+  if (expiresAt) return Date.now() >= expiresAt;
+  const createdAt = req.createdAt ? new Date(req.createdAt).getTime() : 0;
+  if (!createdAt) return false;
+  return Date.now() - createdAt >= 24 * 60 * 60 * 1000;
+}
+
+function normalizeRequestForUi(req: RentalRequestListItem, tab: "pending" | "approved" | "all") {
+  if (!isRequestExpired(req)) return req;
+  if (tab === "pending") return null;
+  return {
+    ...req,
+    status: "rejected" as const,
+    rejectionReason: req.rejectionReason || "Solicitud vencida por falta de respuesta.",
+    __expired: true,
+  };
+}
+
+function formatCountdown(targetIso?: string, now = Date.now()) {
+  if (!targetIso) return "";
+  const target = new Date(targetIso).getTime();
+  if (!target || Number.isNaN(target)) return "";
+  const diff = target - now;
+  if (diff <= 0) return "Expira ahora";
+  const totalSeconds = Math.floor(diff / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours >= 24) {
+    const days = Math.floor(hours / 24);
+    const remainHours = hours % 24;
+    return `Esta solicitud vence en ${days}d ${remainHours}h`;
+  }
+  if (hours > 0) {
+    return `Esta solicitud vence en ${hours}h ${String(minutes).padStart(2, "0")}m`;
+  }
+  return `Expira en ${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
 function ImageCarousel({ images, alt }: { images: string[]; alt: string }) {
@@ -190,6 +244,7 @@ export function UserProfile() {
   const [requestsTotalPages, setRequestsTotalPages] = useState(1);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
+  const [requestClock, setRequestClock] = useState(Date.now());
 
   // Redirigir a login si no hay usuario (protección de ruta)
   useEffect(() => {
@@ -200,6 +255,17 @@ export function UserProfile() {
     }
     authService.getProfile().catch(() => undefined);
   }, [accessToken, hasHydrated, navigate]);
+
+  useEffect(() => {
+    if (activeTab === "solicitudes") {
+      markRentalRequestsSeen();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setRequestClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const uploadAvatarFile = async (file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -332,7 +398,10 @@ export function UserProfile() {
           ? await rentalRequestService.getReceived(opts.page, opts.tab)
           : await rentalRequestService.getSent(opts.page, opts.tab);
 
-      const normalized = (result.data ?? []).map((r: any) => rentalRequestService.normalizeForUi(r));
+      const normalized = (result.data ?? [])
+        .map((r: any) => rentalRequestService.normalizeForUi(r))
+        .map((r: RentalRequestListItem) => normalizeRequestForUi(r, opts.tab))
+        .filter((r): r is RentalRequestListItem => Boolean(r));
       setRequests((prev) => (opts.mode === "append" ? [...prev, ...normalized] : normalized));
       setRequestsPage(Number(result.pagination?.page ?? opts.page));
       setRequestsTotalPages(Number(result.pagination?.totalPages ?? 1));
@@ -412,27 +481,17 @@ export function UserProfile() {
   };
 
   const showRequestSummary = async (req: RentalRequestListItem) => {
-    const formatDate = (value?: string) => {
-      if (!value) return "—";
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return "—";
-      return new Intl.DateTimeFormat("es-PA", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      }).format(date);
-    };
-    const startText = formatDate(req.startDate);
-    const endText = formatDate(req.endDate);
+    const startText = formatDateOnly(req.startDate);
+    const endText = formatDateOnly(req.endDate);
     const pickupLabel = req.pickupProposal?.label || req.pickup?.label || "Punto de encuentro";
-    const pickupText = req.pickupProposal?.addressLabel || req.pickup?.addressLabel || req.pickupProposal?.notes || req.pickupProposal?.pickupAt || "Por definir";
+    const pickupText =
+      req.pickupProposal?.addressLabel ||
+      req.pickup?.addressLabel ||
+      req.pickupProposal?.notes ||
+      "Por definir";
     const pickupAtValue = req.pickupProposal?.pickupAt || req.pickup?.pickupAt;
-    const pickupDateText = pickupAtValue ? formatDate(pickupAtValue) : startText;
     const pickupAtText = pickupAtValue
       ? new Intl.DateTimeFormat("es-PA", {
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
           hour: "2-digit",
           minute: "2-digit",
           hour12: true,
@@ -451,7 +510,7 @@ export function UserProfile() {
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
               <div>
                 <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;">Fecha de entrega</div>
-                <div style="font-size:15px;font-weight:800;color:#0f172a;">${pickupDateText}</div>
+                <div style="font-size:15px;font-weight:800;color:#0f172a;">${startText}</div>
               </div>
               <div>
                 <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;">Fecha de devolución</div>
@@ -657,13 +716,7 @@ export function UserProfile() {
       fetchInventoryPage({ page: 1, mode: "replace" });
       notifyRentalRequestsUpdated();
       if (contractUuid) {
-        const go = await alerts.confirm({
-          title: "Contrato generado",
-          text: "La solicitud fue aprobada. ¿Quieres abrir el contrato ahora?",
-          confirmText: "Ver contrato",
-          cancelText: "Más tarde",
-        });
-        if (go) navigate(`/rentals/contracts/${contractUuid}`);
+        navigate(`/rentals/contracts/${contractUuid}`);
       }
     } catch (e: any) {
       await alerts.error("No se pudo aprobar", e?.response?.data?.message || "Intenta de nuevo.");
@@ -746,6 +799,36 @@ export function UserProfile() {
         return;
       }
       await alerts.error("No se pudo borrar", message);
+    }
+  };
+
+  const editTool = (tool: any) => {
+    navigate("/create-listing", { state: { editTool: tool } });
+  };
+
+  const toggleTool = async (tool: any) => {
+    const toolUuid = String(tool?.uuid ?? tool?.id ?? tool?._id ?? "");
+    if (!toolUuid) return;
+
+    const willActivate = tool?.isAvailable === false;
+    const ok = await alerts.confirm({
+      title: willActivate ? "¿Activar herramienta?" : "¿Pausar herramienta?",
+      text: willActivate
+        ? "La herramienta volverá a aparecer en el marketplace."
+        : "La herramienta dejará de aparecer en el marketplace temporalmente.",
+      confirmText: willActivate ? "Sí, activar" : "Sí, pausar",
+      cancelText: "Cancelar",
+    });
+    if (!ok) return;
+
+    try {
+      await api.patch(`/tools/${encodeURIComponent(toolUuid)}/toggle`);
+      await fetchInventoryPage({ page: 1, mode: "replace" });
+    } catch (e: any) {
+      const status = e?.response?.status;
+      const message = e?.response?.data?.message || "No se pudo cambiar el estado de la herramienta.";
+      if (status === 409) { await alerts.warning("No permitido", message); return; }
+      await alerts.error("Error", message);
     }
   };
 
@@ -1140,11 +1223,25 @@ export function UserProfile() {
                     </div>
 
                     <div className="flex gap-2 shrink-0">
-                      <Button variant="ghost" size="icon" className="rounded-full text-slate-400 hover:text-primary hover:bg-orange-50">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-full text-slate-400 hover:text-primary hover:bg-orange-50 disabled:opacity-30"
+                        onClick={() => editTool(item.tool)}
+                        disabled={item.status === "En renta"}
+                        title={item.status === "En renta" ? "No puedes editar una herramienta en renta" : "Editar herramienta"}
+                      >
                         <Pencil className="h-5 w-5" />
                       </Button>
-                      <Button variant="ghost" size="icon" className="rounded-full text-slate-400 hover:bg-slate-50">
-                        {item.available ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-full text-slate-400 hover:bg-slate-50 disabled:opacity-30"
+                        onClick={() => toggleTool(item.tool)}
+                        disabled={item.status === "En renta"}
+                        title={item.status === "En renta" ? "No puedes pausar una herramienta en renta" : (item.tool?.isAvailable !== false ? "Pausar herramienta" : "Activar herramienta")}
+                      >
+                        {item.tool?.isAvailable !== false ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
                       </Button>
                       <Button
                         variant="ghost"
@@ -1274,8 +1371,16 @@ export function UserProfile() {
                   const renterName = `${String(renterFirst || "Usuario")} ${String(renterLast || "")}`.trim();
                   const toolName = req.tool?.name ?? "Herramienta";
                   const contractUuid = String((req as any)?.contract?.uuid ?? (req as any)?.contractUuid ?? "");
+                  const expired = Boolean((req as any).__expired) || isRequestExpired(req);
+                  const countdownText = expired
+                    ? "Solicitud vencida por falta de respuesta."
+                    : req.status === "pending" || req.status === "pending_owner" || req.status === "pending_tenant"
+                      ? formatCountdown(req.expiresAt, requestClock)
+                      : "";
                   const statusLabel =
-                    req.status === "approved"
+                    expired
+                      ? "Vencida"
+                      : req.status === "approved"
                       ? "Aprobada"
                       : req.status === "rejected"
                       ? "Rechazada"
@@ -1283,13 +1388,15 @@ export function UserProfile() {
                       ? "Esperando solicitante"
                       : "Pendiente";
                   const statusClass =
-                    req.status === "approved"
+                    expired
+                      ? "bg-slate-100 text-slate-600 border-slate-200"
+                      : req.status === "approved"
                       ? "bg-green-50 text-green-700 border-green-200"
                       : req.status === "rejected"
                       ? "bg-red-50 text-red-700 border-red-200"
                       : "bg-orange-50 text-orange-700 border-orange-200";
 
-                  const canOwnerAct = req.status === "pending" || req.status === "pending_owner";
+                  const canOwnerAct = !expired && (req.status === "pending" || req.status === "pending_owner");
                   const canTenantAct = req.status === "pending_tenant";
 
                   return (
@@ -1301,7 +1408,7 @@ export function UserProfile() {
                               {statusLabel}
                             </Badge>
                             <div className="text-[10px] font-black text-slate-400 tracking-widest uppercase">
-                              {(req as any).fromDate ?? (req as any).startDate ?? "—"} → {(req as any).toDate ?? (req as any).endDate ?? "—"}
+                              {formatDateOnly((req as any).fromDate ?? (req as any).startDate ?? undefined)} → {formatDateOnly((req as any).toDate ?? (req as any).endDate ?? undefined)}
                             </div>
                           </div>
                           <div className="text-xl font-bold text-slate-900">{toolName}</div>
@@ -1317,8 +1424,11 @@ export function UserProfile() {
                             )}
                           </div>
                           {req.message && <div className="text-sm text-slate-500 line-clamp-2">“{req.message}”</div>}
-                          {req.status === "rejected" && req.rejectionReason && (
+                          {(req.status === "rejected" || expired) && req.rejectionReason && (
                             <div className="text-sm text-red-600">Motivo: {req.rejectionReason}</div>
+                          )}
+                          {countdownText && !expired && (
+                            <div className="text-xs font-semibold text-orange-700">{countdownText}</div>
                           )}
                         </div>
 
