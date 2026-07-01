@@ -1,6 +1,6 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom"; // Importación limpia
-import { ChevronLeft, ShieldCheck, Lock, ArrowRight } from "lucide-react";
+import { ShieldCheck, Lock, ArrowRight } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import {
@@ -257,15 +257,6 @@ const { accessToken: storeToken } = useAuthStore();
                   </form>
                 )}
 
-                {!documentImage && (
-                  <button
-                    type="button"
-                    onClick={() => navigate("/profile")}
-                    className="flex w-full items-center justify-center gap-2 text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors mt-6"
-                  >
-                    <ChevronLeft size={16} /> Volver al paso anterior
-                  </button>
-                )}
               </div>
             </div>
           </section>

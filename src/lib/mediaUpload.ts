@@ -5,6 +5,7 @@ export type PresignedUpload = {
   fileKey: string;
   method: 'PUT' | 'POST';
   fields: Record<string, string> | null;
+  publicUrl: string;
 };
 
 type UploadPurpose = 'catalog' | 'avatar' | 'evidence';
@@ -73,11 +74,20 @@ export async function getUploadUrlAndKey(
     throw new Error('Respuesta inválida de /media/upload-url (faltan uploadUrl o fileKey).');
   }
 
+  const publicUrl =
+    data?.publicUrl ??
+    `${(
+      (import.meta as any).env?.VITE_MEDIA_PUBLIC_BASE_URL ||
+      (import.meta as any).env?.VITE_S3_PUBLIC_BASE_URL ||
+      'https://renttools-inventario-publico.s3.us-east-2.amazonaws.com'
+    ).replace(/\/+$/, '')}/${String(fileKey).replace(/^\/+/, '')}`;
+
   return {
     uploadUrl: String(uploadUrl),
     fileKey: String(fileKey),
     method,
     fields,
+    publicUrl,
   };
 }
 

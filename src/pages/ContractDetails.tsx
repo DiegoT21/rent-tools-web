@@ -11,11 +11,10 @@ import { mediaService } from "@/services/mediaService";
 
 function shortDate(value?: string) {
   if (!value) return "—";
-  try {
-    return new Date(value).toLocaleDateString();
-  } catch {
-    return value;
-  }
+  const normalized = String(value).slice(0, 10);
+  const [year, month, day] = normalized.split("-").map(Number);
+  if (!year || !month || !day) return "—";
+  return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`;
 }
 
 function parseIso(value?: string): Date | null {
@@ -24,18 +23,9 @@ function parseIso(value?: string): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-function withinHours(now: Date, target: Date, hours: number) {
-  const diffMs = Math.abs(now.getTime() - target.getTime());
-  return diffMs <= hours * 60 * 60 * 1000;
-}
-
-function buildReturnTarget(endDateIso?: string, pickupAtIso?: string): Date | null {
-  const endDate = parseIso(endDateIso);
-  const pickupAt = parseIso(pickupAtIso);
-  if (!endDate || !pickupAt) return null;
-  const target = new Date(endDate);
-  target.setHours(pickupAt.getHours(), pickupAt.getMinutes(), 0, 0);
-  return target;
+function isSameDayPanama(a: Date, b: Date): boolean {
+  const opts: Intl.DateTimeFormatOptions = { timeZone: 'America/Panama', year: 'numeric', month: '2-digit', day: '2-digit' };
+  return a.toLocaleDateString('en-CA', opts) === b.toLocaleDateString('en-CA', opts);
 }
 
 export function ContractDetails() {
@@ -52,45 +42,77 @@ export function ContractDetails() {
   const isTenant = useMemo(() => Boolean(contract?.tenantUuid && currentUserUuid && contract.tenantUuid === currentUserUuid), [contract?.tenantUuid, currentUserUuid]);
 
   const status = String(contract?.status ?? "");
-  const canHold = isTenant && ["signed", "owner_evidence_pending", "payment_pending"].includes(status);
+  const canHold = isTenant && ["owner_evidence_pending", "payment_pending"].includes(status);
   const canUploadEvidence = isOwner && ["signed", "owner_evidence_pending", "payment_pending"].includes(status);
+  const canPayRental = isTenant && status === "in_progress" && (contract as any)?.payment?.rentalPaidStatus !== "paid";
 
-  const now = useMemo(() => new Date(), [contract?.updatedAt]); // refresh timing on reloads
+  const now = useMemo(() => new Date(), [contract]);
   const pickupInfo = useMemo(() => (contract as any)?.pickupProposal ?? (contract as any)?.pickup ?? {}, [contract]);
   const pickupAt = useMemo(() => parseIso(pickupInfo?.pickupAt), [pickupInfo?.pickupAt]);
-  const returnTarget = useMemo(() => buildReturnTarget((contract as any)?.endDate, pickupInfo?.pickupAt), [contract, pickupInfo?.pickupAt]);
+  const endDate = useMemo(() => parseIso((contract as any)?.endDate), [contract]);
 
-  const handoverWindowOk = useMemo(() => (pickupAt ? withinHours(now, pickupAt, 12) : false), [now, pickupAt]);
-  const returnWindowOk = useMemo(() => (returnTarget ? withinHours(now, returnTarget, 12) : false), [now, returnTarget]);
+  const handoverWindowOk = useMemo(() => (pickupAt ? isSameDayPanama(now, pickupAt) : false), [now, pickupAt]);
+  const returnWindowOk = useMemo(() => {
+    const raw = (contract as any)?.endDate as string | undefined;
+    if (!raw) return false;
+    const target = raw.slice(0, 10);
+    const todayPanama = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Panama', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(now);
+    return target === todayPanama;
+  }, [contract, now]);
+
+  const handoverOwnerSigned = Boolean((contract as any)?.handoverOwnerSignature?.accepted);
+  const handoverTenantSigned = Boolean((contract as any)?.handoverTenantSignature?.accepted);
+  const returnOwnerSigned = Boolean((contract as any)?.returnOwnerSignature?.accepted);
+  const returnTenantSigned = Boolean((contract as any)?.returnTenantSignature?.accepted);
+  const alreadySignedHandover = (isOwner && handoverOwnerSigned) || (isTenant && handoverTenantSigned);
+  const alreadySignedReturn = (isOwner && returnOwnerSigned) || (isTenant && returnTenantSigned);
 
   const canSignHandover =
     (isOwner || isTenant) &&
     status === "ready_for_handover" &&
     String((contract as any)?.payment?.holdStatus ?? "") === "authorized" &&
-    handoverWindowOk;
-  const canSignReturn = (isOwner || isTenant) && status === "in_progress" && returnWindowOk;
+    handoverWindowOk &&
+    !alreadySignedHandover;
+  const canSignReturn = (isOwner || isTenant) && status === "in_progress" && returnWindowOk && !alreadySignedReturn;
 
   const nextStep = useMemo(() => {
     if (!contract) return { title: "Cargando...", text: "" };
-    if (status === "signed") return { title: "Siguiente paso: Evidencias + Hold", text: "El propietario sube 3 fotos y el solicitante autoriza el hold/pago." };
-    if (status === "owner_evidence_pending") return { title: "Siguiente paso: Autorizar hold", text: "El solicitante debe autorizar el hold/pago para habilitar la entrega." };
-    if (status === "payment_pending") return { title: "Siguiente paso: Autorizar hold", text: "El solicitante debe autorizar el hold/pago para habilitar la entrega." };
+    if (status === "signed") return { title: "Siguiente paso: El propietario sube evidencias", text: "El propietario debe subir 3 fotos del estado actual de la herramienta. Luego podrás pagar el depósito." };
+    if (status === "owner_evidence_pending") return { title: "Siguiente paso: Pagar depósito", text: "El propietario ya subió las evidencias. Ahora el solicitante debe pagar el depósito de garantía para habilitar la entrega." };
+    if (status === "payment_pending") return { title: "Siguiente paso: Pagar depósito", text: "El solicitante debe pagar el depósito de garantía para habilitar la entrega." };
     if (status === "ready_for_handover") return { title: "Siguiente paso: Firmar entrega", text: "Ambas partes deben firmar la entrega (handover) para iniciar el alquiler." };
-    if (status === "in_progress") return { title: "Siguiente paso: Firmar devolución", text: "Al finalizar, ambas partes firman la devolución (return) para completar el alquiler." };
-    if (status === "completed") return { title: "Alquiler completado", text: "El contrato ya fue cerrado." };
+    if (status === "in_progress") {
+      const rps = (contract as any)?.payment?.rentalPaidStatus;
+      if (isTenant && rps !== "paid") return { title: "Siguiente paso: Pagar el alquiler", text: "El alquiler está activo. Puedes pagar el monto del alquiler en cualquier momento antes de la devolución." };
+      return { title: "Siguiente paso: Firmar devolución", text: "Al finalizar, ambas partes firman la devolución (return) para completar el alquiler." };
+    }
+    if (status === "completed") {
+      const refund = (contract as any)?.payment?.depositRefundStatus;
+      if (refund === "refunded") return { title: "Alquiler completado", text: "El contrato fue cerrado y el depósito fue reembolsado automáticamente." };
+      if (refund === "failed") return { title: "Alquiler completado — revisar reembolso", text: "El alquiler terminó pero hubo un error al reembolsar el depósito. Contacta soporte." };
+      return { title: "Alquiler completado", text: "El contrato ya fue cerrado." };
+    }
     return { title: `Estado: ${status}`, text: "Sigue el timeline para continuar." };
   }, [contract, status]);
 
   const payment = (contract as any)?.payment ?? null;
+  const pricing = (contract as any)?.pricing ?? null;
   const holdStatus = String(payment?.holdStatus ?? "");
-  const paymentPlan = String(payment?.paymentPlan ?? "");
-  const depositAmount = typeof payment?.depositAmount === "number" ? payment.depositAmount : null;
-  const rentalAmount = typeof payment?.rentalAmount === "number" ? payment.rentalAmount : null;
-  const amountDueNow = typeof payment?.amountDueNow === "number" ? payment.amountDueNow : null;
-  const amountDueLater = typeof payment?.amountDueLater === "number" ? payment.amountDueLater : null;
-  const paidAmount = typeof payment?.paidAmount === "number" ? payment.paidAmount : null;
-  const paidStatus = String(payment?.paidStatus ?? "");
-  const showPaymentBox = isTenant && (holdStatus === "authorized" || status === "ready_for_handover" || paidStatus !== "");
+  const depositAmount =
+    typeof payment?.depositAmount === "number" && payment.depositAmount > 0
+      ? payment.depositAmount
+      : (pricing?.depositAmount ?? 0);
+  const rentalAmount =
+    typeof payment?.rentalAmount === "number" && payment.rentalAmount > 0
+      ? payment.rentalAmount
+      : (pricing?.rentalAmount ?? (pricing?.pricePerDay && pricing?.totalDays ? pricing.pricePerDay * pricing.totalDays : 0));
+  const paidAmount = typeof payment?.paidAmount === "number" ? payment.paidAmount : 0;
+  const depositPaidStatus = String(payment?.depositPaidStatus ?? "");
+  const rentalPaidStatus = String(payment?.rentalPaidStatus ?? "");
+  const depositRefundStatus = String(payment?.depositRefundStatus ?? "");
+  const showPaymentBox = isTenant && (holdStatus === "authorized" || ["ready_for_handover", "in_progress", "completed"].includes(status));
   const pickupLabel = String(pickupInfo?.label ?? pickupInfo?.addressLabel ?? "Punto de encuentro");
   const pickupAddress = String(pickupInfo?.addressLabel ?? pickupInfo?.label ?? "—");
   const pickupAtText = pickupInfo?.pickupAt ? new Date(pickupInfo.pickupAt).toLocaleString("es-PA") : "—";
@@ -172,53 +194,10 @@ export function ContractDetails() {
   const doHoldAndPay = async () => {
     if (!uuid) return;
     if (!canHold) {
-      await alerts.info("No disponible", "Solo el solicitante puede autorizar el hold y solo cuando corresponda.");
+      await alerts.info("No disponible", "Solo el solicitante puede autorizar el hold y pagar.");
       return;
     }
-    const ok = await alerts.confirm({
-      title: "Autorizar hold y pagar",
-      text: "Esto autoriza el hold/garantía y registra el pago (simulado) de la primera parte.",
-      confirmText: "Continuar",
-      cancelText: "Cancelar",
-    });
-    if (!ok) return;
-    const { isConfirmed, value } = await Swal.fire({
-      title: "Plan de pago",
-      input: "select",
-      inputOptions: { one_time: "Un solo pago", two_payments: "En 2 pagos" },
-      inputValue: "one_time",
-      showCancelButton: true,
-      confirmButtonColor: "#f97316",
-      cancelButtonColor: "#0f172a",
-    });
-    if (!isConfirmed) return;
-    try {
-      await contractService.paymentHold(uuid, value as any);
-      await contractService.paymentPay(uuid, "first");
-      await alerts.success("Listo", "Hold autorizado y pago (simulado) registrado.");
-      refresh();
-    } catch (e: any) {
-      await alerts.error("No se pudo completar", e?.response?.data?.message || "Intenta de nuevo.");
-    }
-  };
-
-  const paySimulated = async (part: "first" | "second") => {
-    if (!uuid) return;
-    if (!isTenant) return;
-    const ok = await alerts.confirm({
-      title: part === "first" ? "Pagar ahora (simulado)" : "Pagar segunda parte (simulado)",
-      text: "Esto es una simulación para pruebas (sin pasarela).",
-      confirmText: "Pagar",
-      cancelText: "Cancelar",
-    });
-    if (!ok) return;
-    try {
-      await contractService.paymentPay(uuid, part);
-      await alerts.success("Pago registrado", "Se actualizó el estado del pago (simulado).");
-      refresh();
-    } catch (e: any) {
-      await alerts.error("No se pudo pagar", e?.response?.data?.message || "Intenta de nuevo.");
-    }
+    navigate(`/checkout/${uuid}`);
   };
 
   const signPhase = async (phase: "handover" | "return") => {
@@ -299,8 +278,6 @@ export function ContractDetails() {
   if (error) return <div className="max-w-5xl mx-auto py-10 px-4 text-red-600">{error}</div>;
   if (!contract) return <div className="max-w-5xl mx-auto py-10 px-4 text-slate-600">Contrato no encontrado.</div>;
 
-  const pickup = contract.pickup;
-  const pricing = contract.pricing;
   const evidencePhotos = Array.isArray(contract.ownerEvidence?.photosBeforeHandover)
     ? contract.ownerEvidence?.photosBeforeHandover.map((p) => (typeof p === "string" ? mediaService.resolvePublicUrl(p) : p))
     : [];
@@ -341,64 +318,49 @@ export function ContractDetails() {
               <div className="rounded-xl border border-slate-200 p-3">
                 <div className="text-xs text-slate-500">Costo estimado</div>
                 <div className="font-semibold text-slate-800">
-                  ${pricing?.totalAmountEstimated ?? "—"}{" "}
+                  ${(pricing?.pricePerDay ?? 0) * (pricing?.totalDays ?? 0)}{" "}
                   <span className="text-xs text-slate-500 font-medium">
-                    ({pricing?.totalDays ?? "—"} días)
+                    ({pricing?.totalDays ?? "—"} días × ${pricing?.pricePerDay ?? 0}/día)
                   </span>
                 </div>
                 <div className="text-xs text-slate-500 mt-1">Depósito: ${pricing?.depositAmount ?? 0}</div>
+                <div className="text-xs font-semibold text-orange-600 mt-1">
+                  Total: ${pricing?.totalAmountEstimated ?? "—"}
+                </div>
               </div>
             </div>
 
             {showPaymentBox && (
               <div className="pt-2">
-                <div className="text-sm font-semibold text-slate-800 mb-2">Pago (simulado)</div>
+                <div className="text-sm font-semibold text-slate-800 mb-2">Estado del Pago</div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                    <div className="rounded-xl border border-slate-200 p-3">
-                      <div className="text-xs text-slate-500">Depósito (hold)</div>
-                      <div className="font-semibold text-slate-800">{depositAmount !== null ? `$${depositAmount}` : "—"}</div>
-                      <div className="text-xs text-slate-500 mt-1">Estado hold: {holdStatus || "—"}</div>
+                    <div className={`rounded-xl border p-3 ${depositPaidStatus === "paid" ? "border-green-200 bg-green-50" : "border-slate-200"}`}>
+                      <div className="text-xs text-slate-500">Depósito de garantía</div>
+                      <div className="font-semibold text-slate-800">${depositAmount.toFixed(2)}</div>
+                      <div className={`text-xs mt-1 font-medium ${depositPaidStatus === "paid" ? "text-green-600" : "text-slate-500"}`}>
+                        {depositPaidStatus === "paid" ? "✓ Pagado" : depositPaidStatus === "failed" ? "✗ Error" : "Pendiente"}
+                      </div>
                     </div>
-                    <div className="rounded-xl border border-slate-200 p-3">
-                      <div className="text-xs text-slate-500">Alquiler total</div>
-                      <div className="font-semibold text-slate-800">{rentalAmount !== null ? `$${rentalAmount}` : "—"}</div>
-                      <div className="text-xs text-slate-500 mt-1">Plan: {paymentPlan || "—"}</div>
-                    </div>
-                    <div className="rounded-xl border border-slate-200 p-3">
-                      <div className="text-xs text-slate-500">A pagar ahora</div>
-                      <div className="font-semibold text-slate-800">{amountDueNow !== null ? `$${amountDueNow}` : "—"}</div>
-                      <div className="text-xs text-slate-500 mt-1">Pagado: {paidAmount !== null ? `$${paidAmount}` : "$0"}</div>
-                    </div>
-                    <div className="rounded-xl border border-slate-200 p-3">
-                      <div className="text-xs text-slate-500">A pagar luego</div>
-                      <div className="font-semibold text-slate-800">{amountDueLater !== null ? `$${amountDueLater}` : "$0"}</div>
-                      <div className="text-xs text-slate-500 mt-1">Estado pago: {paidStatus || "—"}</div>
+                    <div className={`rounded-xl border p-3 ${rentalPaidStatus === "paid" ? "border-green-200 bg-green-50" : "border-slate-200"}`}>
+                      <div className="text-xs text-slate-500">Alquiler ({pricing?.totalDays ?? "—"} días)</div>
+                      <div className="font-semibold text-slate-800">${rentalAmount.toFixed(2)}</div>
+                      <div className={`text-xs mt-1 font-medium ${rentalPaidStatus === "paid" ? "text-green-600" : "text-slate-500"}`}>
+                        {rentalPaidStatus === "paid" ? `✓ Pagado ($${paidAmount.toFixed(2)})` : rentalPaidStatus === "failed" ? "✗ Error" : "Pendiente"}
+                      </div>
                     </div>
                   </div>
-
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <Button
-                      onClick={() => paySimulated("first")}
-                      className="bg-orange-500 hover:bg-orange-600 text-white font-bold h-11"
-                      disabled={holdStatus !== "authorized" || (paidAmount ?? 0) > 0}
-                    >
-                      {(paidAmount ?? 0) > 0 ? "Pago registrado" : "Pagar ahora (simulado)"}
-                    </Button>
-                    {paymentPlan === "two_payments" && (amountDueLater ?? 0) > 0 && (
-                      <Button
-                        onClick={() => paySimulated("second")}
-                        variant="secondary"
-                        className="bg-white border border-slate-200 text-slate-800 font-bold h-11"
-                        disabled={holdStatus !== "authorized"}
-                      >
-                        Pagar segunda parte (simulado)
-                      </Button>
-                    )}
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    Nota: esto no usa Stripe; el backend simula los pagos para pruebas.
-                  </div>
+                  {depositRefundStatus && depositRefundStatus !== "" && (
+                    <div className={`rounded-xl border p-3 text-sm ${depositRefundStatus === "refunded" ? "border-blue-200 bg-blue-50" : depositRefundStatus === "failed" ? "border-red-200 bg-red-50" : "border-slate-200"}`}>
+                      <div className="text-xs text-slate-500">Reembolso del depósito</div>
+                      <div className={`font-medium mt-1 ${depositRefundStatus === "refunded" ? "text-blue-700" : depositRefundStatus === "failed" ? "text-red-600" : "text-slate-500"}`}>
+                        {depositRefundStatus === "refunded" && `✓ Reembolsado ($${depositAmount.toFixed(2)})`}
+                        {depositRefundStatus === "failed" && "✗ Error en el reembolso — contacta soporte"}
+                        {depositRefundStatus === "skipped" && "Simulado (no se usó Stripe)"}
+                        {depositRefundStatus === "pending" && "Procesando..."}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -447,8 +409,25 @@ export function ContractDetails() {
             )}
 
             {isTenant && (
-              <Button className="w-full bg-orange-500 hover:bg-orange-600" onClick={doHoldAndPay} disabled={!canHold}>
-                Autorizar hold y pagar ahora
+              <>
+                <Button className="w-full bg-orange-500 hover:bg-orange-600" onClick={doHoldAndPay} disabled={!canHold}>
+                  Pagar depósito de garantía
+                </Button>
+                {status === "signed" && (
+                  <div className="text-xs text-slate-500 -mt-1">
+                    Esperando que el propietario suba las 3 fotos de evidencia.
+                  </div>
+                )}
+              </>
+            )}
+
+            {isTenant && (
+              <Button
+                className="w-full bg-orange-600 hover:bg-orange-700"
+                onClick={() => uuid && navigate(`/checkout-rental/${uuid}`)}
+                disabled={!canPayRental}
+              >
+                {(contract as any)?.payment?.rentalPaidStatus === "paid" ? "Alquiler pagado ✓" : "Pagar alquiler"}
               </Button>
             )}
 
@@ -460,8 +439,13 @@ export function ContractDetails() {
             >
               Firmar entrega (handover)
             </Button>
-            {!canSignHandover && status === "ready_for_handover" && !handoverWindowOk && (
-              <div className="text-xs text-slate-500 -mt-2">Solo puedes firmar dentro de ±12h del pickup.</div>
+            {status === "ready_for_handover" && !canSignHandover && (
+              <div className="text-xs -mt-2">
+                {alreadySignedHandover
+                  ? <span className="text-green-600">Ya firmaste la entrega. Esperando la otra parte.</span>
+                  : <span className="text-slate-500">El botón se habilita el día del pickup ({pickupAt ? pickupAt.toLocaleDateString("es-PA", { timeZone: "America/Panama" }) : "—"}).</span>
+                }
+              </div>
             )}
             <Button
               variant="secondary"
@@ -471,8 +455,13 @@ export function ContractDetails() {
             >
               Firmar devolución (return)
             </Button>
-            {!canSignReturn && status === "in_progress" && !returnWindowOk && (
-              <div className="text-xs text-slate-500 -mt-2">Solo puedes firmar dentro de ±12h de la devolución.</div>
+            {status === "in_progress" && !canSignReturn && (
+              <div className="text-xs -mt-2">
+                {alreadySignedReturn
+                  ? <span className="text-green-600">Ya firmaste la devolución. Esperando la otra parte.</span>
+                  : <span className="text-slate-500">El botón se habilita el día de la devolución ({shortDate((contract as any)?.endDate)}).</span>
+                }
+              </div>
             )}
 
             <div className="text-xs text-slate-500 pt-2">La firma genera un token temporal validando tu contraseña.</div>

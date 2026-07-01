@@ -30,10 +30,7 @@ export function isToolRented(tool: any, activeRentals: RentalRequestListItem[]):
     return true;
   }
 
-  if (tool?.isAvailable === false && rentalState !== "paused") {
-    return true;
-  }
-
+  // isAvailable=false alone does NOT mean rented — owner may have manually paused the listing.
   return false;
 }
 

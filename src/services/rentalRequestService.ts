@@ -1,14 +1,15 @@
 import { api } from "@/lib/api";
 
 export type RentalRequestStatus =
-  | { hasPending: false }
-  | { hasPending: true; requestUuid: string };
+  | { hasPending: false; hasActive?: false; status?: undefined; requestUuid?: undefined; expiresAt?: string }
+  | { hasPending?: true; hasActive: true; status?: string; requestUuid?: string; expiresAt?: string };
 
 export interface CreateRentalRequestBody {
   toolUuid: string;
   startDate: string; // YYYY-MM-DD
   endDate: string; // YYYY-MM-DD
   message?: string;
+  acceptedTerms: true;
   pickup?: {
     label?: string;
     lat?: number;
@@ -101,6 +102,7 @@ export interface RentalRequestListItem {
   status: RentalRequestStatusValue;
   rejectionReason?: string;
   createdAt?: string;
+  expiresAt?: string;
   _source?: "rentalrequests" | "rentals_legacy" | string;
 }
 
@@ -127,7 +129,16 @@ export const rentalRequestService = {
   getStatus: async (toolUuid: string): Promise<RentalRequestStatus> => {
     const response = await api.get("/rentals/requests/status", { params: { toolUuid } });
     const data = unwrap(response);
-    if (data?.hasPending) return { hasPending: true, requestUuid: String(data.requestUuid ?? "") };
+    const hasActive = Boolean(data?.hasActive ?? data?.hasPending);
+    if (hasActive) {
+      return {
+        hasPending: true,
+        hasActive: true,
+        requestUuid: String(data.requestUuid ?? ""),
+        status: typeof data?.status === "string" ? data.status : undefined,
+        expiresAt: typeof data?.expiresAt === "string" ? data.expiresAt : undefined,
+      };
+    }
     return { hasPending: false };
   },
 
@@ -220,6 +231,7 @@ export const rentalRequestService = {
       status: normalizeStatus(raw?.status),
       rejectionReason: raw?.rejectionReason,
       createdAt: raw?.createdAt,
+      expiresAt: raw?.expiresAt,
       _source: raw?._source,
     };
     return normalized;

@@ -20,12 +20,24 @@ export interface RentalContract {
   startDate?: string;
   endDate?: string;
   pickup?: { lat?: number; lng?: number; addressLabel?: string; notes?: string; pickupAt?: string };
-  pricing?: { pricePerDay?: number; depositAmount?: number; totalDays?: number; totalAmountEstimated?: number };
+  pricing?: { pricePerDay?: number; rentalAmount?: number; depositAmount?: number; totalDays?: number; totalAmountEstimated?: number };
   status: ContractStatus | string;
   ownerSignature?: { accepted?: boolean; acceptedAt?: string };
   tenantSignature?: { accepted?: boolean; acceptedAt?: string };
   ownerEvidence?: { photosBeforeHandover?: string[]; uploadedAt?: string };
-  payment?: { holdStatus?: string; paymentPlan?: string; paidStatus?: string };
+  payment?: {
+    holdStatus?: string;
+    paymentPlan?: string;
+    paidStatus?: string;
+    rentalAmount?: number;
+    depositAmount?: number;
+    amountDueNow?: number;
+    amountDueLater?: number;
+    paidAmount?: number;
+    depositPaidStatus?: 'pending' | 'paid' | 'failed';
+    rentalPaidStatus?: 'pending' | 'paid' | 'failed';
+    depositRefundStatus?: 'pending' | 'refunded' | 'failed' | 'skipped';
+  };
 }
 
 export interface TimelineEvent {
@@ -98,6 +110,26 @@ export const contractService = {
 
   sign: async (contractUuid: string, body: { actor: "tenant" | "owner"; phase: "handover" | "return"; signatureToken: string }) => {
     const response = await api.post(`/rentals/contracts/${encodeURIComponent(contractUuid)}/sign`, body);
+    return unwrap(response);
+  },
+
+  createPaymentIntent: async (contractUuid: string) => {
+    const response = await api.post(`/rentals/contracts/${encodeURIComponent(contractUuid)}/payment/intent`);
+    return unwrap(response);
+  },
+
+  confirmStripePayment: async (contractUuid: string) => {
+    const response = await api.post(`/rentals/contracts/${encodeURIComponent(contractUuid)}/payment/confirm`);
+    return unwrap(response);
+  },
+
+  createRentalPaymentIntent: async (contractUuid: string) => {
+    const response = await api.post(`/rentals/contracts/${encodeURIComponent(contractUuid)}/payment/rental-intent`);
+    return unwrap(response);
+  },
+
+  confirmRentalPayment: async (contractUuid: string) => {
+    const response = await api.post(`/rentals/contracts/${encodeURIComponent(contractUuid)}/payment/confirm-rental`);
     return unwrap(response);
   },
 };
