@@ -19,20 +19,37 @@ Sigue estos pasos para levantar el entorno de desarrollo local:
 
 1.  **Clonar el repositorio:**
     ```bash
-    git clone [url-del-repositorio]
+    git clone https://github.com/DiegoT21/rent-tools-web.git
+    cd rent-tools-web
     ```
 2.  **Instalar dependencias:**
     ```bash
     npm install
     ```
 3.  **Configurar variables de entorno:**
-    *   Configurar la URL base de la API en el archivo `.env`.
+    ```bash
+    cp .env.example .env
+    ```
+    Para usar el backend en **Railway** (recomendado para el equipo):
+    ```env
+    VITE_API_URL=https://rent-tools-back-production.up.railway.app/api
+    ```
+    Ver guía completa: [docs/CONEXION-RAILWAY.md](docs/CONEXION-RAILWAY.md)
 4.  **Iniciar la aplicación:**
     ```bash
-    npm start
+    npm run dev
     ```
+    Abre `http://localhost:5173`
 
 ---
+
+## ☁️ Conexión a Railway
+
+El backend y MongoDB están en Railway. La web solo necesita `VITE_API_URL` en `.env`.
+
+- **API:** `https://rent-tools-back-production.up.railway.app/api`
+- **Documentación:** [docs/CONEXION-RAILWAY.md](docs/CONEXION-RAILWAY.md)
+
 
 ## 👥 Integrantes (Grupo 1GS141)
 *   Samir Caballero

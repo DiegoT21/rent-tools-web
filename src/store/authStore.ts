@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { api } from '../lib/api';
 
 interface User {
   uuid?: string;
@@ -49,23 +50,14 @@ export const useAuthStore = create<AuthState>()(
 
         set({ isLoading: true, error: null });
         try {
-          const response = await fetch('/api/users/profile', {
-            method: 'GET',
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              'Content-Type': 'application/json',
-            },
-          });
-
-          const json = await response.json();
-          if (response.ok && json.success) {
-            set({ user: json.data });
-          } else {
-            set({ error: json.message || "Error al obtener el perfil", user: null });
-          }
-        } catch (error) {
+          const response = await api.get('/users/profile');
+          set({ user: response.data.data });
+        } catch (error: any) {
           console.error("Error fetching profile:", error);
-          set({ error: "Error de conexión al obtener el perfil", user: null });
+          set({
+            error: error.response?.data?.message || "Error de conexión al obtener el perfil",
+            user: null,
+          });
         } finally {
           set({ isLoading: false });
         }

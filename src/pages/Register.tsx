@@ -4,6 +4,8 @@ import { ChevronRight, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { useNavigate } from "react-router-dom";
+import { isAxiosError } from "axios";
+import { authService } from "../services/authService";
 
 export function Register() {
   const navigate = useNavigate();
@@ -38,29 +40,21 @@ export function Register() {
     setError(null);
 
     try {
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          firstName,
-          lastName,
-          email,
-          password,
-          identityDocument
-        })
+      const data = await authService.register({
+        firstName,
+        lastName,
+        email,
+        password,
+        identityDocument,
       });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        // Obtenemos el token desde la respuesta (data.data.accessToken)
-        const accessToken = data.data?.accessToken;
-        navigate("/register/step-2", { state: { accessToken } });
-      } else {
-        setError(data.message || "Error al crear la cuenta");
-      }
+      const accessToken = data.data?.accessToken;
+      navigate("/register/step-2", { state: { accessToken } });
     } catch (err) {
-      setError("Error de conexión con el servidor");
+      if (isAxiosError(err)) {
+        setError(err.response?.data?.message || "Error al crear la cuenta");
+      } else {
+        setError("Error de conexión con el servidor");
+      }
     } finally {
       setIsLoading(false);
     }
