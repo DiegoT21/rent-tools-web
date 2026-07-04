@@ -1,4 +1,4 @@
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { Search, User, MapPin, ShieldCheck, ShieldAlert } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuthStore();
+  const location = useLocation();
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") ?? "");
 
   useEffect(() => {
@@ -50,14 +51,33 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
           </div>
         </Link>
         <nav className="flex items-center gap-6">
-          <a href="#" className="text-sm font-semibold text-primary border-b-2 border-primary py-5">Ubicación</a>
+          <Link
+            to="/"
+            className={`text-sm transition-colors py-5 border-b-2 ${
+              location.pathname === "/"
+                ? "font-semibold text-primary border-primary"
+                : "font-medium text-slate-500 hover:text-slate-900 border-transparent"
+            }`}
+          >
+            Ubicación
+          </Link>
           <button 
             onClick={toggleSidebar}
             className={`text-sm transition-colors py-5 ${isSidebarOpen ? "font-semibold text-primary border-b-2 border-primary" : "font-medium text-slate-500 hover:text-slate-900 border-b-2 border-transparent"}`}
           >
             Categorías
           </button>
-          <a href="#" className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors py-5 border-b-2 border-transparent">Mis Rentas</a>
+          <Link
+            to="/my-rentals"
+            id="nav-my-rentals"
+            className={`text-sm transition-colors py-5 border-b-2 ${
+              location.pathname === "/my-rentals"
+                ? "font-semibold text-primary border-primary"
+                : "font-medium text-slate-500 hover:text-slate-900 border-transparent"
+            }`}
+          >
+            Alquileres
+          </Link>
         </nav>
       </div>
 

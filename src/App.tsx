@@ -13,6 +13,7 @@ import { ContractDetails } from './pages/ContractDetails'
 import { Checkout } from './pages/Checkout'
 import { CheckoutRental } from './pages/CheckoutRental'
 import { DeliveryProtocol } from './pages/DeliveryProtocol'
+import { MyRentals } from './pages/MyRentals'
 
 function App() {
   return (
@@ -60,6 +61,11 @@ function App() {
         <Route path="/delivery" element={
           <RootLayout>
             <DeliveryProtocol />
+          </RootLayout>
+        } />
+        <Route path="/my-rentals" element={
+          <RootLayout>
+            <MyRentals />
           </RootLayout>
         } />
       </Routes>

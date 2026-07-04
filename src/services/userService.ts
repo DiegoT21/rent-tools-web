@@ -24,7 +24,12 @@ export const userService = {
     const response = await api.get(`/users/${encodeURIComponent(userUuid)}/reviews`);
     const data = unwrap(response);
     return {
-      reviews: Array.isArray(data?.reviews) ? data.reviews : [],
+      reviews: Array.isArray(data?.reviews)
+        ? data.reviews.map((r: any) => ({
+            ...r,
+            rating: typeof r.ownerRating === "number" ? r.ownerRating : r.rating,
+          }))
+        : [],
       summary: data?.summary ?? { count: 0, averageRating: 0 },
     };
   },

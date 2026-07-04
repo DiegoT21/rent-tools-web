@@ -8,6 +8,8 @@ export interface PublicTool {
   category?: string;
   pricePerDay?: number;
   rating?: number;
+  ratingCount?: number;
+  ratingScore?: number;
   imageUrl?: string;
   imageUrls?: string[];
   images?: string[];

@@ -40,6 +40,42 @@ export interface RentalContract {
   };
 }
 
+export interface MyRental {
+  uuid: string;
+  status: ContractStatus | string;
+  startDate?: string;
+  endDate?: string;
+  tool?: {
+    uuid?: string;
+    name?: string;
+    imageUrls?: string[];
+    pricePerDay?: number;
+    depositAmount?: number;
+  };
+  owner?: {
+    uuid?: string;
+    firstName?: string;
+    lastName?: string;
+    profileImageUrl?: string;
+  };
+  pricing?: {
+    pricePerDay?: number;
+    rentalAmount?: number;
+    depositAmount?: number;
+    totalDays?: number;
+    totalAmountEstimated?: number;
+  };
+}
+
+export interface MyRentalsResponse {
+  data: MyRental[];
+  pagination: {
+    page: number;
+    totalPages: number;
+    total: number;
+  };
+}
+
 export interface TimelineEvent {
   uuid: string;
   actor: "tenant" | "owner" | "system" | string;
@@ -131,5 +167,21 @@ export const contractService = {
   confirmRentalPayment: async (contractUuid: string) => {
     const response = await api.post(`/rentals/contracts/${encodeURIComponent(contractUuid)}/payment/confirm-rental`);
     return unwrap(response);
+  },
+
+  getMyRentals: async (opts: { status: 'active' | 'past' | 'all'; page?: number; search?: string; sortBy?: 'recent' | 'oldest' }): Promise<MyRentalsResponse> => {
+    const response = await api.get('/rentals/contracts/my-rentals', {
+      params: {
+        status: opts.status,
+        page: opts.page ?? 1,
+        search: opts.search,
+        sortBy: opts.sortBy,
+      },
+    });
+    const raw = response?.data;
+    return {
+      data: Array.isArray(raw?.data) ? raw.data : [],
+      pagination: raw?.pagination ?? { page: 1, totalPages: 1, total: 0 },
+    };
   },
 };
