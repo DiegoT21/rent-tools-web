@@ -21,7 +21,7 @@ export function RootLayout({ children }: RootLayoutProps) {
   }, [location.pathname]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#f8f9fb] relative">
+    <div className="flex flex-col min-h-screen bg-white relative">
       <Header toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} isSidebarOpen={isSidebarOpen} />
       
       <div className="flex flex-1 overflow-hidden relative">

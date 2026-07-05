@@ -250,6 +250,7 @@ export function UserProfile() {
   const [userReviews, setUserReviews] = useState<any[]>([]);
   const [userSummary, setUserSummary] = useState<{ count: number; averageRating: number } | null>(null);
   const [userReviewsLoading, setUserReviewsLoading] = useState(false);
+  const [profileTab, setProfileTab] = useState<"resenas" | "listados" | "historial">("resenas");
 
   const StarRow = ({ rating }: { rating: number }) => {
     const full = Math.round(Math.max(0, Math.min(5, rating)));
@@ -1015,14 +1016,14 @@ export function UserProfile() {
           <div className="space-y-6 animate-in fade-in duration-500">
             <Card className="border-none shadow-sm overflow-hidden bg-white">
               <CardContent className="p-8">
-                <div className="flex items-start justify-between">
+                <div className="flex items-start justify-between gap-4">
                   <div className="flex gap-6">
                     <div className="relative">
                       <button
                         type="button"
                         onClick={openAvatarPicker}
                         disabled={avatarUploading}
-                        className="h-28 w-28 rounded-full bg-slate-200 overflow-hidden border-4 border-white shadow-md relative group disabled:opacity-70"
+                        className="h-28 w-28 rounded-full bg-orange-100 overflow-hidden border-4 border-white shadow-md relative group disabled:opacity-70"
                         aria-label="Cambiar foto de perfil"
                       >
                         <UserAvatar
@@ -1030,7 +1031,7 @@ export function UserProfile() {
                           lastName={user?.lastName}
                           profileImageUrl={user?.profileImageUrl}
                           className="h-full w-full"
-                          textClassName="text-3xl text-slate-600"
+                          textClassName="text-3xl text-primary"
                         />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           {avatarUploading ? (
@@ -1040,38 +1041,22 @@ export function UserProfile() {
                           )}
                         </div>
                       </button>
+                      <span className="absolute bottom-1 right-1 grid h-8 w-8 place-items-center rounded-full bg-primary text-white border-4 border-white shadow-sm">
+                        <Edit3 className="h-3.5 w-3.5" />
+                      </span>
                     </div>
-                    <div className="space-y-3 pt-2">
-                      <div className="space-y-1">
-                        <h1 className="text-2xl font-bold text-slate-900">
-                          {user ? `${user.firstName} ${user.lastName || ''}` : 'Invitado'}
-                        </h1>
-                        <div className="flex items-center gap-4 text-sm text-slate-500 font-medium">
-                          <div className="flex items-center gap-1">
-                            <MapPin className="h-4 w-4" />
-                            <span>Panamá Oeste, Panamá</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            <span>Miembro desde 2024</span>
-                          </div>
+                    <div className="space-y-2 pt-2">
+                      <h1 className="text-3xl font-black text-slate-900">
+                        {user ? `${user.firstName} ${user.lastName || ''}` : 'Invitado'}
+                      </h1>
+                      <div className="flex items-center gap-4 text-sm text-slate-500 font-medium">
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-4 w-4" />
+                          <span>Panamá Oeste, Panamá</span>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-8 pt-2">
-                        <div className="text-center">
-                          <p className="text-xl font-bold text-slate-900">
-                            {userSummary ? userSummary.averageRating.toFixed(1) : "0.0"}{" "}
-                            <Star className={cn("h-4 w-4 inline mb-1 ml-0.5", userSummary && userSummary.averageRating > 0 ? "text-amber-400 fill-amber-400" : "text-slate-400")} />
-                          </p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Calificación</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-xl font-bold text-slate-900">{userSummary ? userSummary.count : 0}</p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Rentas</p>
-                        </div>
-                        <div className="text-center">
-                          <p className="text-xl font-bold text-slate-900">{metrics.totalPublicaciones}</p>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Publicaciones</p>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-4 w-4" />
+                          <span>Miembro desde 2024</span>
                         </div>
                       </div>
                     </div>
@@ -1079,92 +1064,199 @@ export function UserProfile() {
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
-                      className="rounded-full gap-2 font-bold px-6 text-slate-700"
+                      className="rounded-xl gap-2 font-bold px-6 text-slate-700"
                       onClick={openAvatarPicker}
                       disabled={avatarUploading}
                     >
                       {avatarUploading ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
-                        <Edit3 className="h-4 w-4" />
+                        <Pencil className="h-4 w-4" />
                       )}
                       Editar Perfil
                     </Button>
-                    <Button variant="ghost" size="icon" className="rounded-full text-slate-400">
+                    <Button variant="outline" size="icon" className="rounded-xl text-slate-400">
                       <MoreHorizontal className="h-5 w-5" />
                     </Button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+                  <div className="rounded-2xl bg-slate-50 border border-slate-100 p-5 text-center">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Calificación</p>
+                    <p className="text-3xl font-black text-primary flex items-center justify-center gap-1">
+                      {userSummary ? userSummary.averageRating.toFixed(1) : "0.0"}
+                      <Star className="h-5 w-5 fill-primary text-primary" />
+                    </p>
+                    <p className="text-xs text-slate-400 font-medium mt-1">
+                      Basado en {userSummary ? userSummary.count : 0} reseña{(userSummary?.count ?? 0) !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 border border-slate-100 p-5 text-center">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Rentas totales</p>
+                    <p className="text-3xl font-black text-slate-900">{userSummary ? userSummary.count : 0}</p>
+                    <p className="text-xs text-slate-400 font-medium mt-1">Herramientas alquiladas</p>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 border border-slate-100 p-5 text-center">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Publicaciones</p>
+                    <p className="text-3xl font-black text-slate-900">{metrics.totalPublicaciones}</p>
+                    <p className="text-xs text-slate-400 font-medium mt-1">Equipos en inventario</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {userReviewsLoading && (
-              <Card className="border-none shadow-sm min-h-[250px] bg-white flex items-center justify-center">
-                <CardContent className="p-6 text-slate-500 font-semibold flex items-center gap-2">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  Cargando reviews...
-                </CardContent>
-              </Card>
-            )}
+            <Card className="border-none shadow-sm bg-white">
+              <CardContent className="p-8">
+                <div className="flex items-center gap-8 border-b border-slate-100 -mt-2 mb-8">
+                  {([
+                    ["resenas", "Reseñas"],
+                    ["listados", "Mis Listados"],
+                    ["historial", "Historial"],
+                  ] as const).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setProfileTab(value)}
+                      className={cn(
+                        "pb-4 text-sm font-semibold border-b-2 transition-colors -mb-px",
+                        profileTab === value
+                          ? "text-primary border-primary"
+                          : "text-slate-500 border-transparent hover:text-slate-900"
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
 
-            {!userReviewsLoading && userReviews.length === 0 && (
-              <Card className="border-none shadow-sm min-h-[400px] bg-white flex items-center justify-center">
-                <CardContent className="text-center space-y-6 max-w-sm">
-                  <div className="relative">
-                    <div className="w-48 h-32 bg-slate-50 rounded-lg mx-auto transform -rotate-3 border border-slate-100 flex flex-col p-4 gap-2">
-                      <div className="w-1/2 h-2 bg-slate-200 rounded-full" />
-                      <div className="w-3/4 h-2 bg-slate-100 rounded-full" />
-                      <div className="flex gap-1 mt-2">
-                        {[1,2,3,4].map(i => <Star key={i} className="h-4 w-4 text-orange-200 fill-orange-100" />)}
-                        <Star key={5} className="h-4 w-4 text-slate-200" />
+                {profileTab === "resenas" && (
+                  <>
+                    {userReviewsLoading && (
+                      <div className="min-h-[200px] flex items-center justify-center text-slate-500 font-semibold gap-2">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        Cargando reviews...
                       </div>
-                    </div>
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-32 bg-white rounded-lg border shadow-xl flex flex-col p-4 gap-2 transform rotate-3">
-                       <div className="w-1/2 h-2 bg-slate-100 rounded-full" />
-                       <div className="w-3/4 h-2 bg-slate-50 rounded-full" />
-                       <div className="flex gap-1 mt-2">
-                         {[1,2,3,4].map(i => <Star key={i} className="h-4 w-4 text-orange-400 fill-orange-400" />)}
-                         <Star key={5} className="h-4 w-4 text-slate-200" />
-                       </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2 pt-8">
-                    <h3 className="text-xl font-bold text-slate-900">Aún no tienes reviews</h3>
-                    <p className="text-sm text-slate-500 font-medium">
-                      Los reviews ayudan a mantener nuestra comunidad confiable y segura. Empieza a rentar para que otros te conozcan.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                    )}
 
-            {!userReviewsLoading && userReviews.length > 0 && (
-              <Card className="border-none shadow-sm bg-white">
-                <CardContent className="p-8 space-y-6">
-                  <div className="text-lg font-bold text-slate-900">Reviews de la comunidad</div>
-                  <div className="grid gap-4">
-                    {userReviews.map((r, idx) => (
-                      <div key={r.uuid ?? idx} className="rounded-2xl border border-slate-100 bg-white p-5 space-y-3 shadow-sm hover:shadow transition-shadow">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <StarRow rating={r.rating ?? 0} />
-                            <span className="text-sm font-bold text-slate-800">
-                              {typeof r.rating === "number" ? r.rating.toFixed(1) : "—"} / 5
-                            </span>
+                    {!userReviewsLoading && userReviews.length === 0 && (
+                      <div className="flex flex-col items-center text-center py-10">
+                        <div className="relative mb-6">
+                          <div className="grid h-20 w-20 place-items-center rounded-2xl bg-orange-50 border border-orange-100">
+                            <Star className="h-9 w-9 text-primary fill-primary" />
                           </div>
-                          <span className="text-xs text-slate-400 font-medium">
-                            {r.createdAt ? formatDateOnly(r.createdAt) : ""}
+                          <span className="absolute -top-2 -right-2 grid h-8 w-8 place-items-center rounded-xl bg-white border border-slate-200 shadow-sm">
+                            <FileText className="h-4 w-4 text-slate-400" />
                           </span>
                         </div>
-                        <p className="text-sm text-slate-600 whitespace-pre-line font-medium">
-                          {r.comment || "Sin comentario"}
+                        <h3 className="text-xl font-black text-slate-900 mb-2">Aún no tienes reviews</h3>
+                        <p className="text-sm text-slate-500 font-medium max-w-md mb-6">
+                          Los reviews ayudan a mantener nuestra comunidad confiable y segura. Empieza a rentar para que otros te conozcan y construyas tu reputación en la plataforma.
                         </p>
+                        <div className="flex flex-wrap justify-center gap-3">
+                          <Button
+                            onClick={() => navigate("/")}
+                            className="rounded-xl bg-primary hover:bg-primary/90 text-white font-bold px-6 h-11"
+                          >
+                            Explorar Herramientas
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="rounded-xl border-slate-200 text-slate-700 font-bold px-6 h-11"
+                          >
+                            Invitar Amigos
+                          </Button>
+                        </div>
+
+                        <div className="w-full max-w-lg mt-12">
+                          <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-3">
+                            Vista previa de una reseña
+                          </p>
+                          <div className="rounded-2xl border border-slate-100 bg-white p-5 text-left opacity-60">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex items-center gap-3">
+                                <div className="h-9 w-9 rounded-full bg-slate-100" />
+                                <div>
+                                  <p className="text-sm font-bold text-slate-800">Usuario de Prueba</p>
+                                  <p className="text-xs text-slate-400">Alquiler: Excavadora Bobcat E35</p>
+                                </div>
+                              </div>
+                              <StarRow rating={4} />
+                            </div>
+                            <p className="text-sm text-slate-500 italic mt-3">
+                              "Excelente trato y la maquinaria estaba en perfectas condiciones. Muy recomendable."
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                    ))}
+                    )}
+
+                    {!userReviewsLoading && userReviews.length > 0 && (
+                      <div className="grid gap-4">
+                        {userReviews.map((r, idx) => (
+                          <div key={r.uuid ?? idx} className="rounded-2xl border border-slate-100 bg-white p-5 space-y-3 shadow-sm hover:shadow transition-shadow">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <StarRow rating={r.rating ?? 0} />
+                                <span className="text-sm font-bold text-slate-800">
+                                  {typeof r.rating === "number" ? r.rating.toFixed(1) : "—"} / 5
+                                </span>
+                              </div>
+                              <span className="text-xs text-slate-400 font-medium">
+                                {r.createdAt ? formatDateOnly(r.createdAt) : ""}
+                              </span>
+                            </div>
+                            <p className="text-sm text-slate-600 whitespace-pre-line font-medium">
+                              {r.comment || "Sin comentario"}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {profileTab === "listados" && (
+                  <div className="flex flex-col items-center text-center py-14">
+                    <div className="grid h-20 w-20 place-items-center rounded-2xl bg-orange-50 border border-orange-100 mb-6">
+                      <Package className="h-9 w-9 text-primary" />
+                    </div>
+                    <h3 className="text-xl font-black text-slate-900 mb-2">
+                      {metrics.totalPublicaciones > 0 ? "Gestiona tu inventario" : "Aún no tienes listados"}
+                    </h3>
+                    <p className="text-sm text-slate-500 font-medium max-w-md mb-6">
+                      {metrics.totalPublicaciones > 0
+                        ? `Tienes ${metrics.totalPublicaciones} equipo${metrics.totalPublicaciones !== 1 ? "s" : ""} publicado${metrics.totalPublicaciones !== 1 ? "s" : ""}. Revísalos en tu inventario.`
+                        : "Publica tu primera herramienta y empieza a generar ingresos."}
+                    </p>
+                    <Button
+                      onClick={() => setActiveTab("inventario")}
+                      className="rounded-xl bg-primary hover:bg-primary/90 text-white font-bold px-6 h-11"
+                    >
+                      Ir a Mi Inventario
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                )}
+
+                {profileTab === "historial" && (
+                  <div className="flex flex-col items-center text-center py-14">
+                    <div className="grid h-20 w-20 place-items-center rounded-2xl bg-orange-50 border border-orange-100 mb-6">
+                      <Calendar className="h-9 w-9 text-primary" />
+                    </div>
+                    <h3 className="text-xl font-black text-slate-900 mb-2">Historial de alquileres</h3>
+                    <p className="text-sm text-slate-500 font-medium max-w-md mb-6">
+                      Consulta el detalle de tus rentas activas y pasadas en la sección de alquileres.
+                    </p>
+                    <Button
+                      onClick={() => navigate("/my-rentals")}
+                      className="rounded-xl bg-primary hover:bg-primary/90 text-white font-bold px-6 h-11"
+                    >
+                      Ver Alquileres
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         )}
 
@@ -1659,17 +1751,7 @@ export function UserProfile() {
 
         {activeTab === "publicar" && (
           <div className="animate-in slide-in-from-right-4 duration-500">
-            <div className="mb-6 flex items-center gap-4">
-              <Button 
-                variant="ghost" 
-                onClick={() => setActiveTab("inventario")}
-                className="text-slate-500 hover:text-slate-900"
-              >
-                ← Volver al Inventario
-              </Button>
-              <h1 className="text-3xl font-black text-slate-900 tracking-tight">Publicar nueva herramienta</h1>
-            </div>
-            <CreateListing />
+            <CreateListing embedded onBack={() => setActiveTab("inventario")} />
           </div>
         )}
       </main>

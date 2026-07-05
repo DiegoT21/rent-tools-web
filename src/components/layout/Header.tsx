@@ -55,7 +55,7 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
         <Link to="/" className="flex items-center gap-2.5 group hover:opacity-80 transition-opacity whitespace-nowrap">
           <img src="/logo.jpeg" alt="RentTools Logo" className="h-8 w-8 object-cover rounded-md" />
           <div className="text-xl font-bold tracking-tight text-slate-900">
-            Rent<span className="text-slate-600 font-medium">Tools</span>
+            Rent<span className="text-primary">Tools</span>
           </div>
         </Link>
         {(!isAdmin || !location.pathname.startsWith("/admin")) && (
