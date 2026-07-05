@@ -105,6 +105,7 @@ export function RentalRequestDialog({
 }) {
   const isDesktop = useIsDesktop();
   const pricePerDay = typeof tool.pricePerDay === "number" ? tool.pricePerDay : 0;
+  const backendPricing = (tool as any)?.pricingSummary ?? null;
   const [loadingBookings, setLoadingBookings] = useState(false);
   const [bookings, setBookings] = useState<Booking[]>([]);
 
@@ -114,6 +115,7 @@ export function RentalRequestDialog({
   const [pickupMinute, setPickupMinute] = useState("00");
   const [pickupPeriod, setPickupPeriod] = useState<Period>("AM");
   const [message, setMessage] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -137,12 +139,15 @@ export function RentalRequestDialog({
 
   useEffect(() => {
     if (!open) return;
-    setRange({ from: today, to: today });
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    setRange({ from: today, to: tomorrow });
     setPickupLabel("");
     setPickupHour12("9");
     setPickupMinute("00");
     setPickupPeriod("AM");
     setMessage("");
+    setAcceptedTerms(false);
     setSelectedMeetingIndex(0);
     setFormError(null);
   }, [open, today]);
@@ -184,25 +189,24 @@ export function RentalRequestDialog({
     });
   }, [bookings]);
 
-  const totalDays = useMemo(() => {
+  const selectedDays = useMemo(() => {
     if (!range?.from) return 0;
     const from = new Date(range.from.getFullYear(), range.from.getMonth(), range.from.getDate());
     const to = range.to ? new Date(range.to.getFullYear(), range.to.getMonth(), range.to.getDate()) : from;
-    const diff = Math.round((to.getTime() - from.getTime()) / 86400000) + 1;
+    const diff = Math.round((to.getTime() - from.getTime()) / 86400000);
     return Number.isFinite(diff) && diff > 0 ? diff : 0;
   }, [range]);
 
-  const subtotalRental = useMemo(() => {
-    if (!totalDays) return 0;
-    return pricePerDay * totalDays;
-  }, [pricePerDay, totalDays]);
-
-  const holdAmount = useMemo(() => {
-    if (!subtotalRental) return 0;
-    return Math.round(subtotalRental * 0.25);
-  }, [subtotalRental]);
-
-  const totalEstimated = useMemo(() => subtotalRental + holdAmount, [holdAmount, subtotalRental]);
+  const depositMin = typeof (tool as any)?.depositAmount === "number" ? (tool as any).depositAmount : 0;
+  const totalDays = typeof backendPricing?.totalDays === "number" ? backendPricing.totalDays : selectedDays;
+  const subtotalRental =
+    typeof backendPricing?.subtotal === "number" ? backendPricing.subtotal : totalDays * pricePerDay;
+  const holdAmount =
+    typeof backendPricing?.hold === "number"
+      ? backendPricing.hold
+      : Math.max(depositMin, Math.round(subtotalRental * 0.2));
+  const totalEstimated =
+    typeof backendPricing?.totalEstimated === "number" ? backendPricing.totalEstimated : subtotalRental + holdAmount;
 
   const disabledDays = useMemo(() => {
     return [
@@ -246,7 +250,7 @@ export function RentalRequestDialog({
     const { startDateStr } = buildIsoDateRange(from, to);
 
     if (from < today) return "La fecha de inicio no puede ser anterior a hoy.";
-    if (to < from) return "La fecha de fin debe ser igual o posterior al inicio.";
+    if (to <= from) return "Debes seleccionar al menos 1 día de alquiler.";
 
     for (const b of bookings) {
       const bStart = new Date(b.startDate);
@@ -277,7 +281,8 @@ export function RentalRequestDialog({
     }
 
     if (meetingLocations.length === 0 && !pickupLabel.trim()) return "Indica el punto de encuentro.";
-    if (!totalDays) return "Selecciona un rango de fechas válido.";
+    if (!selectedDays) return "Selecciona un rango de fechas válido.";
+    if (!acceptedTerms) return "Debes aceptar los términos y condiciones del alquiler.";
     return null;
   };
 
@@ -329,6 +334,7 @@ export function RentalRequestDialog({
         startDate,
         endDate,
         message: message.trim() ? message.trim() : undefined,
+        acceptedTerms: true,
         pickup: pickupPayload,
       });
 
@@ -412,6 +418,17 @@ export function RentalRequestDialog({
                   mode="range"
                   selected={range}
                   onSelect={(next) => {
+                    if (next?.from && next?.to) {
+                      const from = new Date(next.from.getFullYear(), next.from.getMonth(), next.from.getDate());
+                      const to = new Date(next.to.getFullYear(), next.to.getMonth(), next.to.getDate());
+                      if (to <= from) {
+                        const adjustedTo = new Date(from);
+                        adjustedTo.setDate(adjustedTo.getDate() + 1);
+                        setRange({ from, to: adjustedTo });
+                        setFormError("Debes seleccionar al menos 1 día de alquiler.");
+                        return;
+                      }
+                    }
                     setRange(next);
                     setFormError(null);
                   }}
@@ -559,6 +576,27 @@ export function RentalRequestDialog({
                   className="min-h-0 resize-none rounded-lg text-sm"
                 />
               </div>
+
+              <div className="mt-2.5 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-bold text-slate-800">Términos y condiciones</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-600">
+                  Al enviar esta solicitud, acepto que RentTools validará mi identidad, disponibilidad del equipo y
+                  fechas seleccionadas antes de procesar el alquiler. Entiendo que el propietario deberá aprobar la
+                  solicitud para generar el contrato, que el depósito o hold será calculado según el total estimado,
+                  y que la entrega y devolución requerirán firma y evidencias fotográficas. También acepto que la
+                  solicitud puede expirar automáticamente si no recibe respuesta dentro del plazo establecido y que
+                  no podrá aprobarse si la fecha de inicio ya pasó.
+                </p>
+                <label className="mt-3 flex cursor-pointer items-start gap-2 text-xs text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-orange-500 focus:ring-orange-500"
+                  />
+                  <span>Acepto los términos y condiciones del alquiler</span>
+                </label>
+              </div>
             </section>
 
             {/* Resumen */}
@@ -575,7 +613,7 @@ export function RentalRequestDialog({
                     <span className="font-bold">{totalDays ? `$${subtotalRental}` : "—"}</span>
                   </div>
                   <div className="flex justify-between gap-2">
-                    <span className="text-slate-600">Depósito 25%</span>
+                    <span className="text-slate-600">Depósito de garantía</span>
                     <span className="font-bold">{totalDays ? `$${holdAmount}` : "—"}</span>
                   </div>
                   <div className="flex justify-between gap-2 border-t border-slate-200 pt-1.5">
@@ -628,7 +666,7 @@ export function RentalRequestDialog({
             size="sm"
             className="rounded-lg bg-[#e86f00] px-5 font-bold hover:bg-[#d46500]"
             onClick={onSubmit}
-            disabled={submitting}
+            disabled={submitting || !acceptedTerms}
           >
             {submitting ? "Enviando..." : (
               <span className="inline-flex items-center gap-2">

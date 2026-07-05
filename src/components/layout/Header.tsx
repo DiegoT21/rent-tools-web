@@ -6,6 +6,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { alerts } from "@/lib/alerts";
 import { UserAvatar } from "@/components/UserAvatar";
 import { NotificationBell } from "@/components/layout/NotificationBell";
+import { useState, useEffect } from "react";
 
 export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () => void, isSidebarOpen?: boolean }) {
   const navigate = useNavigate();
@@ -13,6 +14,21 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
   const { user, clearSession } = useAuthStore();
   const isAdmin = user?.role === 'admin';
   const activeTab = searchParams.get("tab") || "users";
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") ?? "");
+
+  useEffect(() => {
+    setSearchQuery(searchParams.get("q") ?? "");
+  }, [searchParams]);
+
+  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && searchQuery.trim()) {
+      navigate(`/?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
+    if (e.key === "Escape") {
+      setSearchQuery("");
+      navigate("/");
+    }
+  };
 
   const handlePublicarClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (user && !user.isVerified) {
@@ -89,6 +105,9 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
               type="search" 
               placeholder="Buscar maquinaria industrial..." 
               className="w-full bg-[#f3f4f6] pl-10 h-10 border-transparent rounded-full shadow-none focus-visible:ring-primary/20 focus-visible:border-primary/50"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={handleSearch}
             />
           </div>
         </div>

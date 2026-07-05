@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Package, MapPin, Image as ImageIcon, ShieldCheck, Wrench, Upload, CloudUpload, Loader2, Camera } from "lucide-react";
 import { LocationPicker } from "@/components/LocationPicker";
 import { PhotoCaptureDialog, dataUrlToFile } from "@/components/ui/PhotoCaptureDialog";
@@ -28,30 +29,49 @@ export enum ToolUsageLevel {
 
 export function CreateListing() {
   const user = useAuthStore((state) => state.user);
-  console.log("Usuario actual en el store:", user);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const editTool: any = location.state?.editTool ?? null;
+  const isEditing = Boolean(editTool);
+
   const [loading, setLoading] = useState(false);
   const [meetingLocations, setMeetingLocations] = useState<Array<{
     label: string;
     address: string;
     lat: number | null;
     lng: number | null;
-  }>>([
-    { label: "", address: "", lat: null, lng: null },
-    { label: "", address: "", lat: null, lng: null },
-  ]);
+  }>>(() => {
+    const existing = editTool?.meetingLocations;
+    if (Array.isArray(existing) && existing.length >= 2) {
+      return existing.map((loc: any) => ({
+        label: loc.label ?? "",
+        address: loc.address ?? "",
+        lat: loc.lat ?? null,
+        lng: loc.lng ?? null,
+      }));
+    }
+    return [
+      { label: "", address: "", lat: null, lng: null },
+      { label: "", address: "", lat: null, lng: null },
+    ];
+  });
   const [selectedMediaFiles, setSelectedMediaFiles] = useState<File[]>([]);
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [cameraDialogOpen, setCameraDialogOpen] = useState(false);
 
+  const existingFileKeys: string[] = editTool?.fileKeys ?? [];
+  const existingImageUrls: string[] = editTool?.imageUrls ?? [];
+  const existingInvoiceFileKey: string = editTool?.invoiceFileKey ?? "";
+
   const [formData, setFormData] = useState({
-    name: "",
-    brand: "",
-    category: "",
-    description: "",
-    pricePerDay: "",
-    serialNumber: "",
-    usageLevel: "" as ToolUsageLevel | "",
+    name: editTool?.name ?? "",
+    brand: editTool?.brand ?? "",
+    category: editTool?.category ?? "",
+    description: editTool?.description ?? "",
+    pricePerDay: editTool?.pricePerDay?.toString() ?? "",
+    serialNumber: editTool?.serialNumber ?? "",
+    usageLevel: (editTool?.usageLevel as ToolUsageLevel | "") ?? "",
   });
 
   const resetForm = () => {
@@ -169,7 +189,7 @@ export function CreateListing() {
       return;
     }
 
-    if (selectedMediaFiles.length < 3) {
+    if (!isEditing && selectedMediaFiles.length < 3) {
       await alerts.warning("Faltan fotos", "Debes seleccionar al menos 3 fotos para publicar la herramienta.");
       return;
     }
@@ -177,49 +197,64 @@ export function CreateListing() {
     setLoading(true);
     setUploadProgress(null);
     try {
-      if (!invoiceFile) {
+      if (!isEditing && !invoiceFile) {
         await alerts.warning("Falta comprobante", "Debes subir la factura/comprobante para publicar la herramienta.");
         return;
       }
 
-      setUploadProgress("Subiendo fotos y comprobante...");
-
-      const mediaToUpload = selectedMediaFiles.slice(0, 3);
-      const mediaFileKeys: string[] = [];
-      for (let i = 0; i < mediaToUpload.length; i++) {
-        const fileKey = await uploadFileToStorage(mediaToUpload[i], false, "catalog");
-        mediaFileKeys.push(fileKey);
-        setUploadProgress(`Subiendo fotos... (${i + 1}/${mediaToUpload.length})`);
+      // --- Fotos ---
+      let finalFileKeys: string[];
+      if (selectedMediaFiles.length > 0) {
+        setUploadProgress("Subiendo fotos...");
+        const mediaToUpload = selectedMediaFiles.slice(0, 3);
+        finalFileKeys = [];
+        for (let i = 0; i < mediaToUpload.length; i++) {
+          const fileKey = await uploadFileToStorage(mediaToUpload[i], false, "catalog");
+          finalFileKeys.push(fileKey);
+          setUploadProgress(`Subiendo fotos... (${i + 1}/${mediaToUpload.length})`);
+        }
+      } else {
+        finalFileKeys = existingFileKeys;
       }
 
-      setUploadProgress("Subiendo factura/comprobante...");
-      const invoiceFileKey = await uploadFileToStorage(invoiceFile, true, "evidence");
+      // --- Factura ---
+      let finalInvoiceFileKey: string;
+      if (invoiceFile) {
+        setUploadProgress("Subiendo factura/comprobante...");
+        finalInvoiceFileKey = await uploadFileToStorage(invoiceFile, true, "evidence");
+      } else {
+        finalInvoiceFileKey = existingInvoiceFileKey;
+      }
 
-      setUploadProgress("Publicando herramienta...");
+      setUploadProgress(isEditing ? "Guardando cambios..." : "Publicando herramienta...");
 
       const payload = {
         ...formData,
         pricePerDay: Number(formData.pricePerDay),
-        owner: user.id || user._id,
         meetingLocations: meetingPayload,
-        fileKeys: mediaFileKeys,
-        invoiceFileKey,
-        isAvailable: true
+        fileKeys: finalFileKeys,
+        invoiceFileKey: finalInvoiceFileKey,
+        ...(!isEditing && { owner: (user as any).id || (user as any)._id, isAvailable: true }),
       };
 
-      const response = await api.post("/tools", payload);
-
-      if (response.data) {
-        await alerts.success("Publicado", "Herramienta publicada exitosamente.");
-        resetForm();
+      if (isEditing) {
+        await api.patch(`/tools/${editTool.uuid}`, payload);
+        await alerts.success("Guardado", "La herramienta fue actualizada correctamente.");
+        navigate("/profile?tab=inventario");
+      } else {
+        const response = await api.post("/tools", payload);
+        if (response.data) {
+          await alerts.success("Publicado", "Herramienta publicada exitosamente.");
+          resetForm();
+        }
       }
     } catch (error: any) {
-      console.error("Error al publicar la herramienta:", error);
+      console.error("Error al guardar la herramienta:", error);
       const message =
         error.response?.data?.message ||
         error.message ||
-        "Ocurrió un error al publicar la herramienta.";
-      await alerts.error("No se pudo publicar", message);
+        "Ocurrió un error al guardar la herramienta.";
+      await alerts.error(isEditing ? "No se pudo actualizar" : "No se pudo publicar", message);
     } finally {
       setLoading(false);
       setUploadProgress(null);
@@ -228,6 +263,14 @@ export function CreateListing() {
 
   return (
     <div className="container mx-auto max-w-4xl py-10 px-4 space-y-8">
+      {isEditing && (
+        <div className="flex items-center gap-3 pb-2 border-b border-slate-200">
+          <button onClick={() => navigate("/profile?tab=inventario")} className="text-slate-400 hover:text-slate-700 text-sm font-semibold">← Volver al inventario</button>
+          <span className="text-slate-300">|</span>
+          <h2 className="text-xl font-black text-slate-800">Editando: {editTool.name}</h2>
+        </div>
+      )}
+
       {/* Información Básica */}
       <Card className="border-none shadow-sm bg-white">
         <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-6">
@@ -408,12 +451,22 @@ export function CreateListing() {
               Tomar foto con cámara
             </Button>
           </div>
+          {isEditing && existingImageUrls.length > 0 && selectedMediaFiles.length === 0 && (
+            <div className="mt-5 space-y-3">
+              <p className="text-sm text-slate-500 font-semibold">Fotos actuales ({existingImageUrls.length}) — sube nuevas para reemplazarlas:</p>
+              <div className="grid grid-cols-3 gap-3">
+                {existingImageUrls.map((url, i) => (
+                  <img key={i} src={url} alt={`Foto ${i + 1}`} className="w-full h-24 object-cover rounded-xl border border-slate-200" />
+                ))}
+              </div>
+            </div>
+          )}
           {selectedMediaFiles.length > 0 && (
             <div className="mt-5 space-y-3">
               <div className="flex items-center justify-between text-sm text-slate-600">
                 <span>{selectedMediaFiles.length} archivo{selectedMediaFiles.length > 1 ? "s" : ""} seleccionado{selectedMediaFiles.length > 1 ? "s" : ""}</span>
-                <span className={`${selectedMediaFiles.length < 3 ? "text-red-600" : "text-emerald-600"}`}>
-                  {selectedMediaFiles.length < 3 ? "Selecciona al menos 3 imágenes" : "Listo para continuar"}
+                <span className={`${!isEditing && selectedMediaFiles.length < 3 ? "text-red-600" : "text-emerald-600"}`}>
+                  {!isEditing && selectedMediaFiles.length < 3 ? "Selecciona al menos 3 imágenes" : "Listo para continuar"}
                 </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -451,10 +504,12 @@ export function CreateListing() {
             <label htmlFor="invoice-file-input" className="bg-[#eef2ff] rounded-lg p-4 flex items-center justify-between group cursor-pointer hover:bg-[#e0e7ff] transition-colors border border-transparent hover:border-primary/20">
               <div className="flex items-center gap-3">
                 <Upload className="h-5 w-5 text-slate-500" />
-                <span className="text-slate-600 font-medium text-sm">Subir Factura/Comprobante</span>
+                <span className="text-slate-600 font-medium text-sm">
+                  {isEditing ? "Reemplazar Factura (opcional)" : "Subir Factura/Comprobante"}
+                </span>
               </div>
               <span className="text-primary font-bold text-xs tracking-wider uppercase">
-                {invoiceFile?.name ?? "Explorar"}
+                {invoiceFile?.name ?? (isEditing && existingInvoiceFileKey ? "Ya subida ✓" : "Explorar")}
               </span>
             </label>
             <input
@@ -506,10 +561,10 @@ export function CreateListing() {
           {loading ? (
             <>
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Publicando...
+              {isEditing ? "Guardando..." : "Publicando..."}
             </>
           ) : (
-            "Publicar Herramienta"
+            isEditing ? "Guardar cambios" : "Publicar Herramienta"
           )}
         </Button>
       </div>
