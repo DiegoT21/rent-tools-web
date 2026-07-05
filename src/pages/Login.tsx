@@ -69,7 +69,7 @@ export function Login() {
         </header>
 
         <main className="mt-4 grid flex-1 gap-4 lg:grid-cols-[1.02fr_0.82fr]">
-          <section className="relative overflow-hidden rounded-[24px] bg-slate-950">
+          <section className="relative hidden overflow-hidden rounded-[24px] bg-slate-950 lg:block">
             <div
               className="absolute inset-0 bg-cover bg-center"
               style={{ backgroundImage: `url(${heroImage})` }}

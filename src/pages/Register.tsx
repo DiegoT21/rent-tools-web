@@ -82,7 +82,7 @@ export function Register() {
           </button>
         </header>
 
-        <main className="mt-8 grid flex-1 gap-12 lg:grid-cols-[0.9fr_1.1fr] items-start">
+        <main className="mt-6 grid flex-1 gap-6 lg:mt-8 lg:grid-cols-[0.9fr_1.1fr] lg:gap-12 items-start">
           
           {/* Columna Izquierda: Mensaje de Valor */}
           <section className="space-y-8">
@@ -128,7 +128,7 @@ export function Register() {
           </section>
 
           {/* Columna Derecha: Formulario */}
-          <section className="rounded-[32px] border border-white bg-white p-8 md:p-12 shadow-[0_25px_70px_-35px_rgba(0,0,0,0.08)]">
+          <section className="rounded-[32px] border border-white bg-white p-6 shadow-[0_25px_70px_-35px_rgba(0,0,0,0.08)] md:p-8 lg:p-12">
             <div className="max-w-xl mx-auto">
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#e86f00]">
                 Paso 1 de 3
@@ -143,7 +143,7 @@ export function Register() {
                     {error}
                   </div>
                 )}
-                <div className="grid gap-6 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                   <div className="space-y-2">
                     <label className="text-[13px] font-bold text-slate-800">Nombre</label>
                     <Input 
@@ -164,7 +164,7 @@ export function Register() {
                   </div>
                 </div>
 
-                <div className="grid gap-6 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                   <div className="space-y-2">
                     <label className="text-[13px] font-bold text-slate-800">Documento de Identidad</label>
                     <Input 
@@ -186,7 +186,7 @@ export function Register() {
                   </div>
                 </div>
 
-                <div className="grid gap-6 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                   <div className="space-y-2">
                     <label className="text-[13px] font-bold text-slate-800">Contraseña</label>
                     <div className="relative">

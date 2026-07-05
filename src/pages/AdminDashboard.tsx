@@ -233,11 +233,10 @@ export function AdminDashboard() {
   }, [activeTab, selectedChatUser]);
 
   return (
-    <div className="max-w-7xl mx-auto pb-12">
-      {/* Header Panel */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-slate-100 pb-5 mb-8">
+    <div className="mx-auto max-w-7xl px-2 pb-8 sm:px-4 sm:pb-12">
+      <div className="mb-6 flex flex-col items-start justify-between border-b border-slate-100 pb-4 sm:mb-8 sm:flex-row sm:items-center sm:pb-5">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Panel de Administración</h1>
+          <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight sm:text-3xl">Panel de Administración</h1>
           <p className="text-slate-500 mt-1">Supervisión general, registros de auditoría y soporte de usuarios.</p>
         </div>
       </div>

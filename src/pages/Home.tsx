@@ -10,7 +10,7 @@ import { ToolCard } from "@/components/home/ToolCard";
 
 function SkeletonGrid() {
   return (
-    <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
       {Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="h-72 animate-pulse rounded-2xl bg-slate-200" />
       ))}
@@ -74,7 +74,7 @@ export function Home() {
 
   if (isSearching) {
     return (
-      <div className="-mx-8 -mt-8">
+      <div className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6 lg:-mx-8 lg:-mt-8">
         <div className="mx-auto max-w-7xl px-8 py-10">
           <div className="mb-8 flex items-center gap-2">
             <Search className="h-5 w-5 text-primary" />
@@ -89,7 +89,7 @@ export function Home() {
           ) : searchResults.length === 0 ? (
             <p className="text-sm text-slate-400">No se encontraron herramientas con ese nombre o categoría.</p>
           ) : (
-            <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {searchResults.map((tool) => (
                 <ToolCard key={toolService.getToolId(tool)} tool={tool} />
               ))}
@@ -101,9 +101,9 @@ export function Home() {
   }
 
   return (
-    <div className="-mx-8 -mt-8">
+    <div className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6 lg:-mx-8 lg:-mt-8">
       <HomeHero />
-      <div className="mx-auto max-w-7xl px-8 py-12">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
         <PopularSection tools={popularFiltered} loading={loadingPopular} />
         <RecentSection tools={recent} loading={loadingAll} />
         <ProviderCta />

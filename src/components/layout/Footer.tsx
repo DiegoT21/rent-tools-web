@@ -4,7 +4,7 @@ import { Globe, Mail } from "lucide-react";
 export function Footer() {
   return (
     <footer className="mt-auto border-t border-slate-200 bg-[#f3f4f6]">
-      <div className="container mx-auto flex max-w-7xl flex-col items-center justify-between gap-6 px-8 py-10 md:flex-row">
+      <div className="container mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 py-8 sm:gap-6 sm:px-6 sm:py-10 md:flex-row lg:px-8">
         <div className="flex flex-col items-center gap-2 md:items-start">
           <Link to="/" className="text-lg font-black tracking-tight text-slate-900">
             Rent<span className="text-primary">Tools</span>

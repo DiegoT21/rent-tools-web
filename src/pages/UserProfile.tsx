@@ -33,6 +33,7 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { CreateListing } from "./CreateListing";
+import { MyRentals } from "./MyRentals";
 import { useAuthStore } from "@/store/authStore";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
@@ -930,20 +931,38 @@ export function UserProfile() {
   }, [inventory, inventoryTotal, ownerMetrics, ownerMetricsLoading, activeRentals]);
 
   return (
-    <div className="max-w-7xl mx-auto py-8 px-4 flex gap-8 min-h-[calc(100vh-140px)]">
-      {/* Sidebar de Usuario */}
-      <aside className="w-64 flex-shrink-0 space-y-2">
+    <div className="mx-auto flex min-h-[calc(100vh-140px)] max-w-7xl flex-col gap-4 px-2 py-4 sm:px-4 sm:py-6 lg:flex-row lg:gap-8 lg:py-8">
+      {/* Navegación móvil / tablet */}
+      <div className="flex gap-2 overflow-x-auto pb-1 lg:hidden">
+        {menuItems.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => setActiveTab(item.id)}
+            className={cn(
+              "flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold transition-colors",
+              activeTab === item.id ? "bg-primary text-white" : "bg-slate-100 text-slate-600",
+            )}
+          >
+            <item.icon className="h-4 w-4" />
+            {item.label}
+          </button>
+        ))}
+        <button
+          onClick={handleLogout}
+          className="flex shrink-0 items-center gap-2 rounded-full bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-600"
+        >
+          <LogOut className="h-4 w-4" />
+          Salir
+        </button>
+      </div>
+
+      {/* Sidebar desktop */}
+      <aside className="hidden w-64 shrink-0 space-y-2 lg:block">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden p-2">
           {menuItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => {
-                if (item.id === "alquileres") {
-                  navigate("/my-rentals");
-                } else {
-                  setActiveTab(item.id);
-                }
-              }}
+              onClick={() => setActiveTab(item.id)}
               className={cn(
                 "w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all duration-200",
                 activeTab === item.id 
@@ -969,7 +988,7 @@ export function UserProfile() {
       </aside>
 
       {/* Área de Contenido Principal */}
-      <main className="flex-1 space-y-6">
+      <main className="min-w-0 flex-1 space-y-4 sm:space-y-6">
         {activeTab === "perfil" && !user?.isVerified && (
           <Card className="border-none shadow-sm bg-gradient-to-r from-orange-500 to-orange-600 text-white overflow-hidden relative group">
             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
@@ -1013,15 +1032,15 @@ export function UserProfile() {
         {activeTab === "perfil" && (
           <div className="space-y-6 animate-in fade-in duration-500">
             <Card className="border-none shadow-sm overflow-hidden bg-white">
-              <CardContent className="p-8">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex gap-6">
+              <CardContent className="p-4 sm:p-6 lg:p-8">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:gap-6">
                     <div className="relative">
                       <button
                         type="button"
                         onClick={openAvatarPicker}
                         disabled={avatarUploading}
-                        className="h-28 w-28 rounded-full bg-orange-100 overflow-hidden border-4 border-white shadow-md relative group disabled:opacity-70"
+                        className="h-24 w-24 rounded-full bg-orange-100 overflow-hidden border-4 border-white shadow-md relative group disabled:opacity-70 sm:h-28 sm:w-28"
                         aria-label="Cambiar foto de perfil"
                       >
                         <UserAvatar
@@ -1044,10 +1063,10 @@ export function UserProfile() {
                       </span>
                     </div>
                     <div className="space-y-2 pt-2">
-                      <h1 className="text-3xl font-black text-slate-900">
+                      <h1 className="text-2xl font-black text-slate-900 sm:text-3xl">
                         {user ? `${user.firstName} ${user.lastName || ''}` : 'Invitado'}
                       </h1>
-                      <div className="flex items-center gap-4 text-sm text-slate-500 font-medium">
+                      <div className="flex flex-col gap-2 text-sm text-slate-500 font-medium sm:flex-row sm:items-center sm:gap-4">
                         <div className="flex items-center gap-1">
                           <MapPin className="h-4 w-4" />
                           <span>Panamá Oeste, Panamá</span>
@@ -1059,7 +1078,7 @@ export function UserProfile() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button
                       variant="outline"
                       className="rounded-xl gap-2 font-bold px-6 text-slate-700"
@@ -1079,7 +1098,7 @@ export function UserProfile() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
+                <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 sm:mt-8">
                   <div className="rounded-2xl bg-slate-50 border border-slate-100 p-5 text-center">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Calificación</p>
                     <p className="text-3xl font-black text-primary flex items-center justify-center gap-1">
@@ -1246,7 +1265,7 @@ export function UserProfile() {
                       Consulta el detalle de tus rentas activas y pasadas en la sección de alquileres.
                     </p>
                     <Button
-                      onClick={() => navigate("/my-rentals")}
+                      onClick={() => setActiveTab("alquileres")}
                       className="rounded-xl bg-primary hover:bg-primary/90 text-white font-bold px-6 h-11"
                     >
                       Ver Alquileres
@@ -1278,7 +1297,7 @@ export function UserProfile() {
             </div>
 
             {/* Tarjetas de Estadísticas */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 sm:gap-6">
               <Card className="border-none shadow-sm bg-[#fafaff] relative overflow-hidden group">
                 <CardContent className="p-6 space-y-4">
                   <div className="flex justify-between items-start">
@@ -1745,6 +1764,10 @@ export function UserProfile() {
               )}
             </div>
           </div>
+        )}
+
+        {activeTab === "alquileres" && (
+          <MyRentals embedded onBack={() => setActiveTab("perfil")} />
         )}
 
         {activeTab === "publicar" && (

@@ -351,7 +351,7 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
   };
 
   return (
-    <div className={cn("space-y-8", !embedded && "container mx-auto max-w-4xl py-6 px-4")}>
+    <div className={cn("space-y-6 sm:space-y-8", !embedded && "container mx-auto max-w-4xl px-2 py-4 sm:px-4 sm:py-6")}>
       {/* Encabezado */}
       <div className="space-y-6">
         <button
@@ -628,7 +628,7 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
                   <p className="text-sm text-slate-500 font-semibold">
                     Fotos actuales ({existingImageUrls.length})
                   </p>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
                     {existingImageUrls.map((url, i) => (
                       <img
                         key={i}

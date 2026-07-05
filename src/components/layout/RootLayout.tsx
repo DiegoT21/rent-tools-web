@@ -35,15 +35,15 @@ export function RootLayout({ children }: RootLayoutProps) {
 
         {/* Overlaid Sidebar */}
         <div className={cn(
-          "fixed inset-y-0 left-0 z-40 w-72 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out border-r border-slate-100 mt-16",
+          "fixed inset-y-0 left-0 z-40 w-full max-w-[18rem] bg-white shadow-2xl transform transition-transform duration-300 ease-in-out border-r border-slate-100 mt-14 lg:mt-16",
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}>
           <Sidebar className="w-full h-full" onClose={() => setIsSidebarOpen(false)} />
         </div>
 
-        <main className="flex-1 overflow-y-auto pt-8">
+        <main className="flex-1 overflow-y-auto pt-4 sm:pt-6 lg:pt-8">
           <div className="min-h-full flex flex-col">
-            <div className="flex-1 px-8">
+            <div className="flex-1 px-4 sm:px-6 lg:px-8">
               {children}
             </div>
             <Footer />

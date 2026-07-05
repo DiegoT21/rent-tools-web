@@ -46,7 +46,7 @@ export function ToolCard({ tool, variant = "standard", badge, showOffer }: ToolC
   if (variant === "featured") {
     return (
       <div
-        className="group relative cursor-pointer overflow-hidden rounded-2xl bg-slate-900 min-h-[420px] lg:min-h-full shadow-lg"
+        className="group relative cursor-pointer overflow-hidden rounded-2xl bg-slate-900 min-h-[280px] sm:min-h-[360px] lg:min-h-full shadow-lg"
         onClick={goToDetail}
       >
         <img
@@ -58,18 +58,18 @@ export function ToolCard({ tool, variant = "standard", badge, showOffer }: ToolC
         <div className="absolute right-4 top-4">
           <RentalBadge />
         </div>
-        <div className="relative flex h-full min-h-[420px] flex-col justify-end p-8">
-          <span className="mb-4 w-fit rounded-md bg-primary px-3 py-1 text-[10px] font-bold tracking-widest text-white uppercase">
+        <div className="relative flex h-full min-h-[280px] flex-col justify-end p-5 sm:min-h-[360px] sm:p-8">
+          <span className="mb-3 w-fit rounded-md bg-primary px-3 py-1 text-[10px] font-bold tracking-widest text-white uppercase sm:mb-4">
             {badge ?? "Más popular"}
           </span>
-          <h3 className="mb-2 text-3xl font-black text-white">{tool.name}</h3>
-          <p className="mb-6 max-w-md text-sm text-slate-300">
+          <h3 className="mb-2 text-xl font-black text-white sm:text-2xl lg:text-3xl">{tool.name}</h3>
+          <p className="mb-4 max-w-md text-xs text-slate-300 sm:mb-6 sm:text-sm">
             Equipo industrial verificado, listo para operar con soporte 24/7.
           </p>
           <div className="flex flex-wrap items-center gap-4">
             <div>
               <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">Desde</p>
-              <p className="text-3xl font-black text-white">
+              <p className="text-2xl font-black text-white sm:text-3xl">
                 ${price}
                 <span className="text-base font-medium text-slate-400"> /día</span>
               </p>
@@ -92,7 +92,7 @@ export function ToolCard({ tool, variant = "standard", badge, showOffer }: ToolC
         className="group flex cursor-pointer gap-4 overflow-hidden rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-all hover:shadow-md"
         onClick={goToDetail}
       >
-        <div className="relative h-28 w-32 shrink-0 overflow-hidden rounded-xl bg-slate-100">
+        <div className="relative h-24 w-28 shrink-0 overflow-hidden rounded-xl bg-slate-100 sm:h-28 sm:w-32">
           <img src={pics[0]} alt={tool.name} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
           <div className="absolute left-2 top-2 flex flex-col gap-1">
             {badge && (

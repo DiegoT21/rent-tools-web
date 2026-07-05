@@ -85,7 +85,7 @@ const { accessToken: storeToken } = useAuthStore();
           <button className="text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">Help</button>
         </header>
 
-        <main className="mt-8 grid flex-1 gap-12 lg:grid-cols-[1fr_1fr] items-center">
+        <main className="mt-6 grid flex-1 gap-6 lg:mt-8 lg:grid-cols-2 lg:gap-12 items-center">
 
           {/* Columna Izquierda */}
           <section className="space-y-8 lg:pr-12">

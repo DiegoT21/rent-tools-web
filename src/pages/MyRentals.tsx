@@ -106,7 +106,7 @@ function RentalCard({ rental, onReview, reviewedSet }: RentalCardProps) {
         )}
       />
 
-      <div className="flex gap-4 p-4 pl-5">
+      <div className="flex flex-col gap-4 p-4 sm:flex-row sm:pl-5">
         {/* Tool image */}
         <div className="shrink-0 w-20 h-20 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center">
           {thumbUrl ? (
@@ -164,7 +164,7 @@ function RentalCard({ rental, onReview, reviewedSet }: RentalCardProps) {
           )}
 
           {/* Actions */}
-          <div className="flex items-center gap-2 mt-4">
+          <div className="flex flex-col flex-wrap items-stretch gap-2 mt-4 sm:flex-row sm:items-center">
             <Button
               size="sm"
               variant="secondary"
@@ -261,7 +261,12 @@ function Pagination({
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-export function MyRentals() {
+interface MyRentalsProps {
+  embedded?: boolean;
+  onBack?: () => void;
+}
+
+export function MyRentals({ embedded = false, onBack }: MyRentalsProps) {
   const navigate = useNavigate();
   const { accessToken, hasHydrated } = useAuthStore();
 
@@ -280,11 +285,16 @@ export function MyRentals() {
   // Track which contracts already have a review (after submitting in this session)
   const [reviewedSet, setReviewedSet] = useState<Set<string>>(new Set());
 
-  // Auth guard
+  // Auth guard (solo en ruta standalone; en perfil el padre ya valida sesión)
   useEffect(() => {
-    if (!hasHydrated) return;
+    if (embedded || !hasHydrated) return;
     if (!accessToken) navigate("/login");
-  }, [accessToken, hasHydrated, navigate]);
+  }, [accessToken, embedded, hasHydrated, navigate]);
+
+  const handleBack = () => {
+    if (onBack) onBack();
+    else navigate("/profile?tab=perfil");
+  };
 
   const fetchRentals = useCallback(
     async (tab: "active" | "past", p: number, searchVal: string, sortVal: "recent" | "oldest") => {
@@ -339,13 +349,29 @@ export function MyRentals() {
   ];
 
   return (
-    <div className="max-w-3xl mx-auto pt-6 pb-12">
+    <div className={cn(embedded ? "space-y-6 animate-in slide-in-from-bottom-4 duration-500" : "max-w-3xl mx-auto pt-6 pb-12")}>
+      <button
+        type="button"
+        onClick={handleBack}
+        className="text-sm font-semibold text-slate-500 transition-colors hover:text-primary"
+      >
+        ← Volver al perfil
+      </button>
+
       {/* Page header */}
-      <div className="mb-5">
-        <div className="text-xs font-bold tracking-widest text-slate-400 uppercase mb-1">
-          Mi cuenta
-        </div>
-        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Mis Alquileres</h1>
+      <div className={embedded ? "space-y-1" : "mb-5"}>
+        {embedded ? (
+          <p className="text-xs font-bold uppercase tracking-widest text-slate-400 flex items-center gap-2">
+            Cuenta <span className="text-[8px]">●</span> Alquileres
+          </p>
+        ) : (
+          <div className="text-xs font-bold tracking-widest text-slate-400 uppercase mb-1">
+            Mi cuenta
+          </div>
+        )}
+        <h1 className={cn("font-black text-slate-900 tracking-tight", embedded ? "text-3xl sm:text-4xl" : "text-3xl")}>
+          Mis Alquileres
+        </h1>
         <p className="text-slate-500 mt-1 text-sm">
           Herramientas que has alquilado a otras personas.
         </p>

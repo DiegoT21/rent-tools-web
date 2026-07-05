@@ -287,11 +287,11 @@ export function ContractDetails() {
   const hasAllEvidence = evidencePhotos.length >= 3;
 
   return (
-    <div className="max-w-5xl mx-auto py-10 px-4 space-y-6">
-      <div className="flex items-end justify-between gap-4">
+    <div className="mx-auto max-w-5xl space-y-4 px-2 py-6 sm:space-y-6 sm:px-4 sm:py-10">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="text-xs font-bold tracking-widest text-slate-400 uppercase">Contrato</div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">{contract.tool?.name ?? "Alquiler"}</h1>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight sm:text-3xl">{contract.tool?.name ?? "Alquiler"}</h1>
           <div className="text-sm text-slate-600">
             {shortDate(contract.startDate)} → {shortDate(contract.endDate)} · Estado:{" "}
             <span className="font-semibold text-slate-900">{contract.status}</span>

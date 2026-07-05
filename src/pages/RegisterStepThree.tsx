@@ -113,14 +113,14 @@ export function RegisterStepThree() {
         <main className="mt-6 flex-1 flex flex-col items-center">
           <div className="w-full text-center space-y-4 mb-10">
             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#e86f00]">Paso 3 de 3</span>
-            <h1 className="text-[2.5rem] font-black tracking-tight text-slate-950">Verificación facial</h1>
+            <h1 className="text-2xl font-black tracking-tight text-slate-950 sm:text-[2.5rem]">Verificación facial</h1>
             <p className="text-slate-500 text-base max-w-2xl mx-auto">
               Tómate una selfie. Compararemos tu rostro con la foto de tu cédula del paso anterior. Si no coinciden, no podrás completar el registro.
             </p>
           </div>
 
           <div className="w-full">
-            <section className="rounded-[24px] bg-white border border-slate-200 p-8 flex flex-col space-y-6 shadow-sm">
+            <section className="rounded-[24px] bg-white border border-slate-200 p-4 sm:p-6 lg:p-8 flex flex-col space-y-6 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="bg-[#ff7a00] p-1.5 rounded-lg">
                   <UserCircle className="h-5 w-5 text-white" />

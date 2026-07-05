@@ -13,7 +13,7 @@ interface RecentSectionProps {
 
 function SkeletonGrid() {
   return (
-    <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
       {Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="h-72 animate-pulse rounded-2xl bg-slate-200" />
       ))}
@@ -108,7 +108,7 @@ export function RecentSection({ tools, loading }: RecentSectionProps) {
       ) : sorted.length === 0 ? (
         <p className="text-sm text-slate-400">Aún no hay herramientas para mostrar.</p>
       ) : (
-        <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {sorted.map((tool, index) => (
             <ToolCard
               key={toolService.getToolId(tool)}

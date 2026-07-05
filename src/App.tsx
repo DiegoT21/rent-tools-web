@@ -1,5 +1,5 @@
 import React from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { RootLayout } from './components/layout/RootLayout'
 import { Home } from './pages/Home'
 import { useAuthStore } from './store/authStore'
@@ -15,7 +15,6 @@ import { Checkout } from './pages/Checkout'
 import { CheckoutRental } from './pages/CheckoutRental'
 import { DeliveryProtocol } from './pages/DeliveryProtocol'
 import { AdminDashboard } from './pages/AdminDashboard'
-import { MyRentals } from './pages/MyRentals'
 
 function App() {
   const user = useAuthStore((state) => state.user);
@@ -76,11 +75,7 @@ function App() {
             </RootLayout>
           } />
         )}
-        <Route path="/my-rentals" element={
-          <RootLayout>
-            <MyRentals />
-          </RootLayout>
-        } />
+        <Route path="/my-rentals" element={<Navigate to="/profile?tab=alquileres" replace />} />
       </Routes>
     </BrowserRouter>
   )

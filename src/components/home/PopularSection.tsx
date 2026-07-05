@@ -25,19 +25,17 @@ export function PopularSection({ tools, loading }: PopularSectionProps) {
 
   return (
     <section className="mb-16" id="popular">
-      <div className="mb-6 flex items-end justify-between gap-4">
-        <div>
-          <p className="mb-1 text-[10px] font-bold tracking-[0.2em] text-primary uppercase">Top alquileres</p>
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl border border-orange-100 bg-orange-50 p-2">
-              <Flame className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-black text-slate-900">Lo más rentado esta semana</h2>
-              <p className="text-sm font-medium text-slate-400">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex items-start gap-3 sm:items-center">
+          <div className="rounded-xl border border-orange-100 bg-orange-50 p-2 shrink-0">
+            <Flame className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <p className="mb-1 text-[10px] font-bold tracking-[0.2em] text-primary uppercase">Top alquileres</p>
+            <h2 className="text-xl font-black text-slate-900 sm:text-2xl">Lo más rentado esta semana</h2>
+            <p className="text-xs font-medium text-slate-400 sm:text-sm">
                 Herramientas con más actividad en los últimos 7 días
-              </p>
-            </div>
+            </p>
           </div>
         </div>
         <button
