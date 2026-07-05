@@ -21,18 +21,6 @@ function App() {
   const user = useAuthStore((state) => state.user);
   const isAdmin = user?.role === 'admin';
 
-  if (isAdmin) {
-    return (
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<RootLayout><AdminDashboard /></RootLayout>} />
-          <Route path="/admin" element={<RootLayout><AdminDashboard /></RootLayout>} />
-          <Route path="/login" element={<Login />} />
-          <Route path="*" element={<RootLayout><AdminDashboard /></RootLayout>} />
-        </Routes>
-      </BrowserRouter>
-    );
-  }
 
   return (
     <BrowserRouter>
@@ -81,11 +69,13 @@ function App() {
             <DeliveryProtocol />
           </RootLayout>
         } />
-        <Route path="/admin" element={
-          <RootLayout>
-            <AdminDashboard />
-          </RootLayout>
-        } />
+        {isAdmin && (
+          <Route path="/admin" element={
+            <RootLayout>
+              <AdminDashboard />
+            </RootLayout>
+          } />
+        )}
         <Route path="/my-rentals" element={
           <RootLayout>
             <MyRentals />

@@ -52,13 +52,13 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b bg-white shadow-sm px-6">
       <div className="flex items-center gap-12">
-        <Link to={isAdmin ? "/admin" : "/"} className="flex items-center gap-2.5 group hover:opacity-80 transition-opacity whitespace-nowrap">
+        <Link to="/" className="flex items-center gap-2.5 group hover:opacity-80 transition-opacity whitespace-nowrap">
           <img src="/logo.jpeg" alt="RentTools Logo" className="h-8 w-8 object-cover rounded-md" />
           <div className="text-xl font-bold tracking-tight text-slate-900">
             Rent<span className="text-slate-600 font-medium">Tools</span>
           </div>
         </Link>
-        {!isAdmin && (
+        {(!isAdmin || !location.pathname.startsWith("/admin")) && (
           <nav className="flex items-center gap-6">
             <Link
               to="/"
@@ -89,7 +89,7 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
             </Link>
           </nav>
         )}
-        {isAdmin && (
+        {isAdmin && location.pathname.startsWith("/admin") && (
           <nav className="flex items-center gap-6">
             <button 
               onClick={() => navigate("/admin?tab=users")}
@@ -113,7 +113,7 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
         )}
       </div>
 
-      {!isAdmin && (
+      {(!isAdmin || !location.pathname.startsWith("/admin")) && (
         <div className="flex flex-1 items-center justify-center px-12 gap-3">
           <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 bg-slate-100 py-2 px-3.5 rounded-full hover:bg-slate-200 cursor-pointer transition-colors shadow-sm">
             <MapPin className="h-4 w-4 text-primary" />
@@ -134,6 +134,24 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
       )}
 
       <div className="flex items-center gap-4">
+        {isAdmin && (
+          location.pathname.startsWith("/admin") ? (
+            <Button 
+              onClick={() => navigate("/")}
+              variant="outline"
+              className="rounded-full border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold px-6"
+            >
+              Ver Sitio Web
+            </Button>
+          ) : (
+            <Button 
+              onClick={() => navigate("/admin")}
+              className="rounded-full bg-red-600 hover:bg-red-700 text-white font-semibold px-6 shadow-md shadow-red-200"
+            >
+              Panel Admin
+            </Button>
+          )
+        )}
         {!isAdmin && (
           <Button 
             onClick={handlePublicarClick}
