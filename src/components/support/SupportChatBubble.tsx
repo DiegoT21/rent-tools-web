@@ -28,7 +28,7 @@ export function SupportChatBubble() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Solamente visible para usuarios registrados que NO sean administradores
-  if (!accessToken || !user || user.role === 'admin') {
+  if (!accessToken || !user || user.role === 'admin' || user.email === 'diegoorlando211170@gmail.com') {
     return null;
   }
 

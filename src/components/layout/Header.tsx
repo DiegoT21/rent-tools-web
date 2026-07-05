@@ -12,7 +12,7 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, clearSession } = useAuthStore();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.email === 'diegoorlando211170@gmail.com';
   const activeTab = searchParams.get("tab") || "users";
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") ?? "");
