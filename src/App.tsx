@@ -15,6 +15,7 @@ import { Checkout } from './pages/Checkout'
 import { CheckoutRental } from './pages/CheckoutRental'
 import { DeliveryProtocol } from './pages/DeliveryProtocol'
 import { AdminDashboard } from './pages/AdminDashboard'
+import { ProtectedRoute } from './components/auth/ProtectedRoute'
 
 function App() {
   const user = useAuthStore((state) => state.user);
@@ -45,9 +46,11 @@ function App() {
           </RootLayout>
         } />
         <Route path="/profile" element={
-          <RootLayout>
-            <UserProfile />
-          </RootLayout>
+          <ProtectedRoute>
+            <RootLayout>
+              <UserProfile />
+            </RootLayout>
+          </ProtectedRoute>
         } />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -75,7 +78,11 @@ function App() {
             </RootLayout>
           } />
         )}
-        <Route path="/my-rentals" element={<Navigate to="/profile?tab=alquileres" replace />} />
+        <Route path="/my-rentals" element={
+          <ProtectedRoute>
+            <Navigate to="/profile?tab=alquileres" replace />
+          </ProtectedRoute>
+        } />
       </Routes>
     </BrowserRouter>
   )

@@ -1,17 +1,18 @@
 import React from "react";
 import { BriefcaseBusiness, Eye, EyeOff, Globe, LockKeyhole, Mail } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import heroImage from "../assets/hero.png";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
-import { useNavigate } from "react-router-dom";
 import { isAxiosError } from "axios";
 import { authService } from "../services/authService";
 import { useAuthStore } from "../store/useAuthStore";
 
 export function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const fetchProfile = useAuthStore((state) => state.fetchProfile);
+  const redirectTo = (location.state as { from?: string } | null)?.from ?? "/";
 
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -32,7 +33,7 @@ export function Login() {
     try {
       await authService.login({ email, password });
       await fetchProfile();
-      navigate("/");
+      navigate(redirectTo, { replace: true });
     } catch (err) {
       console.error("Error al iniciar sesión:", err);
       if (isAxiosError(err)) {

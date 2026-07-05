@@ -296,13 +296,9 @@ export function UserProfile() {
 
   // Redirigir a login si no hay usuario (protección de ruta)
   useEffect(() => {
-    if (!hasHydrated) return;
-    if (!accessToken) {
-      navigate("/login");
-      return;
-    }
+    if (!hasHydrated || !accessToken) return;
     authService.getProfile().catch(() => undefined);
-  }, [accessToken, hasHydrated, navigate]);
+  }, [accessToken, hasHydrated]);
 
   useEffect(() => {
     if (activeTab === "solicitudes") {
