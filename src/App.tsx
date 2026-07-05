@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { RootLayout } from './components/layout/RootLayout'
 import { Home } from './pages/Home'
+import { useAuthStore } from './store/authStore'
 import { Login } from './pages/Login'
 import { Register } from './pages/Register'
 import { CreateListing } from './pages/CreateListing'
@@ -10,8 +11,7 @@ import { ToolDetails } from './pages/ToolDetails'
 import { ContractDetails } from './pages/ContractDetails'
 import { Checkout } from './pages/Checkout'
 import { DeliveryProtocol } from './pages/DeliveryProtocol'
-
-<<<<<<< Updated upstream
+import { AdminDashboard } from './pages/AdminDashboard'
 const RegisterStepTwo = lazy(() =>
   import('./pages/RegisterStepTwo').then((m) => ({ default: m.RegisterStepTwo }))
 )
@@ -26,10 +26,24 @@ function PageLoader() {
     </div>
   )
 }
-=======
->>>>>>> Stashed changes
 
 function App() {
+  const user = useAuthStore((state) => state.user);
+  const isAdmin = user?.role === 'admin';
+
+  if (isAdmin) {
+    return (
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<RootLayout><AdminDashboard /></RootLayout>} />
+          <Route path="/admin" element={<RootLayout><AdminDashboard /></RootLayout>} />
+          <Route path="/login" element={<Login />} />
+          <Route path="*" element={<RootLayout><AdminDashboard /></RootLayout>} />
+        </Routes>
+      </BrowserRouter>
+    );
+  }
+
   return (
     <BrowserRouter>
       <Routes>
@@ -78,6 +92,11 @@ function App() {
         <Route path="/delivery" element={
           <RootLayout>
             <DeliveryProtocol />
+          </RootLayout>
+        } />
+        <Route path="/admin" element={
+          <RootLayout>
+            <AdminDashboard />
           </RootLayout>
         } />
       </Routes>
