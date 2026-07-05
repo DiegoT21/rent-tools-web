@@ -4,6 +4,8 @@ import { Sidebar } from "./Sidebar";
 import { Footer } from "./Footer";
 import { cn } from "@/lib/utils";
 import { useLocation } from "react-router-dom";
+import { SupportChatBubble } from "../support/SupportChatBubble";
+
 
 interface RootLayoutProps {
   children: React.ReactNode;
@@ -48,6 +50,7 @@ export function RootLayout({ children }: RootLayoutProps) {
           </div>
         </main>
       </div>
+      <SupportChatBubble />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import React from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { RootLayout } from './components/layout/RootLayout'
 import { Home } from './pages/Home'
+import { useAuthStore } from './store/authStore'
 import { Login } from './pages/Login'
 import { Register } from './pages/Register'
 import { RegisterStepTwo } from './pages/RegisterStepTwo'
@@ -13,9 +14,14 @@ import { ContractDetails } from './pages/ContractDetails'
 import { Checkout } from './pages/Checkout'
 import { CheckoutRental } from './pages/CheckoutRental'
 import { DeliveryProtocol } from './pages/DeliveryProtocol'
+import { AdminDashboard } from './pages/AdminDashboard'
 import { MyRentals } from './pages/MyRentals'
 
 function App() {
+  const user = useAuthStore((state) => state.user);
+  const isAdmin = user?.role === 'admin' || user?.email === 'diegoorlando211170@gmail.com';
+
+
   return (
     <BrowserRouter>
       <Routes>
@@ -63,6 +69,13 @@ function App() {
             <DeliveryProtocol />
           </RootLayout>
         } />
+        {isAdmin && (
+          <Route path="/admin" element={
+            <RootLayout>
+              <AdminDashboard />
+            </RootLayout>
+          } />
+        )}
         <Route path="/my-rentals" element={
           <RootLayout>
             <MyRentals />
