@@ -36,7 +36,11 @@ export function Login() {
     } catch (err) {
       console.error("Error al iniciar sesión:", err);
       if (isAxiosError(err)) {
-        setError(err.response?.data?.message || "Credenciales incorrectas.");
+        if (!err.response) {
+          setError("No se pudo conectar con el servidor. Revisa la configuración del API o CORS.");
+        } else {
+          setError(err.response?.data?.message || "Credenciales incorrectas.");
+        }
       } else {
         setError("Error de conexión al servidor. Intente nuevamente.");
       }
