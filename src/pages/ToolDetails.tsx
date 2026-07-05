@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { ChevronLeft, ChevronRight, MapPin, ChevronDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, ChevronDown, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -283,13 +283,13 @@ export function ToolDetails() {
   const StarRow = ({ rating }: { rating: number }) => {
     const full = Math.round(Math.max(0, Math.min(5, rating)));
     return (
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5">
         {Array.from({ length: 5 }).map((_, i) => (
-          <span
+          <Star
             key={i}
             className={cn(
-              "inline-block h-2.5 w-2.5 rounded-full",
-              i < full ? "bg-orange-500" : "bg-slate-200"
+              "h-3.5 w-3.5 transition-colors",
+              i < full ? "text-amber-400 fill-amber-400" : "text-slate-200 fill-slate-200"
             )}
             aria-hidden="true"
           />
@@ -641,6 +641,15 @@ export function ToolDetails() {
               </div>
               <h1 className="text-2xl font-bold text-slate-900 leading-tight">{tool.name}</h1>
               {brand && <div className="text-sm text-slate-600">{brand}</div>}
+{typeof tool.ratingScore === "number" && (
+  <div className="flex items-center gap-1 mt-2">
+    <StarRow rating={tool.ratingScore} />
+    <span className="text-sm text-slate-600">{tool.ratingScore.toFixed(1)} / 5</span>
+    {typeof tool.ratingCount === "number" && (
+      <span className="text-xs text-slate-500 ml-2">({tool.ratingCount} review{tool.ratingCount !== 1 ? "s" : ""})</span>
+    )}
+  </div>
+)}
             </div>
 
             {typeof tool.pricePerDay === "number" && (

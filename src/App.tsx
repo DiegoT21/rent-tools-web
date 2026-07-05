@@ -15,6 +15,7 @@ import { Checkout } from './pages/Checkout'
 import { CheckoutRental } from './pages/CheckoutRental'
 import { DeliveryProtocol } from './pages/DeliveryProtocol'
 import { AdminDashboard } from './pages/AdminDashboard'
+import { MyRentals } from './pages/MyRentals'
 
 function App() {
   const user = useAuthStore((state) => state.user);
@@ -83,6 +84,11 @@ function App() {
         <Route path="/admin" element={
           <RootLayout>
             <AdminDashboard />
+          </RootLayout>
+        } />
+        <Route path="/my-rentals" element={
+          <RootLayout>
+            <MyRentals />
           </RootLayout>
         } />
       </Routes>

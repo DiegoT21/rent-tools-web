@@ -173,6 +173,7 @@ function ImageCarousel({ images, alt }: { images: string[]; alt: string }) {
 const menuItems = [
   { id: "perfil", label: "Mi Perfil", icon: User },
   { id: "inventario", label: "Mi Inventario", icon: Package },
+  { id: "alquileres", label: "Alquileres", icon: Calendar },
   { id: "solicitudes", label: "Solicitudes", icon: FileText },
   { id: "soporte", label: "Soporte", icon: LifeBuoy },
 ];
@@ -245,6 +246,53 @@ export function UserProfile() {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarDialogOpen, setAvatarDialogOpen] = useState(false);
   const [requestClock, setRequestClock] = useState(Date.now());
+
+  const [userReviews, setUserReviews] = useState<any[]>([]);
+  const [userSummary, setUserSummary] = useState<{ count: number; averageRating: number } | null>(null);
+  const [userReviewsLoading, setUserReviewsLoading] = useState(false);
+
+  const StarRow = ({ rating }: { rating: number }) => {
+    const full = Math.round(Math.max(0, Math.min(5, rating)));
+    return (
+      <div className="flex items-center gap-0.5">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Star
+            key={i}
+            className={cn(
+              "h-3.5 w-3.5 transition-colors",
+              i < full ? "text-amber-400 fill-amber-400" : "text-slate-200 fill-slate-200"
+            )}
+            aria-hidden="true"
+          />
+        ))}
+      </div>
+    );
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    const uid = user?.uuid || user?.id || user?._id;
+    if (!uid) return;
+    if (activeTab !== "perfil") return;
+
+    setUserReviewsLoading(true);
+    userService.getReviews(uid)
+      .then((data) => {
+        if (cancelled) return;
+        setUserReviews(data.reviews ?? []);
+        setUserSummary(data.summary ?? { count: 0, averageRating: 0 });
+      })
+      .catch((err) => {
+        console.error("Error fetching user reviews:", err);
+      })
+      .finally(() => {
+        if (!cancelled) setUserReviewsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, activeTab]);
 
   // Redirigir a login si no hay usuario (protección de ruta)
   useEffect(() => {
@@ -890,7 +938,13 @@ export function UserProfile() {
           {menuItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => {
+                if (item.id === "alquileres") {
+                  navigate("/my-rentals");
+                } else {
+                  setActiveTab(item.id);
+                }
+              }}
               className={cn(
                 "w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-semibold transition-all duration-200",
                 activeTab === item.id 
@@ -1005,11 +1059,14 @@ export function UserProfile() {
                       </div>
                       <div className="flex items-center gap-8 pt-2">
                         <div className="text-center">
-                          <p className="text-xl font-bold text-slate-900">0 <Star className="h-4 w-4 inline text-slate-400 mb-1" /></p>
+                          <p className="text-xl font-bold text-slate-900">
+                            {userSummary ? userSummary.averageRating.toFixed(1) : "0.0"}{" "}
+                            <Star className={cn("h-4 w-4 inline mb-1 ml-0.5", userSummary && userSummary.averageRating > 0 ? "text-amber-400 fill-amber-400" : "text-slate-400")} />
+                          </p>
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Calificación</p>
                         </div>
                         <div className="text-center">
-                          <p className="text-xl font-bold text-slate-900">0</p>
+                          <p className="text-xl font-bold text-slate-900">{userSummary ? userSummary.count : 0}</p>
                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Rentas</p>
                         </div>
                         <div className="text-center">
@@ -1041,34 +1098,73 @@ export function UserProfile() {
               </CardContent>
             </Card>
 
-            <Card className="border-none shadow-sm min-h-[400px] bg-white flex items-center justify-center">
-              <CardContent className="text-center space-y-6 max-w-sm">
-                <div className="relative">
-                  <div className="w-48 h-32 bg-slate-50 rounded-lg mx-auto transform -rotate-3 border border-slate-100 flex flex-col p-4 gap-2">
-                    <div className="w-1/2 h-2 bg-slate-200 rounded-full" />
-                    <div className="w-3/4 h-2 bg-slate-100 rounded-full" />
-                    <div className="flex gap-1 mt-2">
-                      {[1,2,3,4].map(i => <Star key={i} className="h-4 w-4 text-orange-200 fill-orange-100" />)}
-                      <Star key={5} className="h-4 w-4 text-slate-200" />
+            {userReviewsLoading && (
+              <Card className="border-none shadow-sm min-h-[250px] bg-white flex items-center justify-center">
+                <CardContent className="p-6 text-slate-500 font-semibold flex items-center gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Cargando reviews...
+                </CardContent>
+              </Card>
+            )}
+
+            {!userReviewsLoading && userReviews.length === 0 && (
+              <Card className="border-none shadow-sm min-h-[400px] bg-white flex items-center justify-center">
+                <CardContent className="text-center space-y-6 max-w-sm">
+                  <div className="relative">
+                    <div className="w-48 h-32 bg-slate-50 rounded-lg mx-auto transform -rotate-3 border border-slate-100 flex flex-col p-4 gap-2">
+                      <div className="w-1/2 h-2 bg-slate-200 rounded-full" />
+                      <div className="w-3/4 h-2 bg-slate-100 rounded-full" />
+                      <div className="flex gap-1 mt-2">
+                        {[1,2,3,4].map(i => <Star key={i} className="h-4 w-4 text-orange-200 fill-orange-100" />)}
+                        <Star key={5} className="h-4 w-4 text-slate-200" />
+                      </div>
+                    </div>
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-32 bg-white rounded-lg border shadow-xl flex flex-col p-4 gap-2 transform rotate-3">
+                       <div className="w-1/2 h-2 bg-slate-100 rounded-full" />
+                       <div className="w-3/4 h-2 bg-slate-50 rounded-full" />
+                       <div className="flex gap-1 mt-2">
+                         {[1,2,3,4].map(i => <Star key={i} className="h-4 w-4 text-orange-400 fill-orange-400" />)}
+                         <Star key={5} className="h-4 w-4 text-slate-200" />
+                       </div>
                     </div>
                   </div>
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-32 bg-white rounded-lg border shadow-xl flex flex-col p-4 gap-2 transform rotate-3">
-                     <div className="w-1/2 h-2 bg-slate-100 rounded-full" />
-                     <div className="w-3/4 h-2 bg-slate-50 rounded-full" />
-                     <div className="flex gap-1 mt-2">
-                       {[1,2,3,4].map(i => <Star key={i} className="h-4 w-4 text-orange-400 fill-orange-400" />)}
-                       <Star key={5} className="h-4 w-4 text-slate-200" />
-                     </div>
+                  <div className="space-y-2 pt-8">
+                    <h3 className="text-xl font-bold text-slate-900">Aún no tienes reviews</h3>
+                    <p className="text-sm text-slate-500 font-medium">
+                      Los reviews ayudan a mantener nuestra comunidad confiable y segura. Empieza a rentar para que otros te conozcan.
+                    </p>
                   </div>
-                </div>
-                <div className="space-y-2 pt-8">
-                  <h3 className="text-xl font-bold text-slate-900">Aún no tienes reviews</h3>
-                  <p className="text-sm text-slate-500 font-medium">
-                    Los reviews ayudan a mantener nuestra comunidad confiable y segura. Empieza a rentar para que otros te conozcan.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
+
+            {!userReviewsLoading && userReviews.length > 0 && (
+              <Card className="border-none shadow-sm bg-white">
+                <CardContent className="p-8 space-y-6">
+                  <div className="text-lg font-bold text-slate-900">Reviews de la comunidad</div>
+                  <div className="grid gap-4">
+                    {userReviews.map((r, idx) => (
+                      <div key={r.uuid ?? idx} className="rounded-2xl border border-slate-100 bg-white p-5 space-y-3 shadow-sm hover:shadow transition-shadow">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <StarRow rating={r.rating ?? 0} />
+                            <span className="text-sm font-bold text-slate-800">
+                              {typeof r.rating === "number" ? r.rating.toFixed(1) : "—"} / 5
+                            </span>
+                          </div>
+                          <span className="text-xs text-slate-400 font-medium">
+                            {r.createdAt ? formatDateOnly(r.createdAt) : ""}
+                          </span>
+                        </div>
+                        <p className="text-sm text-slate-600 whitespace-pre-line font-medium">
+                          {r.comment || "Sin comentario"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 

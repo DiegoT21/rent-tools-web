@@ -5,11 +5,12 @@ import heroImage from "../assets/hero.png";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { useNavigate } from "react-router-dom";
+import { isAxiosError } from "axios";
+import { authService } from "../services/authService";
 import { useAuthStore } from "../store/useAuthStore";
 
 export function Login() {
   const navigate = useNavigate();
-  const setToken = useAuthStore((state) => state.setToken);
   const fetchProfile = useAuthStore((state) => state.fetchProfile);
 
   const [email, setEmail] = React.useState("");
@@ -29,32 +30,16 @@ export function Login() {
     setError(null);
 
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        // Backend devuelve el token en data.data.accessToken (según el patrón estándar de auth.controller)
-        const token = data.data?.accessToken;
-        if (token) {
-          setToken(token);
-          await fetchProfile(); // Cargar el perfil usando el nuevo token
-          navigate("/"); // O a /profile según se prefiera
-        } else {
-          setError("Respuesta inesperada del servidor (Falta Token).");
-        }
-      } else {
-        setError(data.message || "Credenciales incorrectas.");
-      }
+      await authService.login({ email, password });
+      await fetchProfile();
+      navigate("/");
     } catch (err) {
       console.error("Error al iniciar sesión:", err);
-      setError("Error de conexión al servidor. Intente nuevamente.");
+      if (isAxiosError(err)) {
+        setError(err.response?.data?.message || "Credenciales incorrectas.");
+      } else {
+        setError("Error de conexión al servidor. Intente nuevamente.");
+      }
     } finally {
       setIsLoading(false);
     }
