@@ -1,9 +1,17 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../store/authStore';
 
+const PRODUCTION_API_URL = 'https://rent-tools-back-production.up.railway.app/api';
+
+function resolveApiBaseUrl() {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  if (import.meta.env.PROD) return PRODUCTION_API_URL;
+  return 'http://localhost:3000/api';
+}
+
 // Instancia base de Axios
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api', // URL base del Backend
+  baseURL: resolveApiBaseUrl(),
   withCredentials: true, // CRÍTICO: Permite enviar/recibir cookies HTTP-only (refreshToken)
   headers: {
     'Content-Type': 'application/json',
