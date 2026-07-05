@@ -6,10 +6,13 @@ import { Input } from "../components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { isAxiosError } from "axios";
 import { authService } from "../services/authService";
+import { ServiceTermsDialog } from "@/components/legal/ServiceTermsDialog";
 
 export function Register() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = React.useState(false);
+  const [acceptedTerms, setAcceptedTerms] = React.useState(false);
+  const [termsOpen, setTermsOpen] = React.useState(false);
 
   // Form states
   const [firstName, setFirstName] = React.useState("");
@@ -25,6 +28,11 @@ export function Register() {
 
   const handleNextStep = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!acceptedTerms) {
+      setError("Debes aceptar los términos y condiciones para continuar.");
+      return;
+    }
     
     if (password !== confirmPassword) {
       setError("Las contraseñas no coinciden");
@@ -220,16 +228,34 @@ export function Register() {
                   </div>
                 </div>
 
-                <label className="flex items-start gap-3 py-2 cursor-pointer group">
-                  <input type="checkbox" className="mt-1 h-4 w-4 rounded border-slate-300 accent-[#e86f00]" />
-                  <span className="text-[13px] leading-relaxed text-slate-500">
-                    Acepto los <span className="font-bold text-blue-600 underline group-hover:text-blue-800">términos y condiciones</span> de servicio y la política de privacidad industrial de RentTools.
-                  </span>
-                </label>
+                <div className="flex items-start gap-3 py-2">
+                  <input
+                    id="accept-terms"
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-slate-300 accent-[#e86f00]"
+                  />
+                  <p className="text-[13px] leading-relaxed text-slate-500">
+                    <label htmlFor="accept-terms" className="cursor-pointer">
+                      Acepto los{" "}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setTermsOpen(true)}
+                      className="font-bold text-blue-600 underline hover:text-blue-800"
+                    >
+                      términos y condiciones
+                    </button>{" "}
+                    de servicio y la política de privacidad industrial de RentTools.
+                  </p>
+                </div>
+
+                <ServiceTermsDialog open={termsOpen} onOpenChange={setTermsOpen} />
 
                 <Button 
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || !acceptedTerms}
                   className="h-14 w-full rounded-2xl bg-[#e86f00] text-base font-black text-white hover:bg-[#d46500] shadow-lg shadow-orange-500/20 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   {isLoading ? "Creando cuenta..." : "Continuar al registro"}

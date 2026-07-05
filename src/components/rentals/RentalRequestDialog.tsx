@@ -66,6 +66,14 @@ function overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date) {
   return aStart <= bEnd && bStart <= aEnd;
 }
 
+function bookingBlockedRange(startIso: string, endIso: string) {
+  const start = parseIsoDateOnly(String(startIso).slice(0, 10));
+  const end = parseIsoDateOnly(String(endIso).slice(0, 10));
+  const blockedUntil = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 0, 0, 0, 0);
+  blockedUntil.setDate(blockedUntil.getDate() + 1);
+  return { start, blockedUntil };
+}
+
 function to24Hour(hour12: number, minute: number, period: Period): string {
   let hour = hour12 % 12;
   if (period === "PM") hour += 12;
@@ -176,11 +184,10 @@ export function RentalRequestDialog({
 
   const bookedDates = useMemo(() => {
     return bookings.flatMap((b) => {
-      const start = parseIsoDateOnly(String(b.startDate).slice(0, 10));
-      const end = parseIsoDateOnly(String(b.endDate).slice(0, 10));
+      const { start, blockedUntil } = bookingBlockedRange(String(b.startDate), String(b.endDate));
       const days: Date[] = [];
       const cur = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 0, 0, 0, 0);
-      const last = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 0, 0, 0, 0);
+      const last = new Date(blockedUntil.getFullYear(), blockedUntil.getMonth(), blockedUntil.getDate(), 0, 0, 0, 0);
       while (cur <= last) {
         days.push(new Date(cur));
         cur.setDate(cur.getDate() + 1);
@@ -211,10 +218,10 @@ export function RentalRequestDialog({
   const disabledDays = useMemo(() => {
     return [
       { before: today },
-      ...bookings.map((b) => ({
-        from: new Date(b.startDate),
-        to: new Date(b.endDate),
-      })),
+      ...bookings.map((b) => {
+        const { start, blockedUntil } = bookingBlockedRange(String(b.startDate), String(b.endDate));
+        return { from: start, to: blockedUntil };
+      }),
     ] as any;
   }, [bookings, today]);
 
@@ -253,8 +260,7 @@ export function RentalRequestDialog({
     if (to <= from) return "Debes seleccionar al menos 1 día de alquiler.";
 
     for (const b of bookings) {
-      const bStart = new Date(b.startDate);
-      const bEnd = new Date(b.endDate);
+      const { start: bStart, blockedUntil: bEnd } = bookingBlockedRange(String(b.startDate), String(b.endDate));
       if (overlaps(from, to, bStart, bEnd)) return "La herramienta no está disponible en esas fechas.";
     }
 

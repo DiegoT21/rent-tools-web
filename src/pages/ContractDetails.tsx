@@ -8,6 +8,8 @@ import { alerts } from "@/lib/alerts";
 import { useAuthStore } from "@/store/authStore";
 import { contractService, RentalContract } from "@/services/contractService";
 import { mediaService } from "@/services/mediaService";
+import { downloadContractPdf } from "@/lib/contractPdf";
+import { Download } from "lucide-react";
 
 function shortDate(value?: string) {
   if (!value) return "—";
@@ -397,6 +399,21 @@ export function ContractDetails() {
         <Card className="border-slate-100 shadow-sm">
           <CardContent className="p-6 space-y-3">
             <div className="text-sm font-semibold text-slate-800">Acciones</div>
+
+            <Button
+              variant="outline"
+              className="w-full border-slate-200 text-slate-700 font-semibold"
+              onClick={() => {
+                try {
+                  downloadContractPdf(contract);
+                } catch (e: any) {
+                  alerts.error("No se pudo generar el PDF", e?.message || "Intenta de nuevo.");
+                }
+              }}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Descargar PDF del contrato
+            </Button>
 
             {isOwner && (
               <Button

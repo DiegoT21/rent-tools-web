@@ -1,7 +1,6 @@
 import { 
   User, 
   Package, 
-  LifeBuoy, 
   FileText, 
   LogOut, 
   Edit3, 
@@ -175,7 +174,6 @@ const menuItems = [
   { id: "inventario", label: "Mi Inventario", icon: Package },
   { id: "alquileres", label: "Alquileres", icon: Calendar },
   { id: "solicitudes", label: "Solicitudes", icon: FileText },
-  { id: "soporte", label: "Soporte", icon: LifeBuoy },
 ];
 
 const inventoryItems = [

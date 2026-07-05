@@ -21,6 +21,7 @@ function SkeletonGrid() {
 export function Home() {
   const [searchParams] = useSearchParams();
   const query = searchParams.get("q") ?? "";
+  const categoryFilter = searchParams.get("category") ?? "";
 
   const [allTools, setAllTools] = useState<PublicTool[]>([]);
   const [popular, setPopular] = useState<PublicTool[]>([]);
@@ -38,8 +39,13 @@ export function Home() {
     return () => { cancelled = true; };
   }, []);
 
+  const filteredTools = useMemo(() => {
+    if (!categoryFilter) return allTools;
+    return allTools.filter((t) => String(t.category ?? "").toLowerCase() === categoryFilter.toLowerCase());
+  }, [allTools, categoryFilter]);
+
   const recent = useMemo(() => {
-    const withDate = allTools as Array<PublicTool & { createdAt?: string }>;
+    const withDate = filteredTools as Array<PublicTool & { createdAt?: string }>;
     return [...withDate]
       .sort((a, b) => {
         const da = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -47,17 +53,22 @@ export function Home() {
         return db - da;
       })
       .slice(0, 8);
-  }, [allTools]);
+  }, [filteredTools]);
+
+  const popularFiltered = useMemo(() => {
+    if (!categoryFilter) return popular;
+    return popular.filter((t) => String(t.category ?? "").toLowerCase() === categoryFilter.toLowerCase());
+  }, [popular, categoryFilter]);
 
   const searchResults = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
-    return allTools.filter(
+    return filteredTools.filter(
       (t) =>
         t.name.toLowerCase().includes(q) ||
         (t.category ?? "").toLowerCase().includes(q),
     );
-  }, [query, allTools]);
+  }, [query, filteredTools]);
 
   const isSearching = query.trim().length > 0;
 
@@ -93,7 +104,7 @@ export function Home() {
     <div className="-mx-8 -mt-8">
       <HomeHero />
       <div className="mx-auto max-w-7xl px-8 py-12">
-        <PopularSection tools={popular} loading={loadingPopular} />
+        <PopularSection tools={popularFiltered} loading={loadingPopular} />
         <RecentSection tools={recent} loading={loadingAll} />
         <ProviderCta />
       </div>

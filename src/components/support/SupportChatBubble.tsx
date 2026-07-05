@@ -27,10 +27,10 @@ export function SupportChatBubble() {
   
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Solamente visible para usuarios registrados que NO sean administradores
-  if (!accessToken || !user || user.role === 'admin' || user.email === 'diegoorlando211170@gmail.com') {
-    return null;
-  }
+  const isVisible =
+    Boolean(accessToken && user) &&
+    user?.role !== 'admin' &&
+    user?.email !== 'diegoorlando211170@gmail.com';
 
   // Cargar historial de chat
   const loadMessages = async (showLoader = false) => {
@@ -85,6 +85,8 @@ export function SupportChatBubble() {
       if (interval) clearInterval(interval);
     };
   }, [isOpen]);
+
+  if (!isVisible) return null;
 
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">

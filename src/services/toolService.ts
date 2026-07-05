@@ -19,6 +19,7 @@ export interface PublicTool {
   coverUrl?: string;
   thumbnailUrl?: string;
   isAvailable?: boolean;
+  rentalState?: "rented" | "available";
   pricingSummary?: {
     totalDays?: number;
     subtotal?: number;

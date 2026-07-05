@@ -70,9 +70,10 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
             >
               Ubicación
             </Link>
-            <button 
+            <button
+              type="button"
               onClick={toggleSidebar}
-              className={`text-sm transition-colors py-5 ${isSidebarOpen ? "font-semibold text-primary border-b-2 border-primary" : "font-medium text-slate-500 hover:text-slate-900 border-b-2 border-transparent"}`}
+              className="text-sm font-medium text-slate-500 hover:text-slate-900 border-b-2 border-transparent py-5 transition-colors"
             >
               Categorías
             </button>

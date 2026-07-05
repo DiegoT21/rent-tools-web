@@ -25,9 +25,23 @@ export function ToolCard({ tool, variant = "standard", badge, showOffer }: ToolC
   const uuid = toolService.getToolId(tool);
   const price = typeof tool.pricePerDay === "number" ? tool.pricePerDay : 0;
   const category = (tool.category ?? "herramientas").toString().toUpperCase();
-  const available = tool.isAvailable !== false;
+  const isRented = tool.rentalState === "rented";
+  const available = tool.isAvailable !== false && !isRented;
 
   const goToDetail = () => uuid && navigate(`/tools/${uuid}`);
+
+  const RentalBadge = ({ className }: { className?: string }) =>
+    isRented ? (
+      <span
+        className={cn(
+          "rounded px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase bg-primary text-white",
+          className,
+        )}
+        title="Actualmente alquilado"
+      >
+        act. Alq.
+      </span>
+    ) : null;
 
   if (variant === "featured") {
     return (
@@ -41,6 +55,9 @@ export function ToolCard({ tool, variant = "standard", badge, showOffer }: ToolC
           className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-900/50 to-slate-900/20" />
+        <div className="absolute right-4 top-4">
+          <RentalBadge />
+        </div>
         <div className="relative flex h-full min-h-[420px] flex-col justify-end p-8">
           <span className="mb-4 w-fit rounded-md bg-primary px-3 py-1 text-[10px] font-bold tracking-widest text-white uppercase">
             {badge ?? "Más popular"}
@@ -77,11 +94,14 @@ export function ToolCard({ tool, variant = "standard", badge, showOffer }: ToolC
       >
         <div className="relative h-28 w-32 shrink-0 overflow-hidden rounded-xl bg-slate-100">
           <img src={pics[0]} alt={tool.name} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
-          {badge && (
-            <span className="absolute left-2 top-2 rounded bg-slate-900/80 px-2 py-0.5 text-[9px] font-bold tracking-wider text-white uppercase">
-              {badge}
-            </span>
-          )}
+          <div className="absolute left-2 top-2 flex flex-col gap-1">
+            {badge && (
+              <span className="rounded bg-slate-900/80 px-2 py-0.5 text-[9px] font-bold tracking-wider text-white uppercase">
+                {badge}
+              </span>
+            )}
+            <RentalBadge />
+          </div>
         </div>
         <div className="flex min-w-0 flex-1 flex-col justify-between py-1">
           <div>
@@ -123,10 +143,14 @@ export function ToolCard({ tool, variant = "standard", badge, showOffer }: ToolC
         <span
           className={cn(
             "absolute left-3 top-3 rounded px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase",
-            showOffer ? "bg-primary text-white" : "bg-white/95 text-slate-600",
+            isRented
+              ? "bg-primary text-white"
+              : showOffer
+                ? "bg-primary text-white"
+                : "bg-white/95 text-slate-600",
           )}
         >
-          {showOffer ? "Oferta" : available ? "Disponible" : "Reservado"}
+          {isRented ? "Alq." : showOffer ? "Oferta" : available ? "Disponible" : "Reservado"}
         </span>
         {pics.length > 1 && (
           <>

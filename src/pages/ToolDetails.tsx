@@ -31,11 +31,13 @@ function ImageCarousel({
   alt,
   index,
   onIndexChange,
+  showRentedBadge,
 }: {
   images: string[];
   alt: string;
   index: number;
   onIndexChange: (next: number) => void;
+  showRentedBadge?: boolean;
 }) {
   const pics = images.slice(0, 3);
 
@@ -48,6 +50,14 @@ function ImageCarousel({
     <div className="w-full">
       <div className="relative w-full aspect-[16/10] rounded-2xl overflow-hidden bg-slate-100 border border-slate-200">
         <img src={pics[index]} alt={alt} className="w-full h-full object-cover" />
+        {showRentedBadge && (
+          <span
+            className="absolute right-3 top-3 rounded px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase bg-primary text-white"
+            title="Actualmente alquilado"
+          >
+            act. Alq.
+          </span>
+        )}
 
         {pics.length > 1 && (
           <>
@@ -185,6 +195,7 @@ export function ToolDetails() {
     return map[value] ?? usageLevelRaw;
   }, [usageLevelRaw]);
   const depositRecommendation = "25% del alquiler";
+  const isRented = tool?.rentalState === "rented";
   const ownerUuid = typeof (tool as any)?.owner?.uuid === "string" ? (tool as any).owner.uuid : null;
   const ownerName =
     typeof (tool as any)?.owner?.firstName === "string"
@@ -584,7 +595,7 @@ export function ToolDetails() {
     <div className="max-w-5xl mx-auto py-10 px-4">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         <div className="space-y-4">
-          <ImageCarousel images={images} alt={tool.name} index={imageIndex} onIndexChange={setImageIndex} />
+          <ImageCarousel images={images} alt={tool.name} index={imageIndex} onIndexChange={setImageIndex} showRentedBadge={isRented} />
 
           {images.length > 1 && (
             <div className="grid grid-cols-3 gap-3">
@@ -611,7 +622,9 @@ export function ToolDetails() {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="rounded-xl border border-slate-200 bg-white p-3">
                   <div className="text-xs text-slate-500">Estado</div>
-                  <div className="font-semibold text-slate-800">{tool.isAvailable ? "Disponible" : "No disponible"}</div>
+                  <div className="font-semibold text-slate-800">
+                    {isRented ? "Actualmente alquilado" : tool.isAvailable ? "Disponible" : "No disponible"}
+                  </div>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-white p-3">
                   <div className="text-xs text-slate-500">Uso</div>
@@ -822,6 +835,8 @@ export function ToolDetails() {
                   ? "Solicitud en trámite. Espera la respuesta del propietario."
                   : !canRequestRental
                   ? "Debes completar y aprobar tu KYC para solicitar alquiler."
+                  : isRented
+                  ? "Algunas fechas están bloqueadas por alquileres activos. Podrás reservar a partir del día siguiente al fin del alquiler actual."
                   : "Verifica disponibilidad y coordina entrega con el propietario."}
               </div>
             </div>

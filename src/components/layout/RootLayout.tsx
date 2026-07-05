@@ -38,7 +38,7 @@ export function RootLayout({ children }: RootLayoutProps) {
           "fixed inset-y-0 left-0 z-40 w-72 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out border-r border-slate-100 mt-16",
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}>
-          <Sidebar className="w-full h-full" />
+          <Sidebar className="w-full h-full" onClose={() => setIsSidebarOpen(false)} />
         </div>
 
         <main className="flex-1 overflow-y-auto pt-8">
