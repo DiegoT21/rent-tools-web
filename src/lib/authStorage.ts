@@ -22,3 +22,23 @@ export function clearAuthStorage(): void {
   localStorage.removeItem(AUTH_STORAGE_KEY);
   sessionStorage.removeItem(AUTH_STORAGE_KEY);
 }
+
+/** Lee de ambos storages (migración) y escribe solo en el activo. */
+export const authPersistStorage = {
+  getItem: (name: string): string | null => {
+    const primary = getAuthStorage().getItem(name);
+    if (primary) return primary;
+    const fallback = getAuthStorage() === localStorage ? sessionStorage : localStorage;
+    return fallback.getItem(name);
+  },
+  setItem: (name: string, value: string): void => {
+    const storage = getAuthStorage();
+    storage.setItem(name, value);
+    const other = storage === localStorage ? sessionStorage : localStorage;
+    other.removeItem(name);
+  },
+  removeItem: (name: string): void => {
+    localStorage.removeItem(name);
+    sessionStorage.removeItem(name);
+  },
+};

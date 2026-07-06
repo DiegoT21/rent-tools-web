@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { api } from '../lib/api';
-import { AUTH_STORAGE_KEY, clearAuthStorage, getAuthStorage } from '../lib/authStorage';
+import { AUTH_STORAGE_KEY, authPersistStorage, clearAuthStorage } from '../lib/authStorage';
 
 interface User {
   uuid?: string;
@@ -72,7 +72,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: AUTH_STORAGE_KEY,
-      storage: createJSONStorage(() => getAuthStorage()),
+      storage: createJSONStorage(() => authPersistStorage),
       partialize: (state) => ({
         accessToken: state.accessToken,
         user: state.user,
@@ -81,6 +81,12 @@ export const useAuthStore = create<AuthState>()(
   )
 );
 
-useAuthStore.persist.onFinishHydration(() => {
+function markHydrated() {
   useAuthStore.setState({ hasHydrated: true });
-});
+}
+
+if (useAuthStore.persist.hasHydrated()) {
+  markHydrated();
+} else {
+  useAuthStore.persist.onFinishHydration(markHydrated);
+}

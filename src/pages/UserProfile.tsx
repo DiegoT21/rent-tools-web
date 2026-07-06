@@ -223,7 +223,8 @@ export function UserProfile() {
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get("tab") || "perfil";
   const navigate = useNavigate();
-  const { user, accessToken, clearSession, hasHydrated } = useAuthStore();
+  const { user, accessToken, clearSession } = useAuthStore();
+  const [profileLoading, setProfileLoading] = useState(!user);
   const [inventory, setInventory] = useState<any[]>([]);
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [inventoryError, setInventoryError] = useState<string | null>(null);
@@ -294,11 +295,24 @@ export function UserProfile() {
     };
   }, [user, activeTab]);
 
-  // Redirigir a login si no hay usuario (protección de ruta)
+  // Cargar perfil si hay token pero aún no hay datos de usuario
   useEffect(() => {
-    if (!hasHydrated || !accessToken) return;
-    authService.getProfile().catch(() => undefined);
-  }, [accessToken, hasHydrated]);
+    if (!accessToken) return;
+    if (user) {
+      setProfileLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setProfileLoading(true);
+    authService.getProfile()
+      .catch(() => undefined)
+      .finally(() => {
+        if (!cancelled) setProfileLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, user]);
 
   useEffect(() => {
     if (activeTab === "solicitudes") {
@@ -925,6 +939,14 @@ export function UserProfile() {
       ingresosBadge,
     };
   }, [inventory, inventoryTotal, ownerMetrics, ownerMetricsLoading, activeRentals]);
+
+  if (profileLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-140px)] max-w-7xl flex-col gap-4 px-2 py-4 sm:px-4 sm:py-6 lg:flex-row lg:gap-8 lg:py-8">
