@@ -6,6 +6,7 @@ import { Input } from "../components/ui/input";
 import { useNavigate } from "react-router-dom";
 import { isAxiosError } from "axios";
 import { authService } from "../services/authService";
+import { userService } from "../services/userService";
 
 export function Register() {
   const navigate = useNavigate();
@@ -18,6 +19,8 @@ export function Register() {
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
   const [identityDocument, setIdentityDocument] = React.useState("");
+  const [phonePrefix, setPhonePrefix] = React.useState("+507");
+  const [phone, setPhone] = React.useState("");
 
   // UI states
   const [isLoading, setIsLoading] = React.useState(false);
@@ -31,8 +34,8 @@ export function Register() {
       return;
     }
 
-    if (!firstName || !lastName || !email || !password || !identityDocument) {
-      setError("Todos los campos son obligatorios (excepto el teléfono)");
+    if (!firstName || !lastName || !email || !password || !identityDocument || !phone) {
+      setError("Todos los campos son obligatorios");
       return;
     }
 
@@ -47,6 +50,11 @@ export function Register() {
         password,
         identityDocument,
       });
+
+      // Guardar el teléfono en el perfil recién creado
+      const fullPhone = `${phonePrefix} ${phone}`.trim();
+      await userService.updateProfile({ phone: fullPhone });
+
       const accessToken = data.data?.accessToken;
       navigate("/register/step-2", { state: { accessToken } });
     } catch (err) {
@@ -212,10 +220,20 @@ export function Register() {
                   <label className="text-[13px] font-bold text-slate-800">Teléfono de contacto</label>
                   <div className="flex gap-3">
                     <div className="w-24">
-                      <Input defaultValue="+34" className="h-12 bg-slate-50/50 border-slate-200 rounded-xl text-center" />
+                      <Input 
+                        value={phonePrefix} 
+                        onChange={(e) => setPhonePrefix(e.target.value)} 
+                        className="h-12 bg-slate-50/50 border-slate-200 rounded-xl text-center" 
+                      />
                     </div>
                     <div className="flex-1">
-                      <Input placeholder="600 000 000" className="h-12 bg-slate-50/50 border-slate-200 rounded-xl" />
+                      <Input 
+                        placeholder="60000000" 
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className="h-12 bg-slate-50/50 border-slate-200 rounded-xl" 
+                        required
+                      />
                     </div>
                   </div>
                 </div>
