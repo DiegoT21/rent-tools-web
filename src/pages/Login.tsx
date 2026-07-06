@@ -8,6 +8,21 @@ import { isAxiosError } from "axios";
 import { authService } from "../services/authService";
 import { isRememberMeEnabled } from "../lib/authStorage";
 import { useAuthStore } from "../store/useAuthStore";
+import Swal from "sweetalert2";
+
+declare global {
+  interface Window {
+    google?: any;
+  }
+}
+
+function needsKycCompletion(user: { identityDocument?: string; phone?: string; isVerified?: boolean } | null): boolean {
+  if (!user) return true;
+  const doc = user.identityDocument ?? "";
+  const phone = user.phone ?? "";
+  if (!phone.trim() || !doc.trim() || doc.startsWith("GOOGLE_")) return true;
+  return !user.isVerified;
+}
 
 export function Login() {
   const navigate = useNavigate();
@@ -22,6 +37,125 @@ export function Login() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
+  const finalizeAuth = async () => {
+    await fetchProfile();
+    const user = useAuthStore.getState().user;
+    if (needsKycCompletion(user)) {
+      navigate("/register/step-2", { replace: true });
+      return;
+    }
+    navigate(redirectTo, { replace: true });
+  };
+
+  React.useEffect(() => {
+    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!googleClientId) return;
+
+    const id = "google-gsi-client";
+    if (document.getElementById(id)) return;
+
+    const script = document.createElement("script");
+    script.id = id;
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    document.body.appendChild(script);
+
+    return () => {
+      const existingScript = document.getElementById(id);
+      if (existingScript) {
+        document.body.removeChild(existingScript);
+      }
+    };
+  }, []);
+
+  const handleMockGoogleLogin = async () => {
+    const { value: mockEmail } = await Swal.fire({
+      title: 'Iniciar sesión con Google (Simulador)',
+      input: 'email',
+      inputLabel: 'Introduce un correo de Google de prueba',
+      inputValue: 'test-google@example.com',
+      showCancelButton: true,
+      confirmButtonText: 'Continuar',
+      cancelButtonText: 'Cancelar',
+      inputValidator: (value) => {
+        if (!value) {
+          return '¡Debes ingresar un correo!';
+        }
+      }
+    });
+
+    if (mockEmail) {
+      const { value: mockName } = await Swal.fire({
+        title: 'Nombre de usuario',
+        input: 'text',
+        inputLabel: 'Introduce el nombre para tu perfil simulado',
+        inputValue: 'Google User',
+        showCancelButton: true,
+        confirmButtonText: 'Iniciar sesión',
+        cancelButtonText: 'Cancelar',
+      });
+
+      setIsLoading(true);
+      setError(null);
+      try {
+        await authService.loginWithGoogle({
+          isMock: true,
+          mockEmail: mockEmail,
+          mockName: mockName || 'Google User',
+          rememberMe,
+        });
+        await finalizeAuth();
+      } catch (err: any) {
+        console.error("Error al iniciar sesión simulada con Google:", err);
+        setError(err.response?.data?.message || "Error al autenticar con Google simulado.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const handleGoogleLogin = () => {
+    const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!googleClientId) {
+      handleMockGoogleLogin();
+      return;
+    }
+
+    try {
+      if (window.google) {
+        const tokenClient = window.google.accounts.oauth2.initTokenClient({
+          client_id: googleClientId,
+          scope: 'openid email profile',
+          callback: async (tokenResponse: any) => {
+            if (tokenResponse && tokenResponse.access_token) {
+              setIsLoading(true);
+              setError(null);
+              try {
+                await authService.loginWithGoogle({
+                  accessToken: tokenResponse.access_token,
+                  rememberMe,
+                });
+                await finalizeAuth();
+              } catch (err: any) {
+                console.error("Error al iniciar sesión con Google:", err);
+                setError(err.response?.data?.message || "Error al autenticar con Google.");
+              } finally {
+                setIsLoading(false);
+              }
+            }
+          },
+        });
+        tokenClient.requestAccessToken();
+      } else {
+        setError("No se pudo cargar el SDK de Google Sign-In. Intente nuevamente.");
+      }
+    } catch (err) {
+      console.error("Google init error:", err);
+      setError("Error al iniciar Google Sign-In.");
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!email || !password) {
@@ -34,8 +168,7 @@ export function Login() {
 
     try {
       await authService.login({ email, password, rememberMe });
-      await fetchProfile();
-      navigate(redirectTo, { replace: true });
+      await finalizeAuth();
     } catch (err) {
       console.error("Error al iniciar sesión:", err);
       if (isAxiosError(err)) {
@@ -217,20 +350,16 @@ export function Login() {
                 <div className="h-px flex-1 bg-[#d9e2ef]" />
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3">
                 <Button
+                  type="button"
                   variant="outline"
-                  className="h-11 rounded-xl border-[#dde5f0] bg-[#f3f6fc] text-sm font-bold text-slate-800 hover:bg-white"
+                  onClick={handleGoogleLogin}
+                  disabled={isLoading}
+                  className="h-11 rounded-xl border-[#dde5f0] bg-[#f3f6fc] text-sm font-bold text-slate-800 hover:bg-white flex items-center justify-center gap-2"
                 >
                   <Globe className="h-[18px] w-[18px]" />
                   Google
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-11 rounded-xl border-[#dde5f0] bg-[#f3f6fc] text-sm font-bold text-slate-800 hover:bg-white"
-                >
-                  <BriefcaseBusiness className="h-[18px] w-[18px]" />
-                  LinkedIn
                 </Button>
               </div>
 

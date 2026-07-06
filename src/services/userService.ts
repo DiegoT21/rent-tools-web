@@ -33,5 +33,10 @@ export const userService = {
       summary: data?.summary ?? { count: 0, averageRating: 0 },
     };
   },
+
+  updateProfile: async (data: { phone?: string; identityDocument?: string; profileImageFileKey?: string }) => {
+    const response = await api.patch('/users/profile', data);
+    return response.data?.data ?? response.data;
+  },
 };
 

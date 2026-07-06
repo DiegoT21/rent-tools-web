@@ -40,6 +40,28 @@ export const authService = {
     return response.data;
   },
 
+  loginWithGoogle: async (googleData: {
+    accessToken?: string;
+    isMock?: boolean;
+    mockEmail?: string;
+    mockName?: string;
+    rememberMe?: boolean;
+  }) => {
+    const { rememberMe = true, ...payload } = googleData;
+    setRememberMePreference(rememberMe);
+
+    const response = await api.post('/auth/google', payload);
+    const { accessToken, user } = response.data.data || response.data;
+
+    if (accessToken) {
+      useAuthStore.getState().setAccessToken(accessToken);
+      usePersistedAuthStore.getState().setToken(accessToken);
+    }
+    if (user) syncUserToStores(user);
+
+    return response.data;
+  },
+
   register: async (userData: RegisterData) => {
     const response = await api.post('/auth/register', userData);
     const { accessToken, user } = response.data.data || response.data;
