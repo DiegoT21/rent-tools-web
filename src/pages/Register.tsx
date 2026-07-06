@@ -54,6 +54,7 @@ export function Register() {
         email,
         password,
         identityDocument,
+        acceptTerms: true as const,
       });
       const accessToken = data.data?.accessToken;
       navigate("/register/step-2", { state: { accessToken } });
@@ -247,7 +248,8 @@ export function Register() {
                     >
                       términos y condiciones
                     </button>{" "}
-                    de servicio y la política de privacidad industrial de RentTools.
+                    de servicio y la política de privacidad industrial de RentTools, y autorizo a
+                    RentTools a enviarme notificaciones transaccionales al correo indicado.
                   </p>
                 </div>
 
