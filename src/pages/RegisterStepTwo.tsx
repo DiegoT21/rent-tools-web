@@ -1,6 +1,6 @@
 import React from "react";
 import { useLocation, useNavigate } from "react-router-dom"; // Importación limpia
-import { ShieldCheck, Lock, ArrowRight } from "lucide-react";
+import { ShieldCheck, Lock, ArrowRight, Phone, CreditCard } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import {
@@ -17,11 +17,12 @@ import {
   getRegistrationDocument,
   saveRegistrationDocument,
 } from "@/services/verificationService";
+import { userService } from "@/services/userService";
 
 export function RegisterStepTwo() {
   const location = useLocation();
   const navigate = useNavigate();
-const { accessToken: storeToken } = useAuthStore();
+  const { accessToken: storeToken, user, fetchProfile } = useAuthStore();
 
   const accessToken = location.state?.accessToken || storeToken;
 
@@ -32,10 +33,29 @@ const { accessToken: storeToken } = useAuthStore();
     }
   }, [accessToken, navigate]);
 
+  // Cargar perfil al entrar para tener la información más fresca de cédula/teléfono
+  React.useEffect(() => {
+    if (accessToken) {
+      fetchProfile();
+    }
+  }, [accessToken]);
+
   const [documentImage, setDocumentImage] = React.useState<string | null>(() =>
     getRegistrationDocument()
   );
   const [useManualForm, setUseManualForm] = React.useState(false);
+
+  // Formulario para completar datos faltantes (caso Google u otros que no tengan cedula/teléfono)
+  const needsPhone = React.useMemo(() => !user || !user.phone || !user.phone.trim(), [user]);
+  const needsDoc = React.useMemo(() => {
+    return !user || !user.identityDocument || !user.identityDocument.trim() || user.identityDocument.startsWith("GOOGLE_");
+  }, [user]);
+
+  const isProfileIncomplete = React.useMemo(() => needsPhone || needsDoc, [needsPhone, needsDoc]);
+
+  const [completePhone, setCompletePhone] = React.useState("");
+  const [completeDoc, setCompleteDoc] = React.useState("");
+  const [isUpdatingProfile, setIsUpdatingProfile] = React.useState(false);
 
   // State for manual form
   const [documentType, setDocumentType] = React.useState("CCPA");
@@ -45,6 +65,40 @@ const { accessToken: storeToken } = useAuthStore();
   // Loading and error state
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+
+  const handleUpdateProfileData = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsUpdatingProfile(true);
+
+    try {
+      const payload: any = {};
+      if (needsPhone) {
+        if (!completePhone || completePhone.trim().length < 5) {
+          setError("Por favor, ingrese un número de teléfono válido.");
+          setIsUpdatingProfile(false);
+          return;
+        }
+        payload.phone = completePhone;
+      }
+      if (needsDoc) {
+        if (!completeDoc || completeDoc.trim().length < 5) {
+          setError("Por favor, ingrese un documento de identidad válido.");
+          setIsUpdatingProfile(false);
+          return;
+        }
+        payload.identityDocument = completeDoc;
+      }
+
+      await userService.updateProfile(payload);
+      await fetchProfile();
+    } catch (err: any) {
+      console.error("Error al actualizar el perfil:", err);
+      setError(err.response?.data?.message || "Ocurrió un error al guardar los datos.");
+    } finally {
+      setIsUpdatingProfile(false);
+    }
+  };
 
   const handleNext = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -141,7 +195,58 @@ const { accessToken: storeToken } = useAuthStore();
                     {error}
                   </div>
                 )}
-                {!useManualForm ? (
+                {isProfileIncomplete ? (
+                  <form onSubmit={handleUpdateProfileData} className="space-y-6 animate-in fade-in duration-300">
+                    <p className="text-sm text-slate-500 font-medium">
+                      Para continuar con la verificación, necesitamos completar la siguiente información requerida:
+                    </p>
+
+                    {needsDoc && (
+                      <div className="space-y-2">
+                        <label htmlFor="completeDoc" className="text-[13px] font-bold text-slate-800 flex items-center gap-2">
+                          <CreditCard className="h-4 w-4 text-[#e86f00]" /> Documento de Identidad (Cédula)
+                        </label>
+                        <Input
+                          id="completeDoc"
+                          placeholder="Ej: 8-1251-1829"
+                          value={completeDoc}
+                          onChange={(e) => setCompleteDoc(e.target.value)}
+                          className="h-12 bg-[#f3f6fc] border-none rounded-xl"
+                          required
+                        />
+                      </div>
+                    )}
+
+                    {needsPhone && (
+                      <div className="space-y-2">
+                        <label htmlFor="completePhone" className="text-[13px] font-bold text-slate-800 flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-[#e86f00]" /> Número de Teléfono
+                        </label>
+                        <Input
+                          id="completePhone"
+                          type="tel"
+                          placeholder="Ej: +507 6123-4567"
+                          value={completePhone}
+                          onChange={(e) => setCompletePhone(e.target.value)}
+                          className="h-12 bg-[#f3f6fc] border-none rounded-xl"
+                          required
+                        />
+                      </div>
+                    )}
+
+                    <div className="pt-2">
+                      <Button
+                        type="submit"
+                        disabled={isUpdatingProfile}
+                        className="h-14 w-full rounded-2xl bg-[#e86f00] text-base font-black text-white hover:bg-[#d46500] shadow-lg shadow-orange-500/20 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+                      >
+                        {isUpdatingProfile ? "Guardando datos..." : (
+                          <>Continuar <ArrowRight className="ml-2 h-5 w-5" /></>
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                ) : !useManualForm ? (
                   <div className="space-y-6">
                     {!documentImage ? (
                       <div className="space-y-4">
