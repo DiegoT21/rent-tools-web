@@ -49,7 +49,7 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
       alerts.warning("Verificación requerida", "Debes verificar tu identidad primero para poder publicar herramientas.");
       navigate("/register/step-2");
     } else if (!user) {
-      navigate("/register");
+      navigate("/login", { state: { from: "/profile?tab=publicar" } });
     } else {
       navigate("/profile?tab=publicar");
     }
@@ -110,15 +110,6 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
               <button type="button" onClick={toggleSidebar} className={navLinkClass(Boolean(isSidebarOpen))}>
                 Categorías
               </button>
-              <Link
-                to="/profile?tab=alquileres"
-                id="nav-my-rentals"
-                className={navLinkClass(
-                  location.pathname === "/profile" && searchParams.get("tab") === "alquileres"
-                )}
-              >
-                Alquileres
-              </Link>
             </nav>
           )}
 
@@ -262,13 +253,6 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
                   >
                     Categorías
                   </button>
-                  <Link
-                    to="/profile?tab=alquileres"
-                    className="rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Alquileres
-                  </Link>
                   {!isAdmin && (
                     <button
                       type="button"

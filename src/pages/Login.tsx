@@ -6,6 +6,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { isAxiosError } from "axios";
 import { authService } from "../services/authService";
+import { isRememberMeEnabled } from "../lib/authStorage";
 import { useAuthStore } from "../store/useAuthStore";
 
 export function Login() {
@@ -17,6 +18,7 @@ export function Login() {
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [showPassword, setShowPassword] = React.useState(false);
+  const [rememberMe, setRememberMe] = React.useState(isRememberMeEnabled);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -31,7 +33,7 @@ export function Login() {
     setError(null);
 
     try {
-      await authService.login({ email, password });
+      await authService.login({ email, password, rememberMe });
       await fetchProfile();
       navigate(redirectTo, { replace: true });
     } catch (err) {
@@ -193,6 +195,8 @@ export function Login() {
                 <label className="flex items-center gap-2.5 text-sm text-slate-600">
                   <input
                     type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
                     className="h-4 w-4 rounded border-slate-300 bg-white accent-[#ff7a00]"
                   />
                   Recordarme

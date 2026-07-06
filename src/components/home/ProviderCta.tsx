@@ -31,7 +31,10 @@ export function ProviderCta() {
           <Button
             variant="outline"
             className="rounded-xl border-white/30 bg-transparent px-6 py-5 font-bold text-white hover:bg-white/10 hover:text-white"
-            onClick={() => navigate("/profile")}
+            onClick={() => {
+              if (!user) navigate("/login");
+              else navigate("/profile");
+            }}
           >
             Saber más
           </Button>

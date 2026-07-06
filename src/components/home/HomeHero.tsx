@@ -1,12 +1,9 @@
-import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
 const HERO_BG =
   "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2000&auto=format&fit=crop";
 
 export function HomeHero() {
-  const navigate = useNavigate();
-
   return (
     <section className="relative min-h-[360px] overflow-hidden sm:min-h-[420px] lg:min-h-[480px]">
       <img
@@ -33,13 +30,6 @@ export function HomeHero() {
             }}
           >
             Explorar catálogo
-          </Button>
-          <Button
-            variant="outline"
-            className="rounded-xl border-white/40 bg-white/10 px-8 py-6 text-base font-bold text-white backdrop-blur-sm hover:bg-white/20 hover:text-white"
-            onClick={() => navigate("/profile?tab=alquileres")}
-          >
-            Ver promociones
           </Button>
         </div>
       </div>

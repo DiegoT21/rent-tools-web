@@ -10,7 +10,7 @@ export function Footer() {
             Rent<span className="text-primary">Tools</span>
           </Link>
           <p className="text-xs font-medium text-slate-500">
-            © 2024 RentTools Industrial. Professional Grade Reliability.
+            © {new Date().getFullYear()} RentTools Industrial. Professional Grade Reliability.
           </p>
         </div>
         <div className="flex flex-wrap justify-center gap-6 text-xs font-semibold tracking-wide text-slate-500 uppercase">
