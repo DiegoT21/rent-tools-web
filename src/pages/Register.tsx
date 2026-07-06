@@ -21,6 +21,7 @@ export function Register() {
   const [identityDocument, setIdentityDocument] = React.useState("");
   const [phonePrefix, setPhonePrefix] = React.useState("+507");
   const [phone, setPhone] = React.useState("");
+  const [acceptTerms, setAcceptTerms] = React.useState(false);
 
   // UI states
   const [isLoading, setIsLoading] = React.useState(false);
@@ -39,6 +40,11 @@ export function Register() {
       return;
     }
 
+    if (!acceptTerms) {
+      setError("Debes aceptar los términos y condiciones para registrarte");
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -49,6 +55,7 @@ export function Register() {
         email,
         password,
         identityDocument,
+        acceptTerms,
       });
 
       // Guardar el teléfono en el perfil recién creado
@@ -239,7 +246,12 @@ export function Register() {
                 </div>
 
                 <label className="flex items-start gap-3 py-2 cursor-pointer group">
-                  <input type="checkbox" className="mt-1 h-4 w-4 rounded border-slate-300 accent-[#e86f00]" />
+                  <input 
+                    type="checkbox" 
+                    checked={acceptTerms}
+                    onChange={(e) => setAcceptTerms(e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-slate-300 accent-[#e86f00]" 
+                  />
                   <span className="text-[13px] leading-relaxed text-slate-500">
                     Acepto los <span className="font-bold text-blue-600 underline group-hover:text-blue-800">términos y condiciones</span> de servicio y la política de privacidad industrial de RentTools.
                   </span>
