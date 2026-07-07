@@ -20,8 +20,10 @@ import {
   brandService,
   categoryService,
   DEFAULT_BRANDS,
-  DEFAULT_CATEGORIES,
+  DEFAULT_CATEGORY_TREE,
+  type CategoryTreeNode,
 } from "@/services/catalogService";
+import { CategoryCascadeSelect } from "@/components/catalog/CategoryCascadeSelect";
 import { PhotoCaptureDialog, dataUrlToFile } from "@/components/ui/PhotoCaptureDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -101,12 +103,12 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [cameraDialogOpen, setCameraDialogOpen] = useState(false);
   const [brandOptions, setBrandOptions] = useState(DEFAULT_BRANDS);
-  const [categoryOptions, setCategoryOptions] = useState(DEFAULT_CATEGORIES);
+  const [categoryTree, setCategoryTree] = useState<CategoryTreeNode[]>(DEFAULT_CATEGORY_TREE);
 
   useEffect(() => {
-    Promise.all([categoryService.list(), brandService.list()])
-      .then(([cats, brands]) => {
-        if (cats.length) setCategoryOptions(cats.map((c) => ({ name: c.name, slug: c.slug })));
+    Promise.all([categoryService.listTree(), brandService.list()])
+      .then(([tree, brands]) => {
+        if (tree.length) setCategoryTree(tree);
         if (brands.length) setBrandOptions(brands.map((b) => ({ name: b.name, slug: b.slug })));
       })
       .catch(() => {
@@ -121,7 +123,7 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
   const [formData, setFormData] = useState({
     name: editTool?.name ?? "",
     brand: editTool?.brand ?? "",
-    category: editTool?.category ?? "",
+    categoryId: editTool?.categoryId ?? "",
     description: editTool?.description ?? "",
     pricePerDay: editTool?.pricePerDay?.toString() ?? "",
     serialNumber: editTool?.serialNumber ?? "",
@@ -139,7 +141,7 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
     setFormData({
       name: "",
       brand: "",
-      category: "",
+      categoryId: "",
       description: "",
       pricePerDay: "",
       serialNumber: "",
@@ -228,8 +230,8 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
         await alerts.warning("Campo requerido", "Selecciona la marca.");
         return false;
       }
-      if (!formData.category) {
-        await alerts.warning("Campo requerido", "Selecciona la categoría.");
+      if (!formData.categoryId) {
+        await alerts.warning("Campo requerido", "Selecciona la categoría y subcategoría.");
         return false;
       }
       if (!formData.description.trim()) {
@@ -469,22 +471,13 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-slate-600 font-semibold">Categoría</Label>
-                    <Select onValueChange={(val) => handleSelectChange(val, "category")} value={formData.category}>
-                      <SelectTrigger className="bg-slate-50 border-slate-200 rounded-xl h-12">
-                        <SelectValue placeholder="Selecciona categoría" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categoryOptions.map((c) => (
-                          <SelectItem key={c.slug} value={c.slug}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
+
+                <CategoryCascadeSelect
+                  tree={categoryTree}
+                  value={formData.categoryId}
+                  onChange={(categoryId) => setFormData((prev) => ({ ...prev, categoryId }))}
+                />
 
                 <div className="space-y-2">
                   <Label htmlFor="description" className="text-slate-600 font-semibold">

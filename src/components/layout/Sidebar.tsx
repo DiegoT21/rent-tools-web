@@ -2,9 +2,15 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Grid, Pickaxe, Settings, ShoppingCart, TestTube } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { categoryService, DEFAULT_CATEGORIES } from "@/services/catalogService";
+import { categoryService, DEFAULT_CATEGORY_TREE, type CategoryTreeNode } from "@/services/catalogService";
 
 const iconBySlug: Record<string, typeof Grid> = {
+  "herramientas-poder": Pickaxe,
+  "medicion-precision": TestTube,
+  "energia-generacion": ShoppingCart,
+  "excavacion-demolicion": Settings,
+  "elevacion-manejo": Grid,
+  "laboratorio-ti": TestTube,
   drills: Pickaxe,
   access: Settings,
   generators: ShoppingCart,
@@ -21,12 +27,14 @@ export function Sidebar({
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const activeCategory = searchParams.get("category");
-  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
+  const [categories, setCategories] = useState<Array<{ name: string; slug: string }>>(
+    DEFAULT_CATEGORY_TREE.map((c) => ({ name: c.name, slug: c.slug })),
+  );
 
   useEffect(() => {
     categoryService
-      .list()
-      .then((items) => {
+      .listTree()
+      .then((items: CategoryTreeNode[]) => {
         if (items.length > 0) {
           setCategories(items.map((c) => ({ name: c.name, slug: c.slug })));
         }

@@ -64,8 +64,10 @@ const resolveMaybeKeyToUrl = (value: string): string | null => {
 };
 
 export const toolService = {
-  getPublicTools: async (): Promise<PublicTool[]> => {
-    const response = await api.get("/tools");
+  getPublicTools: async (category?: string): Promise<PublicTool[]> => {
+    const response = await api.get("/tools", {
+      params: category ? { category } : undefined,
+    });
     const data = (response as any).data?.data ?? (response as any).data;
     if (Array.isArray(data)) return data;
     if (Array.isArray(data?.items)) return data.items;
@@ -81,8 +83,10 @@ export const toolService = {
     return null;
   },
 
-  getPopularTools: async (days = 7, limit = 8): Promise<PublicTool[]> => {
-    const response = await api.get("/tools/popular", { params: { days, limit } });
+  getPopularTools: async (days = 7, limit = 8, category?: string): Promise<PublicTool[]> => {
+    const response = await api.get("/tools/popular", {
+      params: { days, limit, ...(category ? { category } : {}) },
+    });
     const data = (response as any).data?.data ?? (response as any).data;
     if (Array.isArray(data)) return data;
     return [];
