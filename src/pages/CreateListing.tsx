@@ -122,7 +122,11 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
 
   const [formData, setFormData] = useState({
     name: editTool?.name ?? "",
-    brand: editTool?.brand ?? "",
+    brand: (() => {
+      const raw = editTool?.brand ?? "";
+      const bySlug = DEFAULT_BRANDS.find((b) => b.slug === raw);
+      return bySlug?.name ?? raw;
+    })(),
     categoryId: editTool?.categoryId ?? "",
     description: editTool?.description ?? "",
     pricePerDay: editTool?.pricePerDay?.toString() ?? "",
@@ -226,8 +230,8 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
         await alerts.warning("Campo requerido", "Ingresa el nombre de la herramienta.");
         return false;
       }
-      if (!formData.brand) {
-        await alerts.warning("Campo requerido", "Selecciona la marca.");
+      if (!formData.brand.trim() || formData.brand.trim().length < 2) {
+        await alerts.warning("Campo requerido", "Escribe la marca del equipo.");
         return false;
       }
       if (!formData.categoryId) {
@@ -337,6 +341,7 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
 
       const payload = {
         ...formData,
+        brand: formData.brand.trim(),
         pricePerDay: Number(formData.pricePerDay),
         meetingLocations: meetingPayload,
         fileKeys: finalFileKeys,
@@ -455,29 +460,38 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-slate-600 font-semibold">Marca</Label>
-                    <Select onValueChange={(val) => handleSelectChange(val, "brand")} value={formData.brand}>
-                      <SelectTrigger className="bg-slate-50 border-slate-200 rounded-xl h-12">
-                        <SelectValue placeholder="Selecciona una marca" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {brandOptions.map((b) => (
-                          <SelectItem key={b.slug} value={b.slug}>
-                            {b.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
                 <CategoryCascadeSelect
                   tree={categoryTree}
                   value={formData.categoryId}
                   onChange={(categoryId) => setFormData((prev) => ({ ...prev, categoryId }))}
                 />
+
+                <div className="space-y-2">
+                  <Label htmlFor="brand" className="text-slate-600 font-semibold">
+                    Marca
+                  </Label>
+                  <Input
+                    id="brand"
+                    list="brand-suggestions"
+                    placeholder={
+                      formData.categoryId
+                        ? "Ej. DeWalt, Hilti, Milwaukee..."
+                        : "Selecciona primero la categoría"
+                    }
+                    disabled={!formData.categoryId}
+                    className="bg-slate-50 border-slate-200 rounded-xl h-12 focus-visible:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    value={formData.brand}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, brand: e.target.value }))}
+                  />
+                  <datalist id="brand-suggestions">
+                    {brandOptions.map((b) => (
+                      <option key={b.slug} value={b.name} />
+                    ))}
+                  </datalist>
+                  <p className="text-xs text-slate-400">
+                    Escribe la marca manualmente. Las sugerencias son opcionales.
+                  </p>
+                </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="description" className="text-slate-600 font-semibold">
