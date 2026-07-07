@@ -16,14 +16,6 @@ declare global {
   }
 }
 
-function needsKycCompletion(user: { identityDocument?: string; phone?: string; isVerified?: boolean } | null): boolean {
-  if (!user) return true;
-  const doc = user.identityDocument ?? "";
-  const phone = user.phone ?? "";
-  if (!phone.trim() || !doc.trim() || doc.startsWith("GOOGLE_")) return true;
-  return !user.isVerified;
-}
-
 export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -39,11 +31,6 @@ export function Login() {
 
   const finalizeAuth = async () => {
     await fetchProfile();
-    const user = useAuthStore.getState().user;
-    if (needsKycCompletion(user)) {
-      navigate("/register/step-2", { replace: true });
-      return;
-    }
     navigate(redirectTo, { replace: true });
   };
 

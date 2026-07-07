@@ -29,7 +29,7 @@ export function RegisterStepTwo() {
   // Protección: Si no hay token, no puede estar aquí
   React.useEffect(() => {
     if (!accessToken) {
-      navigate("/register");
+      navigate("/login");
     }
   }, [accessToken, navigate]);
 
