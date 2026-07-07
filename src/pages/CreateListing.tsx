@@ -476,7 +476,7 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
                     placeholder={
                       formData.categoryId
                         ? "Ej. DeWalt, Hilti, Milwaukee..."
-                        : "Selecciona primero la categoría"
+                        : "Selecciona primero una categoría principal"
                     }
                     disabled={!formData.categoryId}
                     className="bg-slate-50 border-slate-200 rounded-xl h-12 focus-visible:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
@@ -489,7 +489,9 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
                     ))}
                   </datalist>
                   <p className="text-xs text-slate-400">
-                    Escribe la marca manualmente. Las sugerencias son opcionales.
+                    {formData.categoryId
+                      ? 'Escribe la marca manualmente. Las sugerencias son opcionales.'
+                      : 'Debes seleccionar una categoría principal arriba para poder escribir la marca.'}
                   </p>
                 </div>
 
