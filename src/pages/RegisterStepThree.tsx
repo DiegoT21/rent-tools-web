@@ -18,7 +18,7 @@ import {
   verifyIdentity,
 } from "@/services/verificationService";
 import { validateSelfieImage } from "@/lib/faceVerification";
-
+import { BackToHomeButton } from "@/components/auth/BackToHomeButton";
 
 export function RegisterStepThree() {
   const location = useLocation();
@@ -27,16 +27,16 @@ export function RegisterStepThree() {
   const documentImage =
     location.state?.documentImage || getRegistrationDocument() || null;
   const accessToken = location.state?.accessToken || storeToken;
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
 
-  // Protección total: Validar sesión y que venga del Paso 2
   React.useEffect(() => {
+    if (!hasHydrated) return;
     if (!accessToken) {
-      navigate("/register");
+      navigate("/login");
     } else if (!documentImage) {
-      // Si hay sesión pero no hay foto de cédula, mandarlo al Paso 2
       navigate("/register/step-2");
     }
-  }, [accessToken, documentImage, navigate]);
+  }, [accessToken, documentImage, hasHydrated, navigate]);
 
   const [selfieImage, setSelfieImage] = useState<string | null>(null);
   const [selfieWarning, setSelfieWarning] = useState<string | null>(null);
@@ -107,7 +107,7 @@ export function RegisterStepThree() {
         {/* Header */}
         <header className="flex items-center justify-between py-4">
           <span className="text-xl font-black tracking-tight">RentTools</span>
-          <button className="text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">Help</button>
+          <BackToHomeButton className="text-sm font-medium text-slate-500 hover:text-slate-800" />
         </header>
 
         <main className="mt-6 flex-1 flex flex-col items-center">

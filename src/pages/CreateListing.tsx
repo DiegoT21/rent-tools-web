@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Package,
@@ -16,6 +16,12 @@ import {
   Check,
 } from "lucide-react";
 import { LocationPicker } from "@/components/LocationPicker";
+import {
+  brandService,
+  categoryService,
+  DEFAULT_BRANDS,
+  DEFAULT_CATEGORIES,
+} from "@/services/catalogService";
 import { PhotoCaptureDialog, dataUrlToFile } from "@/components/ui/PhotoCaptureDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -94,6 +100,19 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [cameraDialogOpen, setCameraDialogOpen] = useState(false);
+  const [brandOptions, setBrandOptions] = useState(DEFAULT_BRANDS);
+  const [categoryOptions, setCategoryOptions] = useState(DEFAULT_CATEGORIES);
+
+  useEffect(() => {
+    Promise.all([categoryService.list(), brandService.list()])
+      .then(([cats, brands]) => {
+        if (cats.length) setCategoryOptions(cats.map((c) => ({ name: c.name, slug: c.slug })));
+        if (brands.length) setBrandOptions(brands.map((b) => ({ name: b.name, slug: b.slug })));
+      })
+      .catch(() => {
+        /* defaults */
+      });
+  }, []);
 
   const existingFileKeys: string[] = editTool?.fileKeys ?? [];
   const existingImageUrls: string[] = editTool?.imageUrls ?? [];
@@ -442,10 +461,11 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
                         <SelectValue placeholder="Selecciona una marca" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="hilti">Hilti</SelectItem>
-                        <SelectItem value="dewalt">DeWalt</SelectItem>
-                        <SelectItem value="milwaukee">Milwaukee</SelectItem>
-                        <SelectItem value="makita">Makita</SelectItem>
+                        {brandOptions.map((b) => (
+                          <SelectItem key={b.slug} value={b.slug}>
+                            {b.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -456,10 +476,11 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
                         <SelectValue placeholder="Selecciona categoría" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="drills">Taladros y Martillos</SelectItem>
-                        <SelectItem value="saws">Sierras</SelectItem>
-                        <SelectItem value="generators">Generadores</SelectItem>
-                        <SelectItem value="access">Acceso y Elevación</SelectItem>
+                        {categoryOptions.map((c) => (
+                          <SelectItem key={c.slug} value={c.slug}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>

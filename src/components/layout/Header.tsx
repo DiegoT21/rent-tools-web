@@ -1,8 +1,9 @@
 import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
-import { Search, User, MapPin, ShieldCheck, ShieldAlert, LogOut, Menu, X } from "lucide-react";
+import { Search, User, ShieldCheck, ShieldAlert, LogOut, Menu, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/useAuthStore";
+import { authService } from "@/services/authService";
 import { alerts } from "@/lib/alerts";
 import { UserAvatar } from "@/components/UserAvatar";
 import { NotificationBell } from "@/components/layout/NotificationBell";
@@ -12,7 +13,7 @@ import { cn } from "@/lib/utils";
 export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () => void; isSidebarOpen?: boolean }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, clearSession } = useAuthStore();
+  const { user } = useAuthStore();
   const isAdmin = user?.role === "admin" || user?.email === "diegoorlando211170@gmail.com";
   const activeTab = searchParams.get("tab") || "users";
   const location = useLocation();
@@ -56,8 +57,7 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
   };
 
   const handleLogout = () => {
-    clearSession();
-    navigate("/login");
+    void authService.logout();
   };
 
   const navLinkClass = (active: boolean) =>
@@ -104,9 +104,6 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
 
           {showPublicNav && (
             <nav className="hidden items-center gap-6 lg:flex">
-              <Link to="/" className={navLinkClass(location.pathname === "/")}>
-                Ubicación
-              </Link>
               <button type="button" onClick={toggleSidebar} className={navLinkClass(Boolean(isSidebarOpen))}>
                 Categorías
               </button>
@@ -124,16 +121,18 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
               <button onClick={() => navigate("/admin?tab=chat")} className={navLinkClass(activeTab === "chat")}>
                 Soporte
               </button>
+              <button onClick={() => navigate("/admin?tab=catalog")} className={navLinkClass(activeTab === "catalog")}>
+                Catálogo
+              </button>
+              <button onClick={() => navigate("/admin?tab=listings")} className={navLinkClass(activeTab === "listings")}>
+                Publicaciones
+              </button>
             </nav>
           )}
         </div>
 
         {showPublicNav && (
-          <div className="hidden flex-1 items-center justify-center gap-3 px-4 xl:flex xl:px-8">
-            <div className="flex items-center gap-1.5 rounded-full bg-slate-100 px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm">
-              <MapPin className="h-4 w-4 text-primary" />
-              <span>Ubicación</span>
-            </div>
+          <div className="hidden flex-1 items-center justify-center px-4 xl:flex xl:px-8">
             <div className="w-full max-w-xl">{searchInput}</div>
           </div>
         )}
@@ -240,9 +239,6 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
             <nav className="flex flex-col gap-1">
               {showPublicNav ? (
                 <>
-                  <Link to="/" className="rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => setMobileMenuOpen(false)}>
-                    Ubicación
-                  </Link>
                   <button
                     type="button"
                     className="rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -273,6 +269,12 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
                   </button>
                   <button onClick={() => { navigate("/admin?tab=chat"); setMobileMenuOpen(false); }} className="rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
                     Soporte
+                  </button>
+                  <button onClick={() => { navigate("/admin?tab=catalog"); setMobileMenuOpen(false); }} className="rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    Catálogo
+                  </button>
+                  <button onClick={() => { navigate("/admin?tab=listings"); setMobileMenuOpen(false); }} className="rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    Publicaciones
                   </button>
                   <button onClick={() => { navigate("/"); setMobileMenuOpen(false); }} className="mt-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">
                     Ver sitio web

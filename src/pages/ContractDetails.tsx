@@ -34,6 +34,7 @@ export function ContractDetails() {
   const { uuid } = useParams();
   const navigate = useNavigate();
   const accessToken = useAuthStore((s) => s.accessToken);
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const user = useAuthStore((s) => s.user) as any;
   const [contract, setContract] = useState<RentalContract | null>(null);
   const [loading, setLoading] = useState(true);
@@ -134,8 +135,9 @@ export function ContractDetails() {
   };
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (!accessToken) navigate("/login");
-  }, [accessToken, navigate]);
+  }, [accessToken, hasHydrated, navigate]);
 
   useEffect(() => {
     refresh();

@@ -128,4 +128,19 @@ export const toolService = {
   getToolId: (tool: PublicTool): string => {
     return String(tool.uuid ?? tool.id ?? tool._id ?? "");
   },
+
+  listAdmin: async (page = 1, q?: string, ownerEmail?: string) => {
+    const res = await api.get('/tools/admin/list', {
+      params: { page, limit: 15, q, ownerEmail },
+    });
+    return {
+      items: res.data?.items ?? [],
+      pagination: res.data?.pagination ?? { page: 1, totalPages: 1 },
+    };
+  },
+
+  adminDelete: async (uuid: string) => {
+    const res = await api.delete(`/tools/admin/${uuid}`);
+    return res.data;
+  },
 };

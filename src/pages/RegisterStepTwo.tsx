@@ -18,6 +18,7 @@ import {
   saveRegistrationDocument,
 } from "@/services/verificationService";
 import { userService } from "@/services/userService";
+import { BackToHomeButton } from "@/components/auth/BackToHomeButton";
 
 export function RegisterStepTwo() {
   const location = useLocation();
@@ -25,13 +26,15 @@ export function RegisterStepTwo() {
   const { accessToken: storeToken, user, fetchProfile } = useAuthStore();
 
   const accessToken = location.state?.accessToken || storeToken;
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
 
   // Protección: Si no hay token, no puede estar aquí
   React.useEffect(() => {
+    if (!hasHydrated) return;
     if (!accessToken) {
       navigate("/login");
     }
-  }, [accessToken, navigate]);
+  }, [accessToken, hasHydrated, navigate]);
 
   // Cargar perfil al entrar para tener la información más fresca de cédula/teléfono
   React.useEffect(() => {
@@ -136,7 +139,7 @@ export function RegisterStepTwo() {
         {/* Header */}
         <header className="flex items-center justify-between py-4">
           <span className="text-xl font-black tracking-tight">RentTools</span>
-          <button className="text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">Help</button>
+          <BackToHomeButton className="text-sm font-medium text-slate-500 hover:text-slate-800" />
         </header>
 
         <main className="mt-6 grid flex-1 gap-6 lg:mt-8 lg:grid-cols-2 lg:gap-12 items-center">
@@ -149,7 +152,7 @@ export function RegisterStepTwo() {
                 <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">Entorno Seguro</span>
               </div>
 
-              <h1 className="text-[3rem] font-black leading-[1.05] tracking-tight text-slate-950">
+              <h1 className="text-3xl font-black leading-[1.05] tracking-tight text-slate-950 md:text-5xl">
                 Verifica tu identidad profesional.
               </h1>
 

@@ -93,6 +93,11 @@ export const authService = {
   },
 
   logout: async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      /* cookie may already be cleared */
+    }
     useAuthStore.getState().clearSession();
     usePersistedAuthStore.getState().clearAuth();
     window.location.href = '/login';

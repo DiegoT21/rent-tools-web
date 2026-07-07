@@ -17,6 +17,8 @@ import {
   AlertCircle,
   LogOut
 } from 'lucide-react';
+import { AdminCatalogTab } from '@/components/admin/AdminCatalogTab';
+import { AdminListingsTab } from '@/components/admin/AdminListingsTab';
 
 
 interface UserItem {
@@ -75,7 +77,7 @@ interface SupportMessage {
 export function AdminDashboard() {
   const user = useAuthStore((state) => state.user);
   const [searchParams] = useSearchParams();
-  const activeTab = (searchParams.get('tab') || 'users') as 'users' | 'audit' | 'chat';
+  const activeTab = (searchParams.get('tab') || 'users') as 'users' | 'audit' | 'chat' | 'catalog' | 'listings';
 
   // Tab 1: Users
   const [usersList, setUsersList] = useState<UserItem[]>([]);
@@ -629,6 +631,10 @@ export function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {activeTab === 'catalog' && <AdminCatalogTab />}
+
+      {activeTab === 'listings' && <AdminListingsTab />}
     </div>
   );
 }

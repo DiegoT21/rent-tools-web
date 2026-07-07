@@ -16,6 +16,7 @@ import { CheckoutRental } from './pages/CheckoutRental'
 import { DeliveryProtocol } from './pages/DeliveryProtocol'
 import { AdminDashboard } from './pages/AdminDashboard'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
+import { SessionBootstrap } from './components/auth/SessionBootstrap'
 
 function App() {
   const user = useAuthStore((state) => state.user);
@@ -23,6 +24,7 @@ function App() {
 
 
   return (
+    <SessionBootstrap>
     <BrowserRouter>
       <Routes>
         <Route path="/" element={
@@ -85,6 +87,7 @@ function App() {
         } />
       </Routes>
     </BrowserRouter>
+    </SessionBootstrap>
   )
 }
 

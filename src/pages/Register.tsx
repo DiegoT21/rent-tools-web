@@ -8,6 +8,7 @@ import { isAxiosError } from "axios";
 import { authService } from "../services/authService";
 import { userService } from "../services/userService";
 import { ServiceTermsDialog } from "@/components/legal/ServiceTermsDialog";
+import { BackToHomeButton } from "@/components/auth/BackToHomeButton";
 
 export function Register() {
   const navigate = useNavigate();
@@ -81,9 +82,7 @@ export function Register() {
           <div className="flex items-center gap-2">
             <span className="text-xl font-black tracking-tight text-slate-900">RentTools</span>
           </div>
-          <button className="text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
-            Help
-          </button>
+          <BackToHomeButton className="text-sm font-medium text-slate-500 hover:text-slate-800" />
         </header>
 
         <main className="mt-6 grid flex-1 gap-6 lg:mt-8 lg:grid-cols-[0.9fr_1.1fr] lg:gap-12 items-start">
