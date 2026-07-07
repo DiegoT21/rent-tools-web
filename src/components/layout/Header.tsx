@@ -9,12 +9,13 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { isAdminUser } from "@/lib/isAdmin";
 
 export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () => void; isSidebarOpen?: boolean }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuthStore();
-  const isAdmin = user?.role === "admin" || user?.email === "diegoorlando211170@gmail.com";
+  const isAdmin = isAdminUser(user);
   const activeTab = searchParams.get("tab") || "users";
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") ?? "");

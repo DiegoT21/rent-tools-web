@@ -5,17 +5,20 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { categoryService, brandService, type CatalogItem } from '@/services/catalogService';
+import { formatApiError } from '@/lib/isAdmin';
 import Swal from 'sweetalert2';
 
 export function AdminCatalogTab() {
   const [categories, setCategories] = useState<CatalogItem[]>([]);
   const [brands, setBrands] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [catName, setCatName] = useState('');
   const [brandName, setBrandName] = useState('');
 
   const load = async () => {
     setLoading(true);
+    setError(null);
     try {
       const [cats, brs] = await Promise.all([
         categoryService.listAdmin(),
@@ -24,7 +27,7 @@ export function AdminCatalogTab() {
       setCategories(cats);
       setBrands(brs);
     } catch (err) {
-      console.error(err);
+      setError(formatApiError(err));
     } finally {
       setLoading(false);
     }
@@ -88,6 +91,9 @@ export function AdminCatalogTab() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
+      {error && (
+        <div className="lg:col-span-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
+      )}
       <Card className="border-slate-100 shadow-lg">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Categorías</CardTitle>

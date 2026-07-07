@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../lib/api';
 import { MessageSquare, X, Send, RefreshCw } from 'lucide-react';
+import { isAdminUser } from '@/lib/isAdmin';
 
 interface SupportMessage {
   _id: string;
@@ -27,10 +28,7 @@ export function SupportChatBubble() {
   
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const isVisible =
-    Boolean(accessToken && user) &&
-    user?.role !== 'admin' &&
-    user?.email !== 'diegoorlando211170@gmail.com';
+  const isVisible = Boolean(accessToken && user) && !isAdminUser(user);
 
   // Cargar historial de chat
   const loadMessages = async (showLoader = false) => {

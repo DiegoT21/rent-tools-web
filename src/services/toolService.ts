@@ -143,4 +143,9 @@ export const toolService = {
     const res = await api.delete(`/tools/admin/${uuid}`);
     return res.data;
   },
+
+  adminUpdate: async (uuid: string, payload: Record<string, unknown>) => {
+    const res = await api.patch(`/tools/admin/${uuid}`, payload);
+    return res.data?.data;
+  },
 };

@@ -17,10 +17,11 @@ import { DeliveryProtocol } from './pages/DeliveryProtocol'
 import { AdminDashboard } from './pages/AdminDashboard'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { SessionBootstrap } from './components/auth/SessionBootstrap'
+import { isAdminUser } from './lib/isAdmin'
 
 function App() {
   const user = useAuthStore((state) => state.user);
-  const isAdmin = user?.role === 'admin' || user?.email === 'diegoorlando211170@gmail.com';
+  const isAdmin = isAdminUser(user);
 
 
   return (
