@@ -961,7 +961,7 @@ export function UserProfile() {
     }
 
     const utilizacion = totalPublicaciones > 0 ? Math.round((alquilados / totalPublicaciones) * 100) : 0;
-    const utilizacionBadge = `${utilizacion}% utilizaciÃ³n`;
+    const utilizacionBadge = `${utilizacion}% utilización`;
 
     const ingresosBadge = ownerMetricsLoading ? "Calculando..." : `${ownerMetrics?.month ?? ""}`;
 
@@ -1460,7 +1460,7 @@ export function UserProfile() {
               {!inventoryLoading && !inventoryError && inventoryCards.length === 0 && (
                 <Card className="border-none shadow-sm bg-white">
                   <CardContent className="p-6 text-slate-600 font-semibold">
-                    AÃºn no tienes herramientas publicadas.
+                    Aún no tienes herramientas publicadas.
                   </CardContent>
                 </Card>
               )}
