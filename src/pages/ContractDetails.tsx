@@ -4,12 +4,14 @@ import Swal from "sweetalert2";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Timeline } from "@/components/rentals/Timeline";
+import { DisputeDialog } from "@/components/rentals/DisputeDialog";
+import { disputeService } from "@/services/disputeService";
 import { alerts } from "@/lib/alerts";
 import { useAuthStore } from "@/store/authStore";
 import { contractService, RentalContract } from "@/services/contractService";
 import { mediaService } from "@/services/mediaService";
 import { downloadContractPdf } from "@/lib/contractPdf";
-import { Download } from "lucide-react";
+import { Download, AlertTriangle } from "lucide-react";
 
 function shortDate(value?: string) {
   if (!value) return "—";
@@ -38,6 +40,8 @@ export function ContractDetails() {
   const [contract, setContract] = useState<RentalContract | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [disputeOpen, setDisputeOpen] = useState(false);
+  const [disputeSent, setDisputeSent] = useState(false);
 
   const currentUserUuid = String(user?.uuid ?? user?._id ?? user?.id ?? "");
   const isOwner = useMemo(() => Boolean(contract?.ownerUuid && currentUserUuid && contract.ownerUuid === currentUserUuid), [contract?.ownerUuid, currentUserUuid]);
@@ -61,7 +65,7 @@ export function ContractDetails() {
     const todayPanama = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'America/Panama', year: 'numeric', month: '2-digit', day: '2-digit',
     }).format(now);
-    return target === todayPanama;
+    return todayPanama >= target;
   }, [contract, now]);
 
   const handoverOwnerSigned = Boolean((contract as any)?.handoverOwnerSignature?.accepted);
@@ -77,7 +81,10 @@ export function ContractDetails() {
     String((contract as any)?.payment?.holdStatus ?? "") === "authorized" &&
     handoverWindowOk &&
     !alreadySignedHandover;
-  const canSignReturn = (isOwner || isTenant) && status === "in_progress" && returnWindowOk && !alreadySignedReturn;
+  const tenantEvidenceUploaded = Array.isArray((contract as any)?.tenantEvidence?.photosBeforeReturn) &&
+    (contract as any).tenantEvidence.photosBeforeReturn.length >= 2;
+  const canSignReturn = (isOwner || isTenant) && status === "in_progress" && returnWindowOk && !alreadySignedReturn &&
+    (isOwner || tenantEvidenceUploaded);
 
   const nextStep = useMemo(() => {
     if (!contract) return { title: "Cargando...", text: "" };
@@ -88,6 +95,7 @@ export function ContractDetails() {
     if (status === "in_progress") {
       const rps = (contract as any)?.payment?.rentalPaidStatus;
       if (isTenant && rps !== "paid") return { title: "Siguiente paso: Pagar el alquiler", text: "El alquiler está activo. Puedes pagar el monto del alquiler en cualquier momento antes de la devolución." };
+      if (isTenant && !tenantEvidenceUploaded) return { title: "Siguiente paso: Subir evidencias de devolución", text: "Antes de devolver la herramienta, debes subir 2 fotos del estado actual del artículo. Luego podrás firmar la devolución." };
       return { title: "Siguiente paso: Firmar devolución", text: "Al finalizar, ambas partes firman la devolución (return) para completar el alquiler." };
     }
     if (status === "completed") {
@@ -133,12 +141,26 @@ export function ContractDetails() {
     }
   };
 
+  const checkExistingDispute = async (contractUuid: string) => {
+    try {
+      const resp = await disputeService.listMine();
+      const list: any[] = Array.isArray(resp)
+        ? resp
+        : (resp?.items ?? resp?.disputes ?? resp?.data ?? []);
+      const exists = list.some((d: any) => d.rental?.uuid === contractUuid);
+      if (exists) setDisputeSent(true);
+    } catch {
+      // silently ignore — worst case button stays enabled and 409 is handled in dialog
+    }
+  };
+
   useEffect(() => {
     if (!accessToken) navigate("/login");
   }, [accessToken, navigate]);
 
   useEffect(() => {
     refresh();
+    if (uuid) checkExistingDispute(uuid);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uuid]);
 
@@ -193,6 +215,49 @@ export function ContractDetails() {
     }
   };
 
+  const uploadTenantEvidence = async () => {
+    if (!uuid) return;
+    if (!isTenant || status !== "in_progress") {
+      await alerts.info("No disponible", "Solo el arrendatario puede subir evidencias de devolución y solo cuando el alquiler está en progreso.");
+      return;
+    }
+
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.multiple = true;
+    input.click();
+
+    const files: File[] = await new Promise((resolve) => {
+      input.onchange = () => resolve(Array.from(input.files ?? []));
+    });
+
+    if (files.length < 2 || files.length > 3) {
+      await alerts.warning("Evidencias", "Debes seleccionar entre 2 y 3 fotos del estado del artículo.");
+      return;
+    }
+
+    try {
+      Swal.fire({ title: "Subiendo evidencias...", text: "Por favor espera.", allowOutsideClick: false, allowEscapeKey: false, didOpen: () => Swal.showLoading() });
+
+      const signed = await Promise.all(files.map((f) => mediaService.getUploadUrlAndKey(f, false)));
+      for (let i = 0; i < files.length; i++) {
+        await mediaService.uploadToPresignedUrl(signed[i], files[i]);
+      }
+      const urls = signed.map((s) => s.publicUrl).filter(Boolean);
+
+      if (urls.length < 2) throw new Error("No se pudieron resolver las URLs públicas.");
+
+      await contractService.uploadEvidenceBeforeReturn(uuid, urls);
+      Swal.close();
+      await alerts.success("Listo", "Evidencias de devolución guardadas. Ya puedes firmar la devolución.");
+      refresh();
+    } catch (e: any) {
+      Swal.close();
+      await alerts.error("No se pudo guardar", e?.response?.data?.message || "Intenta de nuevo.");
+    }
+  };
+
   const doHoldAndPay = async () => {
     if (!uuid) return;
     if (!canHold) {
@@ -224,7 +289,7 @@ export function ContractDetails() {
         return;
       }
       if (!returnWindowOk) {
-        await alerts.warning("Fuera de ventana", "Solo puedes firmar dentro de ±12h de la devolución.");
+        await alerts.warning("Aún no disponible", `La firma de devolución se habilita a partir del ${shortDate((contract as any)?.endDate)}.`);
         return;
       }
     }
@@ -337,12 +402,29 @@ export function ContractDetails() {
                 <div className="text-sm font-semibold text-slate-800 mb-2">Estado del Pago</div>
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                    <div className={`rounded-xl border p-3 ${depositPaidStatus === "paid" ? "border-green-200 bg-green-50" : "border-slate-200"}`}>
+                    <div className={`rounded-xl border p-3 ${
+                      depositRefundStatus === "refunded" ? "border-blue-200 bg-blue-50" :
+                      depositRefundStatus === "failed" ? "border-red-200 bg-red-50" :
+                      depositPaidStatus === "paid" ? "border-green-200 bg-green-50" :
+                      "border-slate-200"
+                    }`}>
                       <div className="text-xs text-slate-500">Depósito de garantía</div>
                       <div className="font-semibold text-slate-800">${depositAmount.toFixed(2)}</div>
                       <div className={`text-xs mt-1 font-medium ${depositPaidStatus === "paid" ? "text-green-600" : "text-slate-500"}`}>
                         {depositPaidStatus === "paid" ? "✓ Pagado" : depositPaidStatus === "failed" ? "✗ Error" : "Pendiente"}
                       </div>
+                      {depositRefundStatus === "refunded" && (
+                        <div className="text-xs mt-1 font-medium text-blue-600">↩ Devuelto al finalizar el alquiler</div>
+                      )}
+                      {depositRefundStatus === "pending" && depositPaidStatus === "paid" && (
+                        <div className="text-xs mt-1 text-slate-500">↻ Procesando devolución...</div>
+                      )}
+                      {depositRefundStatus === "failed" && (
+                        <div className="text-xs mt-1 text-red-600">✗ Error en la devolución — contacta soporte</div>
+                      )}
+                      {depositRefundStatus === "skipped" && (
+                        <div className="text-xs mt-1 text-slate-400">Simulado (sin Stripe)</div>
+                      )}
                     </div>
                     <div className={`rounded-xl border p-3 ${rentalPaidStatus === "paid" ? "border-green-200 bg-green-50" : "border-slate-200"}`}>
                       <div className="text-xs text-slate-500">Alquiler ({pricing?.totalDays ?? "—"} días)</div>
@@ -352,17 +434,6 @@ export function ContractDetails() {
                       </div>
                     </div>
                   </div>
-                  {depositRefundStatus && depositRefundStatus !== "" && (
-                    <div className={`rounded-xl border p-3 text-sm ${depositRefundStatus === "refunded" ? "border-blue-200 bg-blue-50" : depositRefundStatus === "failed" ? "border-red-200 bg-red-50" : "border-slate-200"}`}>
-                      <div className="text-xs text-slate-500">Reembolso del depósito</div>
-                      <div className={`font-medium mt-1 ${depositRefundStatus === "refunded" ? "text-blue-700" : depositRefundStatus === "failed" ? "text-red-600" : "text-slate-500"}`}>
-                        {depositRefundStatus === "refunded" && `✓ Reembolsado ($${depositAmount.toFixed(2)})`}
-                        {depositRefundStatus === "failed" && "✗ Error en el reembolso — contacta soporte"}
-                        {depositRefundStatus === "skipped" && "Simulado (no se usó Stripe)"}
-                        {depositRefundStatus === "pending" && "Procesando..."}
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
@@ -389,6 +460,36 @@ export function ContractDetails() {
                 </div>
               )}
             </div>
+
+            {/* Evidencias del arrendatario (antes de devolver) */}
+            {status === "in_progress" || status === "completed" ? (() => {
+              const tenantPhotos: string[] = Array.isArray((contract as any)?.tenantEvidence?.photosBeforeReturn)
+                ? (contract as any).tenantEvidence.photosBeforeReturn.map((p: string) => mediaService.resolvePublicUrl(p))
+                : [];
+              return (
+                <div className="pt-2">
+                  <div className="text-sm font-semibold text-slate-800 mb-2">Evidencias del arrendatario (antes de devolver)</div>
+                  {tenantPhotos.length === 0 ? (
+                    <div className="text-sm text-slate-500">
+                      {isTenant ? "Aún no has subido evidencias de devolución." : "El arrendatario aún no ha subido evidencias de devolución."}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {tenantPhotos.map((src, i) => (
+                        <button
+                          key={src}
+                          type="button"
+                          className="relative aspect-[16/10] rounded-xl overflow-hidden border border-slate-200 bg-slate-100"
+                          onClick={() => Swal.fire({ imageUrl: src, imageAlt: `Evidencia devolución ${i + 1}`, showConfirmButton: false })}
+                        >
+                          <img src={src} alt={`Evidencia devolución ${i + 1}`} className="absolute inset-0 w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })() : null}
 
             <div className="pt-2">
               <Timeline contractUuid={contract.uuid} />
@@ -448,6 +549,16 @@ export function ContractDetails() {
               </Button>
             )}
 
+            {isTenant && status === "in_progress" && (
+              <Button
+                className="w-full bg-blue-600 hover:bg-blue-700"
+                onClick={uploadTenantEvidence}
+                disabled={tenantEvidenceUploaded}
+              >
+                {tenantEvidenceUploaded ? "Evidencias de devolución subidas ✓" : "Subir evidencias (antes de devolver)"}
+              </Button>
+            )}
+
             <Button
               variant="secondary"
               className="w-full bg-white border border-slate-200"
@@ -476,15 +587,38 @@ export function ContractDetails() {
               <div className="text-xs -mt-2">
                 {alreadySignedReturn
                   ? <span className="text-green-600">Ya firmaste la devolución. Esperando la otra parte.</span>
-                  : <span className="text-slate-500">El botón se habilita el día de la devolución ({shortDate((contract as any)?.endDate)}).</span>
+                  : <span className="text-slate-500">El botón se habilita a partir del {shortDate((contract as any)?.endDate)}.</span>
                 }
               </div>
             )}
 
             <div className="text-xs text-slate-500 pt-2">La firma genera un token temporal validando tu contraseña.</div>
+
+            {(isOwner || isTenant) && ["in_progress", "completed"].includes(status) && (
+              <div className="pt-2 border-t border-slate-100">
+                <Button
+                  variant="outline"
+                  className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+                  onClick={() => setDisputeOpen(true)}
+                  disabled={disputeSent}
+                >
+                  <AlertTriangle className="mr-2 h-4 w-4" />
+                  {disputeSent ? "Disputa enviada ✓" : "Abrir disputa"}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
+
+      {disputeOpen && contract && (
+        <DisputeDialog
+          rental={{ uuid: contract.uuid, requestUuid: (contract as any).requestUuid, status: contract.status } as any}
+          toolName={contract.tool?.name}
+          onSuccess={() => { setDisputeSent(true); setDisputeOpen(false); }}
+          onClose={() => setDisputeOpen(false)}
+        />
+      )}
     </div>
   );
 }

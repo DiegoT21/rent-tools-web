@@ -104,7 +104,13 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
             >
               Auditoría
             </button>
-            <button 
+            <button
+              onClick={() => navigate("/admin?tab=disputes")}
+              className={`text-sm font-semibold transition-colors py-5 border-b-2 ${activeTab === "disputes" ? "text-primary border-primary" : "text-slate-500 hover:text-slate-900 border-transparent"}`}
+            >
+              Disputas
+            </button>
+            <button
               onClick={() => navigate("/admin?tab=chat")}
               className={`text-sm font-semibold transition-colors py-5 border-b-2 ${activeTab === "chat" ? "text-primary border-primary" : "text-slate-500 hover:text-slate-900 border-transparent"}`}
             >

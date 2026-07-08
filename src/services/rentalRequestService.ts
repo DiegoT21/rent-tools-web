@@ -26,7 +26,8 @@ export type RentalRequestStatusValue =
   | "rejected"
   | "cancelled"
   | "pending_owner"
-  | "pending_tenant";
+  | "pending_tenant"
+  | "completed";
 
 export interface RentalRequestListItem {
   _id?: string;
@@ -114,6 +115,7 @@ const normalizeStatus = (value: unknown): RentalRequestStatusValue => {
   const s = String(value ?? "").toLowerCase();
   if (s === "pending_owner" || s === "pending_tenant") return s as any;
   if (s === "approved" || s === "rejected" || s === "cancelled") return s as any;
+  if (s === "completed") return "completed";
   if (s === "pending") return "pending";
   return "pending";
 };

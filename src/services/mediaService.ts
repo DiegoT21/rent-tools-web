@@ -1,4 +1,4 @@
-import { getUploadUrlAndKey, uploadFileToStorage, uploadToPresignedUrl } from '@/lib/mediaUpload';
+import { getUploadUrlAndKey, uploadFileToStorage, uploadFileToStorageWithUrl, uploadToPresignedUrl } from '@/lib/mediaUpload';
 
 const mediaBaseUrl =
   (import.meta as any).env?.VITE_MEDIA_PUBLIC_BASE_URL ||
@@ -28,5 +28,6 @@ export const mediaService = {
   getUploadUrlAndKey,
   uploadToPresignedUrl,
   uploadFileToStorage,
+  uploadFileToStorageWithUrl,
   resolvePublicUrl: (value: string): string => resolveMaybeKeyToUrl(value),
 };

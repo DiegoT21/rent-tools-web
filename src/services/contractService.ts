@@ -42,7 +42,11 @@ export interface RentalContract {
 
 export interface MyRental {
   uuid: string;
+  requestUuid?: string;
   status: ContractStatus | string;
+  displayStatus?: string;
+  canOpenDispute?: boolean;
+  hasActiveDispute?: boolean;
   startDate?: string;
   endDate?: string;
   tool?: {
@@ -114,9 +118,12 @@ export const contractService = {
   },
 
   uploadEvidenceBeforeHandover: async (contractUuid: string, photoUrls: string[]) => {
-    const response = await api.post(`/rentals/contracts/${encodeURIComponent(contractUuid)}/evidence/before-handover`, {
-      photoUrls,
-    });
+    const response = await api.post(`/rentals/contracts/${encodeURIComponent(contractUuid)}/evidence/before-handover`, { photoUrls });
+    return unwrap(response);
+  },
+
+  uploadEvidenceBeforeReturn: async (contractUuid: string, photoUrls: string[]) => {
+    const response = await api.post(`/rentals/contracts/${encodeURIComponent(contractUuid)}/evidence/before-return`, { photoUrls });
     return unwrap(response);
   },
 

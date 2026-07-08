@@ -1563,9 +1563,12 @@ export function UserProfile() {
                     : req.status === "pending" || req.status === "pending_owner" || req.status === "pending_tenant"
                       ? formatCountdown(req.expiresAt, requestClock)
                       : "";
+                  const isCompleted = req.status === "completed";
                   const statusLabel =
                     expired
                       ? "Vencida"
+                      : isCompleted
+                      ? "Terminado"
                       : req.status === "approved"
                       ? "Aprobada"
                       : req.status === "rejected"
@@ -1576,14 +1579,16 @@ export function UserProfile() {
                   const statusClass =
                     expired
                       ? "bg-slate-100 text-slate-600 border-slate-200"
+                      : isCompleted
+                      ? "bg-slate-100 text-slate-600 border-slate-200"
                       : req.status === "approved"
                       ? "bg-green-50 text-green-700 border-green-200"
                       : req.status === "rejected"
                       ? "bg-red-50 text-red-700 border-red-200"
                       : "bg-orange-50 text-orange-700 border-orange-200";
 
-                  const canOwnerAct = !expired && (req.status === "pending" || req.status === "pending_owner");
-                  const canTenantAct = req.status === "pending_tenant";
+                  const canOwnerAct = !expired && !isCompleted && (req.status === "pending" || req.status === "pending_owner");
+                  const canTenantAct = !isCompleted && req.status === "pending_tenant";
 
                   return (
                     <Card key={req.uuid} className="border-none shadow-sm bg-white overflow-hidden">
@@ -1637,21 +1642,25 @@ export function UserProfile() {
                               Ver resumen
                             </Button>
 
-                            <Button
-                              onClick={() => approveRequest(req)}
-                              disabled={!canOwnerAct}
-                              className="h-11 px-5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold"
-                            >
-                              Aprobar
-                            </Button>
-                            <Button
-                              variant="secondary"
-                              onClick={() => rejectRequest(req)}
-                              disabled={!canOwnerAct}
-                              className="h-11 px-5 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50"
-                            >
-                              Rechazar
-                            </Button>
+                            {!isCompleted && (
+                              <>
+                                <Button
+                                  onClick={() => approveRequest(req)}
+                                  disabled={!canOwnerAct}
+                                  className="h-11 px-5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold"
+                                >
+                                  Aprobar
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  onClick={() => rejectRequest(req)}
+                                  disabled={!canOwnerAct}
+                                  className="h-11 px-5 rounded-xl bg-white border border-slate-200 text-slate-700 font-bold hover:bg-slate-50"
+                                >
+                                  Rechazar
+                                </Button>
+                              </>
+                            )}
 
                             {contractUuid && (
                               <Button

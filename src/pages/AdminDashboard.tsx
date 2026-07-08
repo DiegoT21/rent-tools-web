@@ -1,21 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { api } from '../lib/api';
+import { DisputeThread } from '../components/rentals/DisputeThread';
 import { Badge } from '../components/ui/badge';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Users,
-  History,
-  MessageSquare,
   Send,
   ChevronDown,
   ChevronUp,
   RefreshCw,
   ShieldAlert,
-  User as UserIcon,
   AlertCircle,
-  LogOut
+  MessageSquare,
 } from 'lucide-react';
 
 
@@ -30,20 +27,27 @@ interface UserItem {
   createdAt: string;
 }
 
-interface AuditLogItem {
+interface AuditAction {
   _id: string;
-  user?: {
-    uuid: string;
-    firstName: string;
-    lastName: string;
-    email: string;
-  };
   action: string;
   targetModel?: string;
   details?: any;
   ip?: string;
   userAgent?: string;
   createdAt: string;
+}
+
+interface AuditGroup {
+  user?: {
+    uuid: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    role: string;
+  };
+  actions: AuditAction[];
+  lastActivity: string;
+  totalActions: number;
 }
 
 interface ActiveChat {
@@ -75,20 +79,28 @@ interface SupportMessage {
 export function AdminDashboard() {
   const user = useAuthStore((state) => state.user);
   const [searchParams] = useSearchParams();
-  const activeTab = (searchParams.get('tab') || 'users') as 'users' | 'audit' | 'chat';
+  const activeTab = (searchParams.get('tab') || 'users') as 'users' | 'audit' | 'chat' | 'disputes';
 
   // Tab 1: Users
   const [usersList, setUsersList] = useState<UserItem[]>([]);
   const [usersPage, setUsersPage] = useState(1);
   const [usersTotalPages, setUsersTotalPages] = useState(1);
   const [usersLoading, setUsersLoading] = useState(false);
+  const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
+  const [usersSearch, setUsersSearch] = useState('');
+  const [usersRole, setUsersRole] = useState('');
+  const [usersAccountStatus, setUsersAccountStatus] = useState('');
+  const [usersKycStatus, setUsersKycStatus] = useState('');
+
+  // Tab 2: Audit search
+  const [auditSearch, setAuditSearch] = useState('');
 
   // Tab 2: Audit
-  const [auditList, setAuditList] = useState<AuditLogItem[]>([]);
+  const [auditList, setAuditList] = useState<AuditGroup[]>([]);
   const [auditPage, setAuditPage] = useState(1);
   const [auditTotalPages, setAuditTotalPages] = useState(1);
   const [auditLoading, setAuditLoading] = useState(false);
-  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+  const [expandedUserKey, setExpandedUserKey] = useState<string | null>(null);
 
   // Tab 3: Chats
   const [chatsList, setChatsList] = useState<ActiveChat[]>([]);
@@ -97,6 +109,19 @@ export function AdminDashboard() {
   const [chatMessages, setChatMessages] = useState<SupportMessage[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
   const [newMessage, setNewMessage] = useState('');
+
+  // Tab 4: Disputes
+  const [disputesList, setDisputesList] = useState<any[]>([]);
+  const [disputesPage, setDisputesPage] = useState(1);
+  const [disputesTotalPages, setDisputesTotalPages] = useState(1);
+  const [disputesLoading, setDisputesLoading] = useState(false);
+  const [disputesSearch, setDisputesSearch] = useState('');
+  const [disputesStatus, setDisputesStatus] = useState('');
+  const [expandedDisputeUuid, setExpandedDisputeUuid] = useState<string | null>(null);
+  const [resolveForm, setResolveForm] = useState<{ uuid: string; status: string; resolution: string } | null>(null);
+  const [resolving, setResolving] = useState(false);
+  const [disputeDetails, setDisputeDetails] = useState<Record<string, any>>({});
+  const [disputeDetailsLoading, setDisputeDetailsLoading] = useState<Record<string, boolean>>({});
 
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const clearSession = useAuthStore((state) => state.clearSession);
@@ -118,11 +143,34 @@ export function AdminDashboard() {
     );
   }
 
+  const handleStatusChange = async (uuid: string, newStatus: string) => {
+    setStatusUpdating(uuid);
+    try {
+      await api.patch(`/users/admin/${uuid}/status`, { status: newStatus });
+      setUsersList((prev) =>
+        prev.map((u) => (u.uuid === uuid ? { ...u, accountStatus: newStatus } : u))
+      );
+    } catch (err) {
+      console.error('Error updating user status:', err);
+    } finally {
+      setStatusUpdating(null);
+    }
+  };
+
   // Load registered users
-  const loadUsers = async (page = 1) => {
+  const loadUsers = async (page = 1, overrides?: { search?: string; role?: string; accountStatus?: string; kycStatus?: string }) => {
     setUsersLoading(true);
     try {
-      const res = await api.get(`/users/admin/list?page=${page}&limit=10`);
+      const params = new URLSearchParams({ page: String(page), limit: '10' });
+      const search = overrides?.search ?? usersSearch;
+      const role = overrides?.role ?? usersRole;
+      const accountStatus = overrides?.accountStatus ?? usersAccountStatus;
+      const kycStatus = overrides?.kycStatus ?? usersKycStatus;
+      if (search) params.set('search', search);
+      if (role) params.set('role', role);
+      if (accountStatus) params.set('accountStatus', accountStatus);
+      if (kycStatus) params.set('kycStatus', kycStatus);
+      const res = await api.get(`/users/admin/list?${params}`);
       if (res.data.success) {
         setUsersList(res.data.data.items);
         setUsersTotalPages(res.data.data.pagination.totalPages);
@@ -136,10 +184,13 @@ export function AdminDashboard() {
   };
 
   // Load audit logs
-  const loadAuditLogs = async (page = 1) => {
+  const loadAuditLogs = async (page = 1, overrideSearch?: string) => {
     setAuditLoading(true);
     try {
-      const res = await api.get(`/users/admin/audit?page=${page}&limit=15`);
+      const params = new URLSearchParams({ page: String(page), limit: '15' });
+      const search = overrideSearch ?? auditSearch;
+      if (search) params.set('search', search);
+      const res = await api.get(`/users/admin/audit?${params}`);
       if (res.data.success) {
         setAuditList(res.data.data.items);
         setAuditTotalPages(res.data.data.pagination.totalPages);
@@ -149,6 +200,60 @@ export function AdminDashboard() {
       console.error("Error loading audit logs:", err);
     } finally {
       setAuditLoading(false);
+    }
+  };
+
+  // Load disputes (admin)
+  const loadDisputes = async (page = 1, overrides?: { search?: string; status?: string }) => {
+    setDisputesLoading(true);
+    try {
+      const params = new URLSearchParams({ page: String(page), limit: '10' });
+      const search = overrides?.search ?? disputesSearch;
+      const status = overrides?.status ?? disputesStatus;
+      if (search) params.set('search', search);
+      if (status) params.set('status', status);
+      const res = await api.get(`/disputes/admin/list?${params}`);
+      if (res.data.success) {
+        setDisputesList(res.data.data.items);
+        setDisputesTotalPages(res.data.data.pagination.totalPages);
+        setDisputesPage(page);
+      }
+    } catch (err) {
+      console.error('Error loading disputes:', err);
+    } finally {
+      setDisputesLoading(false);
+    }
+  };
+
+  const handleResolveDispute = async () => {
+    if (!resolveForm) return;
+    setResolving(true);
+    try {
+      await api.patch(`/disputes/admin/${resolveForm.uuid}`, {
+        status: resolveForm.status,
+        resolution: resolveForm.resolution || undefined,
+      });
+      setResolveForm(null);
+      loadDisputes(disputesPage);
+    } catch (err) {
+      console.error('Error resolving dispute:', err);
+    } finally {
+      setResolving(false);
+    }
+  };
+
+  const loadDisputeDetail = async (disputeUuid: string) => {
+    if (disputeDetails[disputeUuid] || disputeDetailsLoading[disputeUuid]) return;
+    setDisputeDetailsLoading((prev) => ({ ...prev, [disputeUuid]: true }));
+    try {
+      const res = await api.get(`/disputes/admin/detail/${disputeUuid}`);
+      if (res.data.success) {
+        setDisputeDetails((prev) => ({ ...prev, [disputeUuid]: res.data.data }));
+      }
+    } catch (err) {
+      console.error('Error loading dispute detail:', err);
+    } finally {
+      setDisputeDetailsLoading((prev) => ({ ...prev, [disputeUuid]: false }));
     }
   };
 
@@ -210,13 +315,10 @@ export function AdminDashboard() {
 
   // Initial tab loading
   useEffect(() => {
-    if (activeTab === 'users') {
-      loadUsers(1);
-    } else if (activeTab === 'audit') {
-      loadAuditLogs(1);
-    } else if (activeTab === 'chat') {
-      loadActiveChats();
-    }
+    if (activeTab === 'users') loadUsers(1);
+    else if (activeTab === 'audit') loadAuditLogs(1);
+    else if (activeTab === 'chat') loadActiveChats();
+    else if (activeTab === 'disputes') loadDisputes(1);
   }, [activeTab]);
 
   // Support chat auto polling (every 5 seconds when chat tab & a conversation is active)
@@ -235,14 +337,14 @@ export function AdminDashboard() {
   return (
     <div className="max-w-7xl mx-auto pb-12">
       {/* Header Panel */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-slate-100 pb-5 mb-8">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-slate-100 pb-5 mb-6">
         <div>
           <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Panel de Administración</h1>
           <p className="text-slate-500 mt-1">Supervisión general, registros de auditoría y soporte de usuarios.</p>
         </div>
       </div>
 
-      {/* Tab: Users */}
+{/* Tab: Users */}
       {activeTab === 'users' && (
         <Card className="shadow-lg border-slate-100">
           <CardHeader className="flex flex-row items-center justify-between">
@@ -255,6 +357,54 @@ export function AdminDashboard() {
             </button>
           </CardHeader>
           <CardContent>
+            {/* Filters */}
+            <div className="flex flex-wrap gap-3 mb-5">
+              <input
+                type="text"
+                value={usersSearch}
+                placeholder="Buscar por nombre o email..."
+                onChange={(e) => setUsersSearch(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && loadUsers(1)}
+                className="flex-1 min-w-[200px] px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
+              />
+              <select
+                value={usersRole}
+                onChange={(e) => { setUsersRole(e.target.value); loadUsers(1, { role: e.target.value }); }}
+                className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-600"
+              >
+                <option value="">Todos los roles</option>
+                <option value="user">Usuario</option>
+                <option value="admin">Admin</option>
+              </select>
+              <select
+                value={usersAccountStatus}
+                onChange={(e) => { setUsersAccountStatus(e.target.value); loadUsers(1, { accountStatus: e.target.value }); }}
+                className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-600"
+              >
+                <option value="">Todos los estados</option>
+                <option value="active">Activo</option>
+                <option value="suspended">Suspendido</option>
+                <option value="blocked">Bloqueado</option>
+              </select>
+              <select
+                value={usersKycStatus}
+                onChange={(e) => { setUsersKycStatus(e.target.value); loadUsers(1, { kycStatus: e.target.value }); }}
+                className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-600"
+              >
+                <option value="">Todos los KYC</option>
+                <option value="pending">Pendiente</option>
+                <option value="in_review">En revisión</option>
+                <option value="approved">Aprobado</option>
+                <option value="rejected">Rechazado</option>
+              </select>
+              <button
+                onClick={() => loadUsers(1)}
+                className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                Buscar
+              </button>
+            </div>
+
             {usersLoading ? (
               <div className="flex items-center justify-center py-16 text-slate-400">
                 <RefreshCw className="w-8 h-8 animate-spin mr-3 text-slate-300" />
@@ -275,6 +425,7 @@ export function AdminDashboard() {
                       <th className="py-4 px-4">Estado Cuenta</th>
                       <th className="py-4 px-4">Estado KYC</th>
                       <th className="py-4 px-4">Registro</th>
+                      <th className="py-4 px-4">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -302,6 +453,20 @@ export function AdminDashboard() {
                         </td>
                         <td className="py-4 px-4 text-slate-400 text-sm">
                           {new Date(usr.createdAt).toLocaleDateString()}
+                        </td>
+                        <td className="py-4 px-4">
+                          {usr.role !== 'admin' && (
+                            <select
+                              value={usr.accountStatus}
+                              disabled={statusUpdating === usr.uuid}
+                              onChange={(e) => handleStatusChange(usr.uuid, e.target.value)}
+                              className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 disabled:opacity-50 cursor-pointer"
+                            >
+                              <option value="active">Activo</option>
+                              <option value="suspended">Suspendido</option>
+                              <option value="blocked">Bloqueado</option>
+                            </select>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -349,100 +514,112 @@ export function AdminDashboard() {
             </button>
           </CardHeader>
           <CardContent>
+            {/* Search */}
+            <div className="flex gap-3 mb-5">
+              <input
+                type="text"
+                value={auditSearch}
+                placeholder="Buscar usuario por nombre o email..."
+                onChange={(e) => setAuditSearch(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && loadAuditLogs(1)}
+                className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
+              />
+              <button
+                onClick={() => loadAuditLogs(1)}
+                className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                Buscar
+              </button>
+            </div>
+
             {auditLoading ? (
               <div className="flex items-center justify-center py-16 text-slate-400">
                 <RefreshCw className="w-8 h-8 animate-spin mr-3 text-slate-300" />
-                Cargando logs de auditoría...
+                Cargando registros...
               </div>
             ) : auditList.length === 0 ? (
               <div className="text-center py-16 text-slate-400">
-                No hay registros de auditoría registrados en la base de datos.
+                No hay registros de auditoría en la base de datos.
               </div>
             ) : (
-              <div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-100 text-slate-400 text-xs font-semibold uppercase tracking-wider bg-slate-50/50">
-                        <th className="py-4 px-4 w-10"></th>
-                        <th className="py-4 px-4">Usuario</th>
-                        <th className="py-4 px-4">Acción</th>
-                        <th className="py-4 px-4">Modelo</th>
-                        <th className="py-4 px-4">IP / Agente</th>
-                        <th className="py-4 px-4">Fecha</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {auditList.map((log) => {
-                        const isExpanded = expandedLogId === log._id;
-                        return (
-                          <React.Fragment key={log._id}>
-                            <tr
-                              className={`border-b border-slate-100 hover:bg-slate-50/30 transition-colors cursor-pointer ${isExpanded ? 'bg-slate-50/50' : ''
-                                }`}
-                              onClick={() => setExpandedLogId(isExpanded ? null : log._id)}
-                            >
-                              <td className="py-4 px-4 text-center">
-                                {isExpanded ? (
-                                  <ChevronUp className="w-4 h-4 text-slate-500" />
-                                ) : (
-                                  <ChevronDown className="w-4 h-4 text-slate-500" />
-                                )}
-                              </td>
-                              <td className="py-4 px-4">
-                                {log.user ? (
-                                  <div>
-                                    <div className="font-semibold text-slate-700">
-                                      {log.user.firstName} {log.user.lastName}
-                                    </div>
-                                    <div className="text-xs text-slate-400">{log.user.email}</div>
-                                  </div>
-                                ) : (
-                                  <span className="text-slate-400 italic">Invitado / Anon</span>
-                                )}
-                              </td>
-                              <td className="py-4 px-4">
-                                <span className="font-mono text-xs px-2 py-1 rounded bg-slate-100 text-slate-700">
-                                  {log.action}
-                                </span>
-                              </td>
-                              <td className="py-4 px-4">
-                                {log.targetModel ? (
-                                  <Badge className="bg-purple-50 text-purple-600 border-purple-100 font-semibold" variant={undefined}>
-                                    {log.targetModel}
-                                  </Badge>
-                                ) : (
-                                  <span className="text-slate-300">-</span>
-                                )}
-                              </td>
-                              <td className="py-4 px-4 text-xs text-slate-400">
-                                <div>IP: {log.ip || 'N/D'}</div>
-                                <div className="truncate max-w-[150px]">{log.userAgent || 'N/D'}</div>
-                              </td>
-                              <td className="py-4 px-4 text-slate-500 text-sm">
-                                {new Date(log.createdAt).toLocaleString()}
-                              </td>
-                            </tr>
-                            {isExpanded && (
-                              <tr className="bg-slate-50/50">
-                                <td colSpan={6} className="py-4 px-8 border-b border-slate-100">
-                                  <div className="bg-slate-900 text-slate-100 p-4 rounded-xl shadow-inner max-w-full overflow-x-auto">
-                                    <div className="text-xs text-slate-400 mb-2 border-b border-slate-800 pb-1.5">
-                                      Detalles de la Petición
-                                    </div>
-                                    <pre className="font-mono text-[11px] leading-relaxed text-green-400">
-                                      {JSON.stringify(log.details, null, 2)}
-                                    </pre>
-                                  </div>
-                                </td>
-                              </tr>
+              <div className="space-y-3">
+                {auditList.map((group, idx) => {
+                  const key = group.user?.uuid ?? `anon-${idx}`;
+                  const isExpanded = expandedUserKey === key;
+                  return (
+                    <div key={key} className="border border-slate-100 rounded-xl overflow-hidden">
+                      {/* User row — click to expand */}
+                      <button
+                        onClick={() => setExpandedUserKey(isExpanded ? null : key)}
+                        className="w-full flex items-center justify-between px-5 py-4 bg-white hover:bg-slate-50/60 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm shrink-0">
+                            {group.user
+                              ? `${group.user.firstName[0]}${group.user.lastName[0]}`.toUpperCase()
+                              : '?'}
+                          </div>
+                          <div>
+                            {group.user ? (
+                              <>
+                                <div className="font-semibold text-slate-800 text-sm">
+                                  {group.user.firstName} {group.user.lastName}
+                                  {group.user.role === 'admin' && (
+                                    <span className="ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-500 border border-red-100">ADMIN</span>
+                                  )}
+                                </div>
+                                <div className="text-xs text-slate-400">{group.user.email}</div>
+                              </>
+                            ) : (
+                              <div className="font-semibold text-slate-500 text-sm italic">Sistema / Anónimo</div>
                             )}
-                          </React.Fragment>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <div className="text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-full px-2.5 py-0.5">
+                              {group.totalActions} {group.totalActions === 1 ? 'acción' : 'acciones'}
+                            </div>
+                            <div className="text-[10px] text-slate-400 mt-1">
+                              Última: {new Date(group.lastActivity).toLocaleString()}
+                            </div>
+                          </div>
+                          {isExpanded
+                            ? <ChevronUp className="w-4 h-4 text-slate-400 shrink-0" />
+                            : <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />}
+                        </div>
+                      </button>
+
+                      {/* Actions list */}
+                      {isExpanded && (
+                        <div className="border-t border-slate-100 bg-slate-50/40 divide-y divide-slate-100">
+                          {group.actions.map((action) => (
+                            <div key={action._id} className="px-5 py-3 flex flex-wrap items-start gap-3">
+                              <span className="font-mono text-xs px-2 py-1 rounded bg-white border border-slate-200 text-slate-700 whitespace-nowrap">
+                                {action.action}
+                              </span>
+                              {action.targetModel && (
+                                <Badge className="bg-purple-50 text-purple-600 border-purple-100 text-[10px]" variant={undefined}>
+                                  {action.targetModel}
+                                </Badge>
+                              )}
+                              <span className="text-xs text-slate-400 whitespace-nowrap ml-auto">
+                                {action.ip && `IP: ${action.ip} · `}{new Date(action.createdAt).toLocaleString()}
+                              </span>
+                              {action.details && Object.keys(action.details).length > 0 && (
+                                <div className="w-full mt-1">
+                                  <pre className="bg-slate-900 text-green-400 text-[10px] font-mono rounded-lg p-3 overflow-x-auto">
+                                    {JSON.stringify(action.details, null, 2)}
+                                  </pre>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
 
                 {/* Pagination */}
                 {auditTotalPages > 1 && (
@@ -450,7 +627,7 @@ export function AdminDashboard() {
                     <button
                       disabled={auditPage <= 1}
                       onClick={() => loadAuditLogs(auditPage - 1)}
-                      className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white text-sm"
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 text-sm"
                     >
                       Anterior
                     </button>
@@ -460,10 +637,271 @@ export function AdminDashboard() {
                     <button
                       disabled={auditPage >= auditTotalPages}
                       onClick={() => loadAuditLogs(auditPage + 1)}
-                      className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:hover:bg-white text-sm"
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 text-sm"
                     >
                       Siguiente
                     </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Tab: Disputes */}
+      {activeTab === 'disputes' && (
+        <Card className="shadow-lg border-slate-100">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-xl font-bold text-slate-800">Gestión de Disputas</CardTitle>
+            <button onClick={() => loadDisputes(disputesPage)} className="text-slate-500 hover:text-slate-800 p-1">
+              <RefreshCw className={`w-5 h-5 ${disputesLoading ? 'animate-spin' : ''}`} />
+            </button>
+          </CardHeader>
+          <CardContent>
+            {/* Filters */}
+            <div className="flex flex-wrap gap-3 mb-5">
+              <input
+                type="text"
+                value={disputesSearch}
+                placeholder="Buscar por usuario..."
+                onChange={(e) => setDisputesSearch(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && loadDisputes(1)}
+                className="flex-1 min-w-[200px] px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
+              />
+              <select
+                value={disputesStatus}
+                onChange={(e) => { setDisputesStatus(e.target.value); loadDisputes(1, { status: e.target.value }); }}
+                className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none bg-white text-slate-600"
+              >
+                <option value="">Todos los estados</option>
+                <option value="open">Abierta</option>
+                <option value="under_review">En revisión</option>
+                <option value="closed">Cerrada</option>
+              </select>
+              <button onClick={() => loadDisputes(1)} className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                Buscar
+              </button>
+            </div>
+
+            {disputesLoading ? (
+              <div className="flex items-center justify-center py-16 text-slate-400">
+                <RefreshCw className="w-8 h-8 animate-spin mr-3 text-slate-300" />Cargando disputas...
+              </div>
+            ) : disputesList.length === 0 ? (
+              <div className="text-center py-16 text-slate-400">No hay disputas registradas.</div>
+            ) : (
+              <div className="space-y-3">
+                {disputesList.map((d: any) => {
+                  const isExpanded = expandedDisputeUuid === d.uuid;
+                  const statusColors: Record<string, string> = {
+                    open: 'bg-amber-50 text-amber-600 border-amber-100',
+                    under_review: 'bg-blue-50 text-blue-600 border-blue-100',
+                    closed: 'bg-green-50 text-green-700 border-green-100',
+                  };
+                  const statusLabels: Record<string, string> = {
+                    open: 'Abierta', under_review: 'En revisión', closed: 'Cerrada',
+                  };
+                  return (
+                    <div key={d.uuid} className="border border-slate-100 rounded-xl overflow-hidden">
+                      <button
+                        onClick={() => {
+                          const next = isExpanded ? null : d.uuid;
+                          setExpandedDisputeUuid(next);
+                          if (next) loadDisputeDetail(next);
+                        }}
+                        className="w-full flex items-center justify-between px-5 py-4 bg-white hover:bg-slate-50/60 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3">
+                          <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />
+                          <div>
+                            <div className="font-semibold text-slate-800 text-sm">
+                              {d.reportedBy?.firstName} {d.reportedBy?.lastName}
+                              <span className="text-slate-400 font-normal mx-1">vs</span>
+                              {d.against?.firstName} {d.against?.lastName}
+                            </div>
+                            <div className="text-xs text-slate-400 capitalize">{d.reason?.replace(/_/g, ' ')} · {new Date(d.createdAt).toLocaleDateString()}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Badge className={`text-xs ${statusColors[d.status] ?? 'bg-slate-100 text-slate-500'}`} variant={undefined}>
+                            {statusLabels[d.status] ?? d.status}
+                          </Badge>
+                          {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                        </div>
+                      </button>
+
+                      {isExpanded && (
+                        <div className="border-t border-slate-100 bg-slate-50/40 p-5 space-y-5">
+                          {/* Resumen caso cerrado */}
+                          {d.status === 'closed' && (
+                            <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-green-700 uppercase tracking-wide">Caso cerrado</span>
+                                {d.resolvedAt && <span className="text-xs text-green-500">· {new Date(d.resolvedAt).toLocaleDateString('es', { day: '2-digit', month: 'short', year: 'numeric' })}</span>}
+                              </div>
+                              {d.resolution && <p className="text-sm text-green-900">{d.resolution}</p>}
+                              {d.resolvedBy && (
+                                <div className="text-xs text-green-600">
+                                  Gestionado por {d.resolvedBy.firstName} {d.resolvedBy.lastName}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Description */}
+                          <p className="text-sm text-slate-700">{d.description}</p>
+
+                          {/* Chat de disputa */}
+                          <DisputeThread
+                            disputeUuid={d.uuid}
+                            title="Conversación de disputa"
+                            subtitle="Habla con las partes y adjunta fotos desde aquí."
+                            compact
+                          />
+
+                          {/* Evidence comparison */}
+                          {disputeDetailsLoading[d.uuid] ? (
+                            <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Cargando evidencias...
+                            </div>
+                          ) : disputeDetails[d.uuid] ? (() => {
+                            const detail = disputeDetails[d.uuid];
+                            const deliveryEvs: any[] = detail.evidences?.delivery ?? [];
+                            const returnEvs: any[] = detail.evidences?.return ?? [];
+                            const disputePhotos: string[] = detail.disputePhotos ?? [];
+                            return (
+                              <div className="space-y-4">
+                                {/* Fotos adjuntas al abrir la disputa */}
+                                {disputePhotos.length > 0 && (
+                                  <div>
+                                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Fotos de la Disputa</div>
+                                    <div className="bg-white border border-rose-100 rounded-xl p-4">
+                                      <div className="text-xs font-semibold text-rose-700 mb-3">Evidencias adjuntadas al reportar</div>
+                                      <div className="grid grid-cols-3 gap-1.5">
+                                        {disputePhotos.map((url: string, i: number) => (
+                                          <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                                            <img
+                                              src={url}
+                                              alt={`Evidencia disputa ${i + 1}`}
+                                              className="w-full aspect-square object-cover rounded-lg border border-slate-100 hover:opacity-90 transition-opacity"
+                                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                            />
+                                          </a>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Comparación entrega vs devolución */}
+                                <div>
+                                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Comparación de Evidencias</div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {[
+                                      { label: 'Evidencias de Entrega', list: deliveryEvs, color: 'blue' },
+                                      { label: 'Evidencias de Devolución', list: returnEvs, color: 'amber' },
+                                    ].map(({ label, list, color }) => (
+                                      <div key={label} className={`bg-white border border-${color}-100 rounded-xl p-4`}>
+                                        <div className={`text-xs font-semibold text-${color}-700 mb-3`}>{label}</div>
+                                        {list.length === 0 ? (
+                                          <p className="text-xs text-slate-400">Sin evidencias registradas.</p>
+                                        ) : list.map((ev: any) => (
+                                          <div key={ev.uuid} className="space-y-2 mb-3">
+                                            <div className="grid grid-cols-3 gap-1.5">
+                                              {ev.urls.map((url: string, i: number) => (
+                                                <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                                                  <img
+                                                    src={url}
+                                                    alt={`Foto ${i + 1}`}
+                                                    className="w-full aspect-square object-cover rounded-lg border border-slate-100 hover:opacity-90 transition-opacity"
+                                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                                  />
+                                                </a>
+                                              ))}
+                                            </div>
+                                            {ev.capturedAt && (
+                                              <div className="text-[10px] text-slate-400">
+                                                {new Date(ev.capturedAt).toLocaleString()}
+                                                {ev.latitude != null && ` · GPS: ${ev.latitude?.toFixed(4)}, ${ev.longitude?.toFixed(4)}`}
+                                                {ev.notes && <span> · {ev.notes}</span>}
+                                              </div>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })() : null}
+
+                          {/* Gestión de disputa */}
+                          {d.status === 'closed' ? null : resolveForm?.uuid === d.uuid ? (() => {
+                            const rf = resolveForm!;
+                            return (
+                            <div className="space-y-3 bg-white border border-slate-200 rounded-xl p-4">
+                              <div className="text-sm font-semibold text-slate-700">Gestionar disputa</div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => setResolveForm((prev) => prev ? { ...prev, status: 'under_review' } : prev)}
+                                  className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${rf.status === 'under_review' ? 'bg-blue-600 text-white border-blue-600' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                >
+                                  En revisión
+                                </button>
+                                <button
+                                  onClick={() => setResolveForm((prev) => prev ? { ...prev, status: 'closed' } : prev)}
+                                  className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${rf.status === 'closed' ? 'bg-green-600 text-white border-green-600' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                >
+                                  Cerrar caso
+                                </button>
+                              </div>
+                              {rf.status === 'closed' && (
+                                <textarea
+                                  value={rf.resolution}
+                                  onChange={(e) => setResolveForm((prev) => prev ? { ...prev, resolution: e.target.value } : prev)}
+                                  placeholder="Resumen de la resolución (mínimo 10 caracteres, quedará visible en el caso)..."
+                                  rows={3}
+                                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500/20 resize-none"
+                                />
+                              )}
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={handleResolveDispute}
+                                  disabled={resolving || (rf.status === 'closed' && rf.resolution.trim().length < 10)}
+                                  className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                                >
+                                  {resolving ? 'Guardando...' : 'Guardar'}
+                                </button>
+                                <button
+                                  onClick={() => setResolveForm(null)}
+                                  className="px-4 py-2 text-sm border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            </div>
+                            );
+                          })() : (
+                            <button
+                              onClick={() => setResolveForm({ uuid: d.uuid, status: d.status === 'open' ? 'under_review' : d.status, resolution: d.resolution ?? '' })}
+                              className="px-4 py-2 text-sm border border-indigo-200 text-indigo-600 rounded-lg hover:bg-indigo-50 transition-colors"
+                            >
+                              Gestionar disputa
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {disputesTotalPages > 1 && (
+                  <div className="flex items-center justify-center gap-2 mt-6">
+                    <button disabled={disputesPage <= 1} onClick={() => loadDisputes(disputesPage - 1)} className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 text-sm">Anterior</button>
+                    <span className="text-sm text-slate-500 px-2">Página {disputesPage} de {disputesTotalPages}</span>
+                    <button disabled={disputesPage >= disputesTotalPages} onClick={() => loadDisputes(disputesPage + 1)} className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 text-sm">Siguiente</button>
                   </div>
                 )}
               </div>

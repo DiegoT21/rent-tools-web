@@ -5,6 +5,8 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Star,
   CheckCircle2,
   Clock,
@@ -28,6 +30,8 @@ import {
 import { useAuthStore } from "@/store/authStore";
 import { contractService, MyRental } from "@/services/contractService";
 import { ReviewDialog } from "@/components/rentals/ReviewDialog";
+import { DisputeThread } from "@/components/rentals/DisputeThread";
+import { disputeService } from "@/services/disputeService";
 import { alerts } from "@/lib/alerts";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -38,6 +42,15 @@ function formatDate(value?: string): string {
   const [year, month, day] = normalized.split("-").map(Number);
   if (!year || !month || !day) return "—";
   return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`;
+}
+
+function isPastEndDate(value?: string): boolean {
+  if (!value) return false;
+  const normalized = String(value).slice(0, 10);
+  const [year, month, day] = normalized.split("-").map(Number);
+  if (!year || !month || !day) return false;
+  const endOfDay = new Date(year, month - 1, day + 1, 0, 0, 0, 0).getTime();
+  return Date.now() >= endOfDay;
 }
 
 interface StatusConfig {
@@ -61,7 +74,9 @@ function getStatusConfig(status: string): StatusConfig {
     case "in_progress":
       return { label: "En progreso", badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle2 className="h-3.5 w-3.5" /> };
     case "completed":
-      return { label: "Completado", badgeClass: "bg-slate-50 text-slate-600 border-slate-200", icon: <CheckCircle2 className="h-3.5 w-3.5" /> };
+      return { label: "Terminado", badgeClass: "bg-slate-50 text-slate-600 border-slate-200", icon: <CheckCircle2 className="h-3.5 w-3.5" /> };
+    case "terminated":
+      return { label: "Terminado", badgeClass: "bg-slate-50 text-slate-600 border-slate-200", icon: <CheckCircle2 className="h-3.5 w-3.5" /> };
     case "cancelled":
       return { label: "Cancelado", badgeClass: "bg-red-50 text-red-600 border-red-200", icon: <XCircle className="h-3.5 w-3.5" /> };
     default:
@@ -75,11 +90,14 @@ interface RentalCardProps {
   rental: MyRental;
   onReview: (rental: MyRental) => void;
   reviewedSet: Set<string>;
+  disputedSet: Set<string>;
 }
 
-function RentalCard({ rental, onReview, reviewedSet }: RentalCardProps) {
+function RentalCard({ rental, onReview, reviewedSet, disputedSet }: RentalCardProps) {
   const navigate = useNavigate();
-  const statusConfig = getStatusConfig(rental.status);
+  const fallbackOverdue = rental.status === "in_progress" && isPastEndDate(rental.endDate);
+  const visualStatus = rental.displayStatus ?? (fallbackOverdue ? "terminated" : rental.status);
+  const statusConfig = getStatusConfig(visualStatus);
   const toolImages = Array.isArray(rental.tool?.imageUrls) ? rental.tool!.imageUrls.filter(Boolean) : [];
   const thumbUrl = toolImages[0] ?? null;
   const toolName = rental.tool?.name ?? "Herramienta";
@@ -87,8 +105,9 @@ function RentalCard({ rental, onReview, reviewedSet }: RentalCardProps) {
     ? `${rental.owner.firstName ?? ""} ${rental.owner.lastName ?? ""}`.trim()
     : "Propietario";
 
-  const isCompleted = rental.status === "completed";
+  const isCompleted = visualStatus === "completed" || visualStatus === "terminated";
   const alreadyReviewed = reviewedSet.has(rental.uuid);
+  const alreadyDisputed = disputedSet.has(rental.requestUuid ?? rental.uuid) || Boolean(rental.hasActiveDispute);
 
   return (
     <div className="group relative bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-slate-200 transition-all duration-200 overflow-hidden">
@@ -191,6 +210,13 @@ function RentalCard({ rental, onReview, reviewedSet }: RentalCardProps) {
                 Reseña enviada
               </span>
             )}
+
+            {alreadyDisputed && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full">
+                <AlertCircle className="h-3.5 w-3.5" />
+                Disputa enviada
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -279,6 +305,10 @@ export function MyRentals() {
   const [reviewTarget, setReviewTarget] = useState<MyRental | null>(null);
   // Track which contracts already have a review (after submitting in this session)
   const [reviewedSet, setReviewedSet] = useState<Set<string>>(new Set());
+  const [disputedSet, setDisputedSet] = useState<Set<string>>(new Set());
+  const [myDisputes, setMyDisputes] = useState<any[]>([]);
+  const [myDisputesLoading, setMyDisputesLoading] = useState(false);
+  const [expandedMyDisputeUuid, setExpandedMyDisputeUuid] = useState<string | null>(null);
 
   // Auth guard
   useEffect(() => {
@@ -311,6 +341,21 @@ export function MyRentals() {
     [accessToken]
   );
 
+  const fetchMyDisputes = useCallback(async () => {
+    if (!accessToken) return;
+    setMyDisputesLoading(true);
+    try {
+      const result = await disputeService.listMine();
+      const items = Array.isArray(result?.items) ? result.items : Array.isArray(result) ? result : [];
+      setMyDisputes(items);
+    } catch (e: any) {
+      console.error("Error loading my disputes:", e);
+      setMyDisputes([]);
+    } finally {
+      setMyDisputesLoading(false);
+    }
+  }, [accessToken]);
+
   // Reset to page 1 on filter/search change
   useEffect(() => {
     setPage(1);
@@ -323,6 +368,10 @@ export function MyRentals() {
     }, 300);
     return () => clearTimeout(timer);
   }, [activeTab, page, search, sortBy, fetchRentals]);
+
+  useEffect(() => {
+    fetchMyDisputes();
+  }, [fetchMyDisputes]);
 
   const handleTabChange = (tab: "active" | "past") => {
     setActiveTab(tab);
@@ -430,6 +479,7 @@ export function MyRentals() {
                 rental={rental}
                 onReview={setReviewTarget}
                 reviewedSet={reviewedSet}
+                disputedSet={disputedSet}
               />
             ))}
           </div>
@@ -465,6 +515,76 @@ export function MyRentals() {
           onClose={() => setReviewTarget(null)}
         />
       )}
+
+      <div className="mt-10 bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <div className="text-xs font-bold tracking-widest text-slate-400 uppercase">Disputas</div>
+            <h2 className="text-xl font-black text-slate-900 tracking-tight">Mis casos</h2>
+            <p className="text-sm text-slate-500">Aquí ves los mensajes que te envía el admin dentro de cada disputa.</p>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            className="bg-slate-50 border border-slate-200 text-slate-700"
+            onClick={fetchMyDisputes}
+            disabled={myDisputesLoading}
+          >
+            {myDisputesLoading ? "Cargando..." : "Actualizar"}
+          </Button>
+        </div>
+
+        {myDisputesLoading && myDisputes.length === 0 ? (
+          <div className="py-10 text-center text-slate-400 text-sm">Cargando tus disputas...</div>
+        ) : myDisputes.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+            Todavía no tienes disputas abiertas o en revisión.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {myDisputes.map((item) => {
+              const dispute = item?.dispute ?? item;
+              const rentalLabel = dispute?.rental?.uuid ?? dispute?.rental?.startDate ?? dispute?.uuid;
+              const title = `${String(dispute?.reason ?? "disputa").replace(/_/g, " ")} · ${rentalLabel}`;
+              const isExpanded = expandedMyDisputeUuid === dispute?.uuid;
+              return (
+                <div key={dispute?.uuid ?? rentalLabel} className="rounded-2xl border border-slate-200 bg-slate-50/60 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedMyDisputeUuid(isExpanded ? null : dispute?.uuid ?? null)}
+                    className="w-full flex items-center justify-between gap-4 px-4 py-4 text-left hover:bg-slate-50/80 transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold text-slate-900 truncate">{title}</div>
+                      <div className="text-xs text-slate-500">Estado: {String(dispute?.status ?? "—")}</div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="text-xs text-slate-400 hidden sm:block">{dispute?.createdAt ? new Date(dispute.createdAt).toLocaleString() : ""}</div>
+                      {isExpanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="border-t border-slate-200 bg-white/80 p-4 space-y-3">
+                      <p className="text-sm text-slate-700">{dispute?.description}</p>
+
+                      {dispute?.uuid ? (
+                        <DisputeThread
+                          disputeUuid={dispute.uuid}
+                          title="Chat de la disputa"
+                          subtitle="Lee y responde dentro del mismo hilo compartido."
+                          compact
+                        />
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }

@@ -95,7 +95,7 @@ export async function uploadViaBackend(
   file: File,
   isPrivate: boolean,
   purpose?: UploadPurpose,
-): Promise<string> {
+): Promise<{ fileKey: string; publicUrl: string | null }> {
   const form = new FormData();
   form.append('file', file);
   form.append('isPrivate', String(isPrivate));
@@ -106,11 +106,12 @@ export async function uploadViaBackend(
   });
 
   const fileKey = response.data?.data?.fileKey ?? response.data?.fileKey;
+  const publicUrl = response.data?.data?.publicUrl ?? response.data?.publicUrl ?? null;
   if (!fileKey) {
     throw new Error('Respuesta inválida de /media/upload (falta fileKey).');
   }
 
-  return String(fileKey);
+  return { fileKey: String(fileKey), publicUrl: publicUrl ? String(publicUrl) : null };
 }
 
 export async function uploadToPresignedUrl(
@@ -160,7 +161,8 @@ export async function uploadFileToStorage(
   purpose?: UploadPurpose,
 ): Promise<string> {
   if (useBackendUpload) {
-    return uploadViaBackend(file, isPrivate, purpose);
+    const uploaded = await uploadViaBackend(file, isPrivate, purpose);
+    return uploaded.fileKey;
   }
 
   const signed = await getUploadUrlAndKey(file, isPrivate, purpose);
@@ -170,4 +172,28 @@ export async function uploadFileToStorage(
 
 export async function uploadAvatar(file: File): Promise<string> {
   return uploadFileToStorage(file, false, 'avatar');
+}
+
+export async function uploadFileToStorageWithUrl(
+  file: File,
+  isPrivate: boolean,
+  purpose?: UploadPurpose,
+): Promise<{ fileKey: string; publicUrl: string }> {
+  if (useBackendUpload) {
+    const uploaded = await uploadViaBackend(file, isPrivate, purpose);
+    return {
+      fileKey: uploaded.fileKey,
+      publicUrl:
+        uploaded.publicUrl ??
+        `${(
+          (import.meta as any).env?.VITE_MEDIA_PUBLIC_BASE_URL ||
+          (import.meta as any).env?.VITE_S3_PUBLIC_BASE_URL ||
+          'https://renttools-inventario-publico.s3.us-east-2.amazonaws.com'
+        ).replace(/\/+$/, '')}/${String(uploaded.fileKey).replace(/^\/+/, '')}`,
+    };
+  }
+
+  const signed = await getUploadUrlAndKey(file, isPrivate, purpose);
+  await uploadToPresignedUrl(signed, file);
+  return { fileKey: signed.fileKey, publicUrl: signed.publicUrl };
 }
