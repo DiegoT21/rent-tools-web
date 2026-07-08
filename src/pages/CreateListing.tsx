@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Package,
@@ -14,6 +14,10 @@ import {
   ArrowRight,
   ArrowLeft,
   Check,
+  ArrowUp,
+  ArrowDown,
+  X,
+  Star,
 } from "lucide-react";
 import { LocationPicker } from "@/components/LocationPicker";
 import {
@@ -80,6 +84,7 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
   const isEditing = Boolean(editTool);
 
   const [currentStep, setCurrentStep] = useState(1);
+  const topRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
   const [meetingLocations, setMeetingLocations] = useState<
     Array<{ label: string; address: string; lat: number | null; lng: number | null }>
@@ -116,9 +121,52 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
       });
   }, []);
 
+  const didMountRef = useRef(false);
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [currentStep]);
+
+  const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
+  useEffect(() => {
+    const urls = selectedMediaFiles.map((file) => URL.createObjectURL(file));
+    setMediaPreviews(urls);
+    return () => {
+      urls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [selectedMediaFiles]);
+
+  useEffect(() => {
+    if (!isEditing || formData.categoryId) return;
+    const label = String(editTool?.category ?? "").trim();
+    if (!label) return;
+    for (const parent of categoryTree) {
+      if (parent.name === label) {
+        setFormData((f) => ({ ...f, categoryId: parent.uuid }));
+        return;
+      }
+      for (const child of parent.children ?? []) {
+        if (child.name === label || label === `${parent.name} > ${child.name}`) {
+          setFormData((f) => ({ ...f, categoryId: child.uuid }));
+          return;
+        }
+      }
+    }
+  }, [categoryTree, isEditing, editTool, formData.categoryId]);
+
   const existingFileKeys: string[] = editTool?.fileKeys ?? [];
   const existingImageUrls: string[] = editTool?.imageUrls ?? [];
   const existingInvoiceFileKey: string = editTool?.invoiceFileKey ?? "";
+
+  const initialCategoryId = (() => {
+    const raw = editTool?.categoryId;
+    if (raw && typeof raw === "object" && raw.uuid) return String(raw.uuid);
+    if (typeof raw === "string" && raw.includes("-")) return raw;
+    return "";
+  })();
 
   const [formData, setFormData] = useState({
     name: editTool?.name ?? "",
@@ -127,7 +175,7 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
       const bySlug = DEFAULT_BRANDS.find((b) => b.slug === raw);
       return bySlug?.name ?? raw;
     })(),
-    categoryId: editTool?.categoryId ?? "",
+    categoryId: initialCategoryId,
     description: editTool?.description ?? "",
     pricePerDay: editTool?.pricePerDay?.toString() ?? "",
     serialNumber: editTool?.serialNumber ?? "",
@@ -208,6 +256,20 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
     });
   };
 
+  const moveMediaFile = (index: number, direction: -1 | 1) => {
+    setSelectedMediaFiles((prev) => {
+      const target = index + direction;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  const removeMediaFile = (index: number) => {
+    setSelectedMediaFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleMediaFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     appendMediaFiles(Array.from(e.target.files));
@@ -235,7 +297,7 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
         return false;
       }
       if (!formData.categoryId) {
-        await alerts.warning("Campo requerido", "Selecciona la categoría y subcategoría.");
+        await alerts.warning("Campo requerido", "Selecciona una categoría (la subcategoría es opcional).");
         return false;
       }
       if (!formData.description.trim()) {
@@ -377,7 +439,7 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
   };
 
   return (
-    <div className={cn("space-y-6 sm:space-y-8", !embedded && "container mx-auto max-w-4xl px-2 py-4 sm:px-4 sm:py-6")}>
+    <div ref={topRef} className={cn("scroll-mt-20 space-y-6 sm:space-y-8", !embedded && "container mx-auto max-w-4xl px-2 py-4 sm:px-4 sm:py-6")}>
       {/* Encabezado */}
       <div className="space-y-6">
         <button
@@ -689,14 +751,68 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
                         : "Listo para continuar"}
                     </span>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <p className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                    <Info className="h-3.5 w-3.5 text-primary" />
+                    La primera foto será la portada que se muestra en el inicio.
+                  </p>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {selectedMediaFiles.map((file, index) => (
                       <div
                         key={`${file.name}-${index}`}
-                        className="rounded-xl border border-slate-200 bg-slate-50 p-3"
+                        className={cn(
+                          "group relative overflow-hidden rounded-xl border bg-slate-50",
+                          index === 0 ? "border-primary ring-2 ring-primary/20" : "border-slate-200",
+                        )}
                       >
-                        <p className="font-semibold text-sm text-slate-800 truncate">{file.name}</p>
-                        <p className="text-xs text-slate-500 mt-1">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                        <div className="aspect-square w-full overflow-hidden bg-slate-100">
+                          {mediaPreviews[index] ? (
+                            <img src={mediaPreviews[index]} alt={file.name} className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="grid h-full w-full place-items-center text-slate-300">
+                              <ImageIcon className="h-8 w-8" />
+                            </div>
+                          )}
+                        </div>
+
+                        {index === 0 && (
+                          <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+                            <Star className="h-3 w-3 fill-white" />
+                            Portada
+                          </span>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => removeMediaFile(index)}
+                          className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-white/90 text-slate-600 shadow-sm hover:bg-white hover:text-red-600"
+                          aria-label="Quitar foto"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+
+                        <div className="flex items-center justify-between gap-1 px-2 py-1.5">
+                          <span className="truncate text-[11px] font-medium text-slate-500">{file.name}</span>
+                          <div className="flex shrink-0 gap-1">
+                            <button
+                              type="button"
+                              onClick={() => moveMediaFile(index, -1)}
+                              disabled={index === 0}
+                              className="grid h-6 w-6 place-items-center rounded-md text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+                              aria-label="Mover antes"
+                            >
+                              <ArrowUp className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveMediaFile(index, 1)}
+                              disabled={index === selectedMediaFiles.length - 1}
+                              className="grid h-6 w-6 place-items-center rounded-md text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+                              aria-label="Mover después"
+                            >
+                              <ArrowDown className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>

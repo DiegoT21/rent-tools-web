@@ -18,10 +18,21 @@ import { AdminDashboard } from './pages/AdminDashboard'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { SessionBootstrap } from './components/auth/SessionBootstrap'
 import { isAdminUser } from './lib/isAdmin'
+import { ForgotPassword } from './pages/ForgotPassword'
+import { ResetPassword } from './pages/ResetPassword'
+import { useFavoritesStore } from './store/favoritesStore'
 
 function App() {
   const user = useAuthStore((state) => state.user);
   const isAdmin = isAdminUser(user);
+
+  React.useEffect(() => {
+    if (user) {
+      void useFavoritesStore.getState().loadIds();
+    } else {
+      useFavoritesStore.getState().reset();
+    }
+  }, [user]);
 
 
   return (
@@ -56,6 +67,8 @@ function App() {
           </ProtectedRoute>
         } />
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/register" element={<Register />} />
         <Route path="/register/step-2" element={<RegisterStepTwo />} />
         <Route path="/register/step-3" element={<RegisterStepThree />} />

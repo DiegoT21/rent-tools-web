@@ -23,7 +23,8 @@ import {
   Hammer,
   Zap,
   Scissors,
-  Wrench
+  Wrench,
+  Heart
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,10 @@ import { markRentalRequestsSeen, notifyRentalRequestsUpdated } from "@/hooks/use
 import { UserAvatar } from "@/components/UserAvatar";
 import { PhotoCaptureDialog, dataUrlToFile } from "@/components/ui/PhotoCaptureDialog";
 import { Loader2 } from "lucide-react";
+import { favoriteService } from "@/services/favoriteService";
+import { PublicTool } from "@/services/toolService";
+import { ToolCard } from "@/components/home/ToolCard";
+import { useFavoritesStore } from "@/store/favoritesStore";
 
 function safeParseDate(value: unknown): Date | null {
   if (typeof value === "string" || typeof value === "number") {
@@ -173,6 +178,7 @@ function ImageCarousel({ images, alt }: { images: string[]; alt: string }) {
 const menuItems = [
   { id: "perfil", label: "Mi Perfil", icon: User },
   { id: "inventario", label: "Mi Inventario", icon: Package },
+  { id: "favoritos", label: "Favoritos", icon: Heart },
   { id: "alquileres", label: "Alquileres", icon: Calendar },
   { id: "solicitudes", label: "Solicitudes", icon: FileText },
 ];
@@ -251,6 +257,8 @@ export function UserProfile() {
   const [userSummary, setUserSummary] = useState<{ count: number; averageRating: number } | null>(null);
   const [userReviewsLoading, setUserReviewsLoading] = useState(false);
   const [profileTab, setProfileTab] = useState<"resenas" | "listados" | "historial">("resenas");
+  const [favorites, setFavorites] = useState<PublicTool[]>([]);
+  const [favoritesLoading, setFavoritesLoading] = useState(false);
 
   const StarRow = ({ rating }: { rating: number }) => {
     const full = Math.round(Math.max(0, Math.min(5, rating)));
@@ -319,6 +327,33 @@ export function UserProfile() {
       markRentalRequestsSeen();
     }
   }, [activeTab]);
+
+  const favoriteIds = useFavoritesStore((state) => state.ids);
+  useEffect(() => {
+    if (!accessToken) return;
+    if (activeTab !== "favoritos") return;
+    let cancelled = false;
+    setFavoritesLoading(true);
+    favoriteService
+      .list()
+      .then((items) => {
+        if (!cancelled) setFavorites(items);
+      })
+      .catch(() => {
+        if (!cancelled) setFavorites([]);
+      })
+      .finally(() => {
+        if (!cancelled) setFavoritesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, accessToken]);
+
+  const visibleFavorites = useMemo(
+    () => favorites.filter((tool) => favoriteIds.includes(String(tool.uuid ?? ""))),
+    [favorites, favoriteIds],
+  );
 
   useEffect(() => {
     const timer = window.setInterval(() => setRequestClock(Date.now()), 1000);
@@ -940,6 +975,13 @@ export function UserProfile() {
     };
   }, [inventory, inventoryTotal, ownerMetrics, ownerMetricsLoading, activeRentals]);
 
+  const memberSinceLabel = (() => {
+    const created = safeParseDate((user as any)?.createdAt);
+    if (!created) return "Miembro nuevo";
+    const formatted = new Intl.DateTimeFormat("es-PA", { month: "short", year: "numeric" }).format(created);
+    return `Miembro desde ${formatted}`;
+  })();
+
   if (profileLoading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
@@ -952,7 +994,7 @@ export function UserProfile() {
     <div className="mx-auto flex min-h-[calc(100vh-140px)] max-w-7xl flex-col gap-4 px-2 py-4 sm:px-4 sm:py-6 lg:flex-row lg:gap-8 lg:py-8">
       {/* Navegación móvil / tablet */}
       <div className="space-y-2 lg:hidden">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
           {menuItems.map((item) => (
             <button
               key={item.id}
@@ -1097,7 +1139,7 @@ export function UserProfile() {
                         </div>
                         <div className="flex items-center gap-1">
                           <Calendar className="h-4 w-4" />
-                          <span>Miembro desde 2024</span>
+                          <span>{memberSinceLabel}</span>
                         </div>
                       </div>
                     </div>
@@ -1796,6 +1838,46 @@ export function UserProfile() {
                 </Button>
               )}
             </div>
+          </div>
+        )}
+
+        {activeTab === "favoritos" && (
+          <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="space-y-1">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                Cuenta <span className="text-[8px]">●</span> Favoritos
+              </p>
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight sm:text-4xl">Mis Favoritos</h1>
+              <p className="text-sm text-slate-500">Herramientas que guardaste para alquilar más tarde.</p>
+            </div>
+
+            {favoritesLoading ? (
+              <div className="flex justify-center py-16 text-slate-400">
+                <Loader2 className="mr-2 h-6 w-6 animate-spin" /> Cargando favoritos...
+              </div>
+            ) : visibleFavorites.length === 0 ? (
+              <div className="flex flex-col items-center text-center py-14">
+                <div className="grid h-20 w-20 place-items-center rounded-2xl bg-orange-50 border border-orange-100 mb-6">
+                  <Heart className="h-9 w-9 text-primary" />
+                </div>
+                <h3 className="text-xl font-black text-slate-900 mb-2">Aún no tienes favoritos</h3>
+                <p className="text-sm text-slate-500 font-medium max-w-md mb-6">
+                  Toca el corazón en cualquier herramienta del catálogo para guardarla aquí.
+                </p>
+                <Button
+                  onClick={() => navigate("/")}
+                  className="rounded-xl bg-primary hover:bg-primary/90 text-white font-bold px-6 h-11"
+                >
+                  Explorar Herramientas
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                {visibleFavorites.map((tool) => (
+                  <ToolCard key={String(tool.uuid)} tool={tool} />
+                ))}
+              </div>
+            )}
           </div>
         )}
 

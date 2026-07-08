@@ -283,12 +283,12 @@ export function Login() {
                     <label htmlFor="password" className="block text-[13px] font-bold text-slate-900">
                       Contrasena
                     </label>
-                    <a
-                      href="#"
+                    <Link
+                      to="/forgot-password"
                       className="text-[13px] font-semibold text-primary transition-colors hover:text-[#e86f00]"
                     >
                       Olvidaste tu contrasena?
-                    </a>
+                    </Link>
                   </div>
 
                   <div className="relative">

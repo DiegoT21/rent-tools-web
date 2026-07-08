@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PublicTool, toolService } from "@/services/toolService";
 import { Button } from "@/components/ui/button";
+import { FavoriteButton } from "@/components/FavoriteButton";
 
 const fallbackImage =
   "https://images.unsplash.com/photo-1504148455328-c376907d081c?q=80&w=600&auto=format&fit=crop";
@@ -22,6 +23,15 @@ export function ToolCard({ tool, variant = "standard", badge, showOffer }: ToolC
   const images = toolService.getToolImages(tool, 3);
   const pics = images.length ? images : [fallbackImage];
   const [imgIdx, setImgIdx] = useState(0);
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    if (pics.length <= 1 || paused) return;
+    const timer = window.setInterval(() => {
+      setImgIdx((i) => (i + 1) % pics.length);
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [pics.length, paused]);
   const uuid = toolService.getToolId(tool);
   const price = typeof tool.pricePerDay === "number" ? tool.pricePerDay : 0;
   const category = (tool.category ?? "herramientas").toString().toUpperCase();
@@ -55,8 +65,9 @@ export function ToolCard({ tool, variant = "standard", badge, showOffer }: ToolC
           className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-900/50 to-slate-900/20" />
-        <div className="absolute right-4 top-4">
+        <div className="absolute right-4 top-4 flex items-center gap-2">
           <RentalBadge />
+          {uuid && <FavoriteButton toolUuid={uuid} />}
         </div>
         <div className="relative flex h-full min-h-[280px] flex-col justify-end p-5 sm:min-h-[360px] sm:p-8">
           <span className="mb-3 w-fit rounded-md bg-primary px-3 py-1 text-[10px] font-bold tracking-widest text-white uppercase sm:mb-4">
@@ -102,6 +113,7 @@ export function ToolCard({ tool, variant = "standard", badge, showOffer }: ToolC
             )}
             <RentalBadge />
           </div>
+          {uuid && <FavoriteButton toolUuid={uuid} size="sm" className="absolute right-2 top-2" />}
         </div>
         <div className="flex min-w-0 flex-1 flex-col justify-between py-1">
           <div>
@@ -133,6 +145,8 @@ export function ToolCard({ tool, variant = "standard", badge, showOffer }: ToolC
     <div
       className="group cursor-pointer overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition-all duration-300 hover:shadow-xl"
       onClick={goToDetail}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
     >
       <div className="relative overflow-hidden bg-slate-50 pt-[72%]">
         <img
@@ -152,6 +166,7 @@ export function ToolCard({ tool, variant = "standard", badge, showOffer }: ToolC
         >
           {isRented ? "Alq." : showOffer ? "Oferta" : available ? "Disponible" : "Reservado"}
         </span>
+        {uuid && <FavoriteButton toolUuid={uuid} size="sm" className="absolute right-3 top-3" />}
         {pics.length > 1 && (
           <>
             <button

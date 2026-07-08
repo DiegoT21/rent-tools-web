@@ -16,6 +16,7 @@ import Swal from "sweetalert2";
 import { rentalRequestService } from "@/services/rentalRequestService";
 import { userService, UserReview } from "@/services/userService";
 import { RentalRequestDialog } from "@/components/rentals/RentalRequestDialog";
+import { FavoriteButton } from "@/components/FavoriteButton";
 
 const DefaultIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -595,7 +596,10 @@ export function ToolDetails() {
     <div className="mx-auto max-w-5xl px-2 py-6 sm:px-4 sm:py-10">
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2 lg:gap-8">
         <div className="space-y-4">
-          <ImageCarousel images={images} alt={tool.name} index={imageIndex} onIndexChange={setImageIndex} showRentedBadge={isRented} />
+          <div className="relative">
+            <ImageCarousel images={images} alt={tool.name} index={imageIndex} onIndexChange={setImageIndex} showRentedBadge={isRented} />
+            {uuid && <FavoriteButton toolUuid={uuid} className="absolute right-3 top-3 z-10" />}
+          </div>
 
           {images.length > 1 && (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
