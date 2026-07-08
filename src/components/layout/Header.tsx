@@ -1,5 +1,5 @@
 import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
-import { Search, User, ShieldCheck, ShieldAlert, LogOut, Menu, X } from "lucide-react";
+import { Search, User, ShieldCheck, ShieldAlert, LogOut, Menu, X, Package, LayoutDashboard } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -98,7 +98,7 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
 
           <Link to="/" className="flex min-w-0 items-center gap-2 transition-opacity hover:opacity-80">
             <img src="/logo.jpeg" alt="RentTools Logo" className="h-8 w-8 shrink-0 rounded-md object-cover" />
-            <div className="truncate text-lg font-bold tracking-tight text-slate-900 sm:text-xl">
+            <div className="hidden truncate text-lg font-bold tracking-tight text-slate-900 min-[380px]:block sm:text-xl">
               Rent<span className="text-primary">Tools</span>
             </div>
           </Link>
@@ -177,7 +177,7 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
           {user && !isAdmin ? <NotificationBell /> : null}
 
           {user ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <div className="hidden flex-col items-end md:flex">
                 <span className="max-w-[120px] truncate text-sm font-semibold text-slate-900 lg:max-w-none">
                   Hola, {user.firstName}
@@ -196,24 +196,27 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
                   </span>
                 )}
               </div>
-              {isAdmin ? (
+              {isAdmin && isAdminRoute ? (
                 <button
                   onClick={handleLogout}
                   className="flex h-10 w-10 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
-                  title="Cerrar Sesión"
+                  title="Cerrar sesión"
+                  aria-label="Cerrar sesión"
                 >
                   <LogOut className="h-5 w-5" />
                 </button>
               ) : (
                 <Link
                   to="/profile"
-                  className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-blue-200 bg-[#eff6ff] text-blue-600 hover:bg-blue-100"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-primary/30 bg-[#eff6ff] text-blue-600 ring-2 ring-primary/10 hover:bg-blue-100"
+                  title="Mi perfil"
+                  aria-label="Mi perfil"
                 >
                   <UserAvatar
                     firstName={user.firstName}
                     lastName={user.lastName}
                     profileImageUrl={user.profileImageUrl}
-                    textClassName="text-blue-600"
+                    textClassName="text-sm font-bold text-blue-600"
                   />
                 </Link>
               )}
@@ -221,9 +224,11 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
           ) : (
             <Link
               to="/login"
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-200 text-slate-700 hover:bg-slate-300"
+              className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-primary px-3 text-white hover:bg-primary/90 sm:px-4"
+              aria-label="Iniciar sesión"
             >
-              <User className="h-5 w-5" />
+              <User className="h-4 w-4 shrink-0" />
+              <span className="hidden text-sm font-semibold min-[380px]:inline">Entrar</span>
             </Link>
           )}
         </div>
@@ -240,6 +245,85 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
             <nav className="flex flex-col gap-1">
               {showPublicNav ? (
                 <>
+                  {user ? (
+                    <div className="mb-3 rounded-xl border border-slate-100 bg-slate-50 p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-primary/30 bg-[#eff6ff]">
+                          <UserAvatar
+                            firstName={user.firstName}
+                            lastName={user.lastName}
+                            profileImageUrl={user.profileImageUrl}
+                            textClassName="text-sm font-bold text-blue-600"
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-bold text-slate-900">
+                            {user.firstName} {user.lastName}
+                          </p>
+                          <p className="truncate text-xs text-slate-500">{user.email}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 grid gap-1">
+                        <Link
+                          to="/profile"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-white"
+                        >
+                          <User className="h-4 w-4 text-primary" />
+                          Mi perfil
+                        </Link>
+                        {!isAdmin && (
+                          <Link
+                            to="/my-rentals"
+                            onClick={() => setMobileMenuOpen(false)}
+                            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-white"
+                          >
+                            <Package className="h-4 w-4 text-primary" />
+                            Mis alquileres
+                          </Link>
+                        )}
+                        {isAdmin && (
+                          <Link
+                            to="/admin"
+                            onClick={() => setMobileMenuOpen(false)}
+                            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-white"
+                          >
+                            <LayoutDashboard className="h-4 w-4 text-red-600" />
+                            Panel admin
+                          </Link>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMobileMenuOpen(false);
+                            handleLogout();
+                          }}
+                          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-red-600 hover:bg-white"
+                        >
+                          <LogOut className="h-4 w-4" />
+                          Cerrar sesión
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mb-3 grid gap-2">
+                      <Link
+                        to="/login"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="rounded-xl bg-primary px-4 py-3 text-center text-sm font-bold text-white"
+                      >
+                        Iniciar sesión
+                      </Link>
+                      <Link
+                        to="/register"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-700"
+                      >
+                        Crear cuenta
+                      </Link>
+                    </div>
+                  )}
+
                   <button
                     type="button"
                     className="rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
