@@ -592,13 +592,13 @@ export function ToolDetails() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto py-10 px-4">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+    <div className="mx-auto max-w-5xl px-2 py-6 sm:px-4 sm:py-10">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2 lg:gap-8">
         <div className="space-y-4">
           <ImageCarousel images={images} alt={tool.name} index={imageIndex} onIndexChange={setImageIndex} showRentedBadge={isRented} />
 
           {images.length > 1 && (
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
               {images.slice(0, 3).map((src, i) => (
                 <button
                   key={src}
@@ -619,7 +619,7 @@ export function ToolDetails() {
           <Card className="border-slate-100 shadow-sm">
             <CardContent className="p-5">
               <div className="text-sm font-semibold text-slate-800 mb-3">Detalles rápidos</div>
-              <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                 <div className="rounded-xl border border-slate-200 bg-white p-3">
                   <div className="text-xs text-slate-500">Estado</div>
                   <div className="font-semibold text-slate-800">

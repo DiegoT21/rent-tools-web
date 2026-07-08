@@ -14,6 +14,12 @@ import {
   AlertCircle,
   MessageSquare,
 } from 'lucide-react';
+import { AdminCatalogTab } from '@/components/admin/AdminCatalogTab';
+import { AdminListingsTab } from '@/components/admin/AdminListingsTab';
+import { isAdminUser, getAdminAccessMessage, formatApiError } from '@/lib/isAdmin';
+import { adminService } from '@/services/adminService';
+import Swal from 'sweetalert2';
+import { Pencil, Trash2 } from 'lucide-react';
 
 
 interface UserItem {
@@ -78,8 +84,11 @@ interface SupportMessage {
 
 export function AdminDashboard() {
   const user = useAuthStore((state) => state.user);
+  const fetchProfile = useAuthStore((state) => state.fetchProfile);
   const [searchParams] = useSearchParams();
-  const activeTab = (searchParams.get('tab') || 'users') as 'users' | 'audit' | 'chat' | 'disputes';
+  const activeTab = (searchParams.get('tab') || 'users') as 'users' | 'audit' | 'chat' | 'disputes' | 'catalog' | 'listings';
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [profileReady, setProfileReady] = useState(false);
 
   // Tab 1: Users
   const [usersList, setUsersList] = useState<UserItem[]>([]);
@@ -132,34 +141,9 @@ export function AdminDashboard() {
     navigate('/login');
   };
 
-  // Check role
-  if (!user || (user.role !== 'admin' && user.email !== 'diegoorlando211170@gmail.com')) {
-    return (
-      <div className="max-w-4xl mx-auto mt-16 p-8 bg-white border border-red-100 rounded-2xl shadow-xl text-center">
-        <ShieldAlert className="w-16 h-16 text-red-500 mx-auto mb-4 animate-bounce" />
-        <h2 className="text-2xl font-bold text-slate-800 mb-2">Acceso Denegado</h2>
-        <p className="text-slate-500">Esta sección es de uso exclusivo para administradores del sistema.</p>
-      </div>
-    );
-  }
-
-  const handleStatusChange = async (uuid: string, newStatus: string) => {
-    setStatusUpdating(uuid);
-    try {
-      await api.patch(`/users/admin/${uuid}/status`, { status: newStatus });
-      setUsersList((prev) =>
-        prev.map((u) => (u.uuid === uuid ? { ...u, accountStatus: newStatus } : u))
-      );
-    } catch (err) {
-      console.error('Error updating user status:', err);
-    } finally {
-      setStatusUpdating(null);
-    }
-  };
-
-  // Load registered users
   const loadUsers = async (page = 1, overrides?: { search?: string; role?: string; accountStatus?: string; kycStatus?: string }) => {
     setUsersLoading(true);
+    setApiError(null);
     try {
       const params = new URLSearchParams({ page: String(page), limit: '10' });
       const search = overrides?.search ?? usersSearch;
@@ -172,38 +156,39 @@ export function AdminDashboard() {
       if (kycStatus) params.set('kycStatus', kycStatus);
       const res = await api.get(`/users/admin/list?${params}`);
       if (res.data.success) {
-        setUsersList(res.data.data.items);
+        setUsersList(res.data.data.items ?? []);
         setUsersTotalPages(res.data.data.pagination.totalPages);
         setUsersPage(page);
       }
     } catch (err) {
-      console.error("Error loading users:", err);
+      setApiError(formatApiError(err));
+      setUsersList([]);
     } finally {
       setUsersLoading(false);
     }
   };
 
-  // Load audit logs
   const loadAuditLogs = async (page = 1, overrideSearch?: string) => {
     setAuditLoading(true);
+    setApiError(null);
     try {
       const params = new URLSearchParams({ page: String(page), limit: '15' });
       const search = overrideSearch ?? auditSearch;
       if (search) params.set('search', search);
       const res = await api.get(`/users/admin/audit?${params}`);
       if (res.data.success) {
-        setAuditList(res.data.data.items);
+        setAuditList(res.data.data.items ?? []);
         setAuditTotalPages(res.data.data.pagination.totalPages);
         setAuditPage(page);
       }
     } catch (err) {
-      console.error("Error loading audit logs:", err);
+      setApiError(formatApiError(err));
+      setAuditList([]);
     } finally {
       setAuditLoading(false);
     }
   };
 
-  // Load disputes (admin)
   const loadDisputes = async (page = 1, overrides?: { search?: string; status?: string }) => {
     setDisputesLoading(true);
     try {
@@ -257,22 +242,23 @@ export function AdminDashboard() {
     }
   };
 
-  // Load support chats list
+
   const loadActiveChats = async () => {
     setChatsLoading(true);
+    setApiError(null);
     try {
       const res = await api.get('/support/admin/chats');
       if (res.data.success) {
-        setChatsList(res.data.data);
+        setChatsList(res.data.data ?? []);
       }
     } catch (err) {
-      console.error("Error loading support chats:", err);
+      setApiError(formatApiError(err));
+      setChatsList([]);
     } finally {
       setChatsLoading(false);
     }
   };
 
-  // Load support chat messages for selected user
   const loadChatMessages = async (userUuid: string, showLoader = false) => {
     if (showLoader) setChatLoading(true);
     try {
@@ -281,13 +267,110 @@ export function AdminDashboard() {
         setChatMessages(res.data.data);
       }
     } catch (err) {
-      console.error("Error loading messages for user:", err);
+      setApiError(formatApiError(err));
     } finally {
       if (showLoader) setChatLoading(false);
     }
   };
 
-  // Send admin response message
+  useEffect(() => {
+    fetchProfile().finally(() => setProfileReady(true));
+  }, [fetchProfile]);
+
+  useEffect(() => {
+    if (!profileReady || !isAdminUser(user)) return;
+    if (activeTab === 'users') loadUsers(1);
+    else if (activeTab === 'audit') loadAuditLogs(1);
+    else if (activeTab === 'chat') loadActiveChats();
+    else if (activeTab === 'disputes') loadDisputes(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, profileReady, user?.role]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (activeTab === 'chat' && selectedChatUser) {
+      interval = setInterval(() => {
+        loadChatMessages(selectedChatUser.uuid, false);
+      }, 5000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, selectedChatUser]);
+
+  useEffect(() => {
+    if (chatBottomRef.current) {
+      chatBottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages]);
+
+  const accessMessage = getAdminAccessMessage(user);
+
+  if (!profileReady) {
+    return (
+      <div className="flex items-center justify-center py-24 text-slate-400">
+        <RefreshCw className="w-8 h-8 animate-spin mr-3" />
+        Verificando permisos de administrador...
+      </div>
+    );
+  }
+
+  if (!user || !isAdminUser(user)) {
+    return (
+      <div className="max-w-4xl mx-auto mt-16 p-8 bg-white border border-red-100 rounded-2xl shadow-xl text-center">
+        <ShieldAlert className="w-16 h-16 text-red-500 mx-auto mb-4 animate-bounce" />
+        <h2 className="text-2xl font-bold text-slate-800 mb-2">Acceso Denegado</h2>
+        <p className="text-slate-500">{accessMessage ?? 'Esta sección es de uso exclusivo para administradores del sistema.'}</p>
+      </div>
+    );
+  }
+
+  const handleEditUser = async (usr: UserItem) => {
+    const { value: formValues } = await Swal.fire({
+      title: `Editar: ${usr.firstName} ${usr.lastName}`,
+      html:
+        `<select id="swal-role" class="swal2-input"><option value="user" ${usr.role === 'user' ? 'selected' : ''}>user</option><option value="admin" ${usr.role === 'admin' ? 'selected' : ''}>admin</option></select>` +
+        `<select id="swal-status" class="swal2-input"><option value="active" ${usr.accountStatus === 'active' ? 'selected' : ''}>active</option><option value="suspended" ${usr.accountStatus === 'suspended' ? 'selected' : ''}>suspended</option><option value="blocked" ${usr.accountStatus === 'blocked' ? 'selected' : ''}>blocked</option></select>` +
+        `<select id="swal-kyc" class="swal2-input"><option value="pending" ${usr.kycStatus === 'pending' ? 'selected' : ''}>pending</option><option value="in_review" ${usr.kycStatus === 'in_review' ? 'selected' : ''}>in_review</option><option value="approved" ${usr.kycStatus === 'approved' ? 'selected' : ''}>approved</option><option value="rejected" ${usr.kycStatus === 'rejected' ? 'selected' : ''}>rejected</option></select>`,
+      focusConfirm: false,
+      showCancelButton: true,
+      confirmButtonText: 'Guardar',
+      preConfirm: () => ({
+        role: (document.getElementById('swal-role') as HTMLSelectElement).value as 'user' | 'admin',
+        accountStatus: (document.getElementById('swal-status') as HTMLSelectElement).value as 'active' | 'suspended' | 'blocked',
+        kycStatus: (document.getElementById('swal-kyc') as HTMLSelectElement).value as 'pending' | 'in_review' | 'approved' | 'rejected',
+      }),
+    });
+    if (!formValues) return;
+    try {
+      await adminService.updateUser(usr.uuid, formValues);
+      await Swal.fire('Actualizado', 'Usuario modificado correctamente.', 'success');
+      loadUsers(usersPage);
+    } catch (err) {
+      await Swal.fire('Error', formatApiError(err), 'error');
+    }
+  };
+
+  const handleDeleteUser = async (usr: UserItem) => {
+    const { isConfirmed } = await Swal.fire({
+      title: 'Eliminar usuario',
+      html: `¿Eliminar <strong>${usr.email}</strong>? Esta acción no se puede deshacer.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      confirmButtonText: 'Eliminar',
+    });
+    if (!isConfirmed) return;
+    try {
+      await adminService.deleteUser(usr.uuid);
+      await Swal.fire('Eliminado', 'Usuario eliminado.', 'success');
+      loadUsers(usersPage);
+    } catch (err) {
+      await Swal.fire('Error', formatApiError(err), 'error');
+    }
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedChatUser || newMessage.trim() === '') return;
@@ -306,40 +389,17 @@ export function AdminDashboard() {
     }
   };
 
-  // Scroll to bottom of chat
-  useEffect(() => {
-    if (chatBottomRef.current) {
-      chatBottomRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [chatMessages]);
-
-  // Initial tab loading
-  useEffect(() => {
-    if (activeTab === 'users') loadUsers(1);
-    else if (activeTab === 'audit') loadAuditLogs(1);
-    else if (activeTab === 'chat') loadActiveChats();
-    else if (activeTab === 'disputes') loadDisputes(1);
-  }, [activeTab]);
-
-  // Support chat auto polling (every 5 seconds when chat tab & a conversation is active)
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (activeTab === 'chat' && selectedChatUser) {
-      interval = setInterval(() => {
-        loadChatMessages(selectedChatUser.uuid, false);
-      }, 5000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [activeTab, selectedChatUser]);
-
   return (
-    <div className="max-w-7xl mx-auto pb-12">
-      {/* Header Panel */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-slate-100 pb-5 mb-6">
+    <div className="mx-auto max-w-7xl px-2 pb-8 sm:px-4 sm:pb-12">
+      {apiError && (
+        <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{apiError}</span>
+        </div>
+      )}
+      <div className="mb-6 flex flex-col items-start justify-between border-b border-slate-100 pb-4 sm:mb-8 sm:flex-row sm:items-center sm:pb-5">
         <div>
-          <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Panel de Administración</h1>
+          <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight sm:text-3xl">Panel de Administración</h1>
           <p className="text-slate-500 mt-1">Supervisión general, registros de auditoría y soporte de usuarios.</p>
         </div>
       </div>
@@ -412,7 +472,7 @@ export function AdminDashboard() {
               </div>
             ) : usersList.length === 0 ? (
               <div className="text-center py-16 text-slate-400">
-                No hay usuarios registrados en el sistema.
+                {apiError ? 'Error al cargar usuarios. Revisa el mensaje arriba.' : 'No hay usuarios registrados en el sistema.'}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -455,18 +515,24 @@ export function AdminDashboard() {
                           {new Date(usr.createdAt).toLocaleDateString()}
                         </td>
                         <td className="py-4 px-4">
-                          {usr.role !== 'admin' && (
-                            <select
-                              value={usr.accountStatus}
-                              disabled={statusUpdating === usr.uuid}
-                              onChange={(e) => handleStatusChange(usr.uuid, e.target.value)}
-                              className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 disabled:opacity-50 cursor-pointer"
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleEditUser(usr)}
+                              className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50"
+                              title="Editar"
                             >
-                              <option value="active">Activo</option>
-                              <option value="suspended">Suspendido</option>
-                              <option value="blocked">Bloqueado</option>
-                            </select>
-                          )}
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteUser(usr)}
+                              className="rounded-lg border border-red-200 p-2 text-red-600 hover:bg-red-50"
+                              title="Eliminar"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1068,6 +1134,10 @@ export function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {activeTab === 'catalog' && <AdminCatalogTab />}
+
+      {activeTab === 'listings' && <AdminListingsTab />}
     </div>
   );
 }

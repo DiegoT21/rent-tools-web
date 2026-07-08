@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import { api } from '../lib/api';
+import { AUTH_STORAGE_KEY, authPersistStorage, clearAuthStorage } from '../lib/authStorage';
 
 interface User {
   uuid?: string;
@@ -38,8 +39,14 @@ export const useAuthStore = create<AuthState>()(
       setAccessToken: (token) => set({ accessToken: token }),
       setToken: (token) => set({ accessToken: token }),
       setUser: (user) => set({ user }),
-      clearSession: () => set({ accessToken: null, user: null, error: null }),
-      clearAuth: () => set({ accessToken: null, user: null, error: null }),
+      clearSession: () => {
+        set({ accessToken: null, user: null, error: null });
+        clearAuthStorage();
+      },
+      clearAuth: () => {
+        set({ accessToken: null, user: null, error: null });
+        clearAuthStorage();
+      },
 
       fetchProfile: async () => {
         const { accessToken } = get();
@@ -64,7 +71,8 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: 'auth-storage',
+      name: AUTH_STORAGE_KEY,
+      storage: createJSONStorage(() => authPersistStorage),
       partialize: (state) => ({
         accessToken: state.accessToken,
         user: state.user,
@@ -73,6 +81,12 @@ export const useAuthStore = create<AuthState>()(
   )
 );
 
-useAuthStore.persist.onFinishHydration(() => {
+function markHydrated() {
   useAuthStore.setState({ hasHydrated: true });
-});
+}
+
+if (useAuthStore.persist.hasHydrated()) {
+  markHydrated();
+} else {
+  useAuthStore.persist.onFinishHydration(markHydrated);
+}

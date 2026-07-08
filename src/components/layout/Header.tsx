@@ -1,217 +1,378 @@
 import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
-import { Search, User, MapPin, ShieldCheck, ShieldAlert, LogOut } from "lucide-react";
+import { Search, User, ShieldCheck, ShieldAlert, LogOut, Menu, X, Package, LayoutDashboard } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/useAuthStore";
+import { authService } from "@/services/authService";
 import { alerts } from "@/lib/alerts";
 import { UserAvatar } from "@/components/UserAvatar";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 import { useState, useEffect } from "react";
+import { cn } from "@/lib/utils";
+import { isAdminUser } from "@/lib/isAdmin";
 
-export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () => void, isSidebarOpen?: boolean }) {
+export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () => void; isSidebarOpen?: boolean }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, clearSession } = useAuthStore();
-  const isAdmin = user?.role === 'admin' || user?.email === 'diegoorlando211170@gmail.com';
+  const { user } = useAuthStore();
+  const isAdmin = isAdminUser(user);
   const activeTab = searchParams.get("tab") || "users";
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") ?? "");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const isAdminRoute = location.pathname.startsWith("/admin");
+  const showPublicNav = !isAdmin || !isAdminRoute;
 
   useEffect(() => {
     setSearchQuery(searchParams.get("q") ?? "");
   }, [searchParams]);
 
+  useEffect(() => {
+    setMobileMenuOpen(false);
+    setMobileSearchOpen(false);
+  }, [location.pathname]);
+
   const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && searchQuery.trim()) {
       navigate(`/?q=${encodeURIComponent(searchQuery.trim())}`);
+      setMobileSearchOpen(false);
     }
     if (e.key === "Escape") {
       setSearchQuery("");
       navigate("/");
+      setMobileSearchOpen(false);
     }
   };
 
-  const handlePublicarClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+  const handlePublicarClick = () => {
+    setMobileMenuOpen(false);
     if (user && !user.isVerified) {
-      e.preventDefault();
       alerts.warning("Verificación requerida", "Debes verificar tu identidad primero para poder publicar herramientas.");
       navigate("/register/step-2");
     } else if (!user) {
-      e.preventDefault();
-      navigate("/register");
+      navigate("/login", { state: { from: "/profile?tab=publicar" } });
     } else {
       navigate("/profile?tab=publicar");
     }
   };
 
   const handleLogout = () => {
-    clearSession();
-    navigate("/login");
+    void authService.logout();
   };
 
+  const navLinkClass = (active: boolean) =>
+    cn(
+      "text-sm transition-colors py-2 lg:py-5 border-b-2",
+      active
+        ? "font-semibold text-primary border-primary"
+        : "font-medium text-slate-500 hover:text-slate-900 border-transparent",
+    );
+
+  const searchInput = (
+    <div className="relative w-full">
+      <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      <Input
+        type="search"
+        placeholder="Buscar maquinaria..."
+        className="w-full bg-[#f3f4f6] pl-10 h-10 border-transparent rounded-full shadow-none focus-visible:ring-primary/20 focus-visible:border-primary/50"
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        onKeyDown={handleSearch}
+      />
+    </div>
+  );
+
   return (
-    <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b bg-white shadow-sm px-6">
-      <div className="flex items-center gap-12">
-        <Link to="/" className="flex items-center gap-2.5 group hover:opacity-80 transition-opacity whitespace-nowrap">
-          <img src="/logo.jpeg" alt="RentTools Logo" className="h-8 w-8 object-cover rounded-md" />
-          <div className="text-xl font-bold tracking-tight text-slate-900">
-            Rent<span className="text-primary">Tools</span>
+    <header className="sticky top-0 z-50 border-b bg-white shadow-sm">
+      <div className="flex h-14 items-center justify-between gap-2 px-4 sm:px-6 lg:h-16">
+        <div className="flex min-w-0 items-center gap-2 lg:gap-12">
+          <button
+            type="button"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 lg:hidden"
+            onClick={() => setMobileMenuOpen((v) => !v)}
+            aria-label="Abrir menú"
+          >
+            {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+
+          <Link to="/" className="flex min-w-0 items-center gap-2 transition-opacity hover:opacity-80">
+            <img src="/logo.jpeg" alt="RentTools Logo" className="h-8 w-8 shrink-0 rounded-md object-cover" />
+            <div className="hidden truncate text-lg font-bold tracking-tight text-slate-900 min-[380px]:block sm:text-xl">
+              Rent<span className="text-primary">Tools</span>
+            </div>
+          </Link>
+
+          {showPublicNav && (
+            <nav className="hidden items-center gap-6 lg:flex">
+              <button type="button" onClick={toggleSidebar} className={navLinkClass(Boolean(isSidebarOpen))}>
+                Categorías
+              </button>
+            </nav>
+          )}
+
+          {isAdmin && isAdminRoute && (
+            <nav className="hidden items-center gap-4 md:gap-6 lg:flex">
+              <button onClick={() => navigate("/admin?tab=users")} className={navLinkClass(activeTab === "users")}>
+                Usuarios
+              </button>
+              <button onClick={() => navigate("/admin?tab=audit")} className={navLinkClass(activeTab === "audit")}>
+                Auditoría
+              </button>
+              <button onClick={() => navigate("/admin?tab=chat")} className={navLinkClass(activeTab === "chat")}>
+                Soporte
+              </button>
+              <button onClick={() => navigate("/admin?tab=disputes")} className={navLinkClass(activeTab === "disputes")}>
+                Disputas
+              </button>
+              <button onClick={() => navigate("/admin?tab=catalog")} className={navLinkClass(activeTab === "catalog")}>
+                Catálogo
+              </button>
+              <button onClick={() => navigate("/admin?tab=listings")} className={navLinkClass(activeTab === "listings")}>
+                Publicaciones
+              </button>
+            </nav>
+          )}
+        </div>
+
+        {showPublicNav && (
+          <div className="hidden flex-1 items-center justify-center px-4 xl:flex xl:px-8">
+            <div className="w-full max-w-xl">{searchInput}</div>
           </div>
-        </Link>
-        {(!isAdmin || !location.pathname.startsWith("/admin")) && (
-          <nav className="flex items-center gap-6">
-            <Link
-              to="/"
-              className={`text-sm transition-colors py-5 border-b-2 ${
-                location.pathname === "/"
-                  ? "font-semibold text-primary border-primary"
-                  : "font-medium text-slate-500 hover:text-slate-900 border-transparent"
-              }`}
-            >
-              Ubicación
-            </Link>
+        )}
+
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          {showPublicNav && (
             <button
               type="button"
-              onClick={toggleSidebar}
-              className="text-sm font-medium text-slate-500 hover:text-slate-900 border-b-2 border-transparent py-5 transition-colors"
+              className="grid h-10 w-10 place-items-center rounded-full text-slate-600 hover:bg-slate-100 xl:hidden"
+              onClick={() => setMobileSearchOpen((v) => !v)}
+              aria-label="Buscar"
             >
-              Categorías
+              <Search className="h-5 w-5" />
             </button>
-            <Link
-              to="/my-rentals"
-              id="nav-my-rentals"
-              className={`text-sm transition-colors py-5 border-b-2 ${
-                location.pathname === "/my-rentals"
-                  ? "font-semibold text-primary border-primary"
-                  : "font-medium text-slate-500 hover:text-slate-900 border-transparent"
-              }`}
-            >
-              Alquileres
-            </Link>
-          </nav>
-        )}
-        {isAdmin && location.pathname.startsWith("/admin") && (
-          <nav className="flex items-center gap-6">
-            <button 
-              onClick={() => navigate("/admin?tab=users")}
-              className={`text-sm font-semibold transition-colors py-5 border-b-2 ${activeTab === "users" ? "text-primary border-primary" : "text-slate-500 hover:text-slate-900 border-transparent"}`}
-            >
-              Usuarios
-            </button>
-            <button 
-              onClick={() => navigate("/admin?tab=audit")}
-              className={`text-sm font-semibold transition-colors py-5 border-b-2 ${activeTab === "audit" ? "text-primary border-primary" : "text-slate-500 hover:text-slate-900 border-transparent"}`}
-            >
-              Auditoría
-            </button>
-            <button
-              onClick={() => navigate("/admin?tab=disputes")}
-              className={`text-sm font-semibold transition-colors py-5 border-b-2 ${activeTab === "disputes" ? "text-primary border-primary" : "text-slate-500 hover:text-slate-900 border-transparent"}`}
-            >
-              Disputas
-            </button>
-            <button
-              onClick={() => navigate("/admin?tab=chat")}
-              className={`text-sm font-semibold transition-colors py-5 border-b-2 ${activeTab === "chat" ? "text-primary border-primary" : "text-slate-500 hover:text-slate-900 border-transparent"}`}
-            >
-              Soporte
-            </button>
-          </nav>
-        )}
-      </div>
+          )}
 
-      {(!isAdmin || !location.pathname.startsWith("/admin")) && (
-        <div className="flex flex-1 items-center justify-center px-12 gap-3">
-          <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 bg-slate-100 py-2 px-3.5 rounded-full hover:bg-slate-200 cursor-pointer transition-colors shadow-sm">
-            <MapPin className="h-4 w-4 text-primary" />
-            <span>Ubicación</span>
-          </div>
-          <div className="relative w-full max-w-xl">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input 
-              type="search" 
-              placeholder="Buscar maquinaria industrial..." 
-              className="w-full bg-[#f3f4f6] pl-10 h-10 border-transparent rounded-full shadow-none focus-visible:ring-primary/20 focus-visible:border-primary/50"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={handleSearch}
-            />
-          </div>
-        </div>
-      )}
+          {isAdmin && (
+            <Button
+              onClick={() => navigate(isAdminRoute ? "/" : "/admin")}
+              variant={isAdminRoute ? "outline" : "default"}
+              className={cn(
+                "hidden rounded-full font-semibold sm:inline-flex",
+                isAdminRoute
+                  ? "border-slate-200 text-slate-700 hover:bg-slate-50"
+                  : "bg-red-600 text-white hover:bg-red-700 shadow-md shadow-red-200",
+              )}
+            >
+              {isAdminRoute ? "Ver Sitio" : "Admin"}
+            </Button>
+          )}
 
-      <div className="flex items-center gap-4">
-        {isAdmin && (
-          location.pathname.startsWith("/admin") ? (
-            <Button 
-              onClick={() => navigate("/")}
-              variant="outline"
-              className="rounded-full border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold px-6"
+          {!isAdmin && (
+            <Button
+              onClick={handlePublicarClick}
+              className="hidden rounded-full bg-primary px-4 font-semibold text-white shadow-md shadow-primary/20 hover:bg-primary/90 sm:inline-flex sm:px-6"
             >
-              Ver Sitio Web
+              Publicar
             </Button>
-          ) : (
-            <Button 
-              onClick={() => navigate("/admin")}
-              className="rounded-full bg-red-600 hover:bg-red-700 text-white font-semibold px-6 shadow-md shadow-red-200"
-            >
-              Panel Admin
-            </Button>
-          )
-        )}
-        {!isAdmin && (
-          <Button 
-            onClick={handlePublicarClick}
-            className="rounded-full bg-primary hover:bg-primary/90 text-white font-semibold px-6 shadow-md shadow-primary/20"
-          >
-            Publicar
-          </Button>
-        )}
-        {user && !isAdmin ? <NotificationBell /> : null}
-        
-        {user ? (
-          <div className="flex items-center gap-3 ml-2">
-            <div className="flex flex-col items-end">
-              <span className="text-sm font-semibold text-slate-900">Hola, {user.firstName}</span>
-              {isAdmin ? (
-                <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
-                  Administrador
+          )}
+
+          {user && !isAdmin ? <NotificationBell /> : null}
+
+          {user ? (
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="hidden flex-col items-end md:flex">
+                <span className="max-w-[120px] truncate text-sm font-semibold text-slate-900 lg:max-w-none">
+                  Hola, {user.firstName}
                 </span>
-              ) : user.isVerified ? (
-                <span className="flex items-center gap-1 text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-200">
-                  <ShieldCheck size={10} /> Cuenta Verificada
-                </span>
+                {isAdmin ? (
+                  <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
+                    Administrador
+                  </span>
+                ) : user.isVerified ? (
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-200">
+                    <ShieldCheck size={10} /> Verificada
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full border border-yellow-200">
+                    <ShieldAlert size={10} /> Pendiente
+                  </span>
+                )}
+              </div>
+              {isAdmin && isAdminRoute ? (
+                <button
+                  onClick={handleLogout}
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-red-200 bg-red-50 text-red-600 hover:bg-red-100"
+                  title="Cerrar sesión"
+                  aria-label="Cerrar sesión"
+                >
+                  <LogOut className="h-5 w-5" />
+                </button>
               ) : (
-                <span className="flex items-center gap-1 text-[10px] font-bold text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full border border-yellow-200">
-                  <ShieldAlert size={10} /> Verificación Pendiente
-                </span>
+                <Link
+                  to="/profile"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-primary/30 bg-[#eff6ff] text-blue-600 ring-2 ring-primary/10 hover:bg-blue-100"
+                  title="Mi perfil"
+                  aria-label="Mi perfil"
+                >
+                  <UserAvatar
+                    firstName={user.firstName}
+                    lastName={user.lastName}
+                    profileImageUrl={user.profileImageUrl}
+                    textClassName="text-sm font-bold text-blue-600"
+                  />
+                </Link>
               )}
             </div>
-            {isAdmin ? (
-              <button
-                onClick={handleLogout}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-colors"
-                title="Cerrar Sesión"
-              >
-                <LogOut className="h-5 w-5" />
-              </button>
-            ) : (
-              <Link to="/profile" className="flex h-10 w-10 items-center justify-center rounded-full bg-[#eff6ff] text-blue-600 border border-blue-200 hover:bg-blue-100 transition-colors overflow-hidden">
-                <UserAvatar
-                  firstName={user.firstName}
-                  lastName={user.lastName}
-                  profileImageUrl={user.profileImageUrl}
-                  textClassName="text-blue-600"
-                />
-              </Link>
-            )}
-          </div>
-        ) : (
-          <Link to="/login" className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-slate-700 hover:bg-slate-300 transition-colors">
-            <User className="h-5 w-5" />
-          </Link>
-        )}
+          ) : (
+            <Link
+              to="/login"
+              className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-primary px-3 text-white hover:bg-primary/90 sm:px-4"
+              aria-label="Iniciar sesión"
+            >
+              <User className="h-4 w-4 shrink-0" />
+              <span className="hidden text-sm font-semibold min-[380px]:inline">Entrar</span>
+            </Link>
+          )}
+        </div>
       </div>
+
+      {showPublicNav && mobileSearchOpen && (
+        <div className="border-t border-slate-100 px-4 py-3 xl:hidden">{searchInput}</div>
+      )}
+
+      {mobileMenuOpen && (
+        <>
+          <div className="fixed inset-0 top-14 z-40 bg-slate-900/40 lg:hidden" onClick={() => setMobileMenuOpen(false)} />
+          <div className="absolute left-0 right-0 top-full z-50 border-b border-slate-200 bg-white px-4 py-4 shadow-lg lg:hidden">
+            <nav className="flex flex-col gap-1">
+              {showPublicNav ? (
+                <>
+                  {user ? (
+                    <div className="mb-3 rounded-xl border border-slate-100 bg-slate-50 p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-primary/30 bg-[#eff6ff]">
+                          <UserAvatar
+                            firstName={user.firstName}
+                            lastName={user.lastName}
+                            profileImageUrl={user.profileImageUrl}
+                            textClassName="text-sm font-bold text-blue-600"
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-bold text-slate-900">
+                            {user.firstName} {user.lastName}
+                          </p>
+                          <p className="truncate text-xs text-slate-500">{user.email}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 grid gap-1">
+                        <Link
+                          to="/profile"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-white"
+                        >
+                          <User className="h-4 w-4 text-primary" />
+                          Mi perfil
+                        </Link>
+                        {!isAdmin && (
+                          <Link
+                            to="/my-rentals"
+                            onClick={() => setMobileMenuOpen(false)}
+                            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-white"
+                          >
+                            <Package className="h-4 w-4 text-primary" />
+                            Mis alquileres
+                          </Link>
+                        )}
+                        {isAdmin && (
+                          <Link
+                            to="/admin"
+                            onClick={() => setMobileMenuOpen(false)}
+                            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-slate-800 hover:bg-white"
+                          >
+                            <LayoutDashboard className="h-4 w-4 text-red-600" />
+                            Panel admin
+                          </Link>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMobileMenuOpen(false);
+                            handleLogout();
+                          }}
+                          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-red-600 hover:bg-white"
+                        >
+                          <LogOut className="h-4 w-4" />
+                          Cerrar sesión
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mb-3 grid gap-2">
+                      <Link
+                        to="/login"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="rounded-xl bg-primary px-4 py-3 text-center text-sm font-bold text-white"
+                      >
+                        Iniciar sesión
+                      </Link>
+                      <Link
+                        to="/register"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="rounded-xl border border-slate-200 px-4 py-3 text-center text-sm font-semibold text-slate-700"
+                      >
+                        Crear cuenta
+                      </Link>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    className="rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      toggleSidebar?.();
+                    }}
+                  >
+                    Categorías
+                  </button>
+                  {!isAdmin && (
+                    <button
+                      type="button"
+                      className="mt-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white"
+                      onClick={handlePublicarClick}
+                    >
+                      Publicar herramienta
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <button onClick={() => { navigate("/admin?tab=users"); setMobileMenuOpen(false); }} className="rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    Usuarios
+                  </button>
+                  <button onClick={() => { navigate("/admin?tab=audit"); setMobileMenuOpen(false); }} className="rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    Auditoría
+                  </button>
+                  <button onClick={() => { navigate("/admin?tab=chat"); setMobileMenuOpen(false); }} className="rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    Soporte
+                  </button>
+                  <button onClick={() => { navigate("/admin?tab=catalog"); setMobileMenuOpen(false); }} className="rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    Catálogo
+                  </button>
+                  <button onClick={() => { navigate("/admin?tab=listings"); setMobileMenuOpen(false); }} className="rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    Publicaciones
+                  </button>
+                  <button onClick={() => { navigate("/"); setMobileMenuOpen(false); }} className="mt-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">
+                    Ver sitio web
+                  </button>
+                </>
+              )}
+            </nav>
+          </div>
+        </>
+      )}
     </header>
   );
 }

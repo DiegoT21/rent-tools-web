@@ -10,7 +10,7 @@ import { ToolCard } from "@/components/home/ToolCard";
 
 function SkeletonGrid() {
   return (
-    <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
       {Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="h-72 animate-pulse rounded-2xl bg-slate-200" />
       ))}
@@ -30,19 +30,39 @@ export function Home() {
 
   useEffect(() => {
     let cancelled = false;
-    toolService.getPublicTools()
-      .then((t) => { if (!cancelled) { setAllTools(t); setLoadingAll(false); } })
-      .catch(() => { if (!cancelled) setLoadingAll(false); });
-    toolService.getPopularTools(7, 8)
-      .then((t) => { if (!cancelled) { setPopular(t); setLoadingPopular(false); } })
-      .catch(() => { if (!cancelled) setLoadingPopular(false); });
-    return () => { cancelled = true; };
-  }, []);
+    setLoadingAll(true);
+    setLoadingPopular(true);
 
-  const filteredTools = useMemo(() => {
-    if (!categoryFilter) return allTools;
-    return allTools.filter((t) => String(t.category ?? "").toLowerCase() === categoryFilter.toLowerCase());
-  }, [allTools, categoryFilter]);
+    toolService
+      .getPublicTools(categoryFilter || undefined)
+      .then((t) => {
+        if (!cancelled) {
+          setAllTools(t);
+          setLoadingAll(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoadingAll(false);
+      });
+
+    toolService
+      .getPopularTools(7, 8, categoryFilter || undefined)
+      .then((t) => {
+        if (!cancelled) {
+          setPopular(t);
+          setLoadingPopular(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoadingPopular(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [categoryFilter]);
+
+  const filteredTools = allTools;
 
   const recent = useMemo(() => {
     const withDate = filteredTools as Array<PublicTool & { createdAt?: string }>;
@@ -55,10 +75,7 @@ export function Home() {
       .slice(0, 8);
   }, [filteredTools]);
 
-  const popularFiltered = useMemo(() => {
-    if (!categoryFilter) return popular;
-    return popular.filter((t) => String(t.category ?? "").toLowerCase() === categoryFilter.toLowerCase());
-  }, [popular, categoryFilter]);
+  const popularFiltered = popular;
 
   const searchResults = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -74,22 +91,20 @@ export function Home() {
 
   if (isSearching) {
     return (
-      <div className="-mx-8 -mt-8">
+      <div className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6 lg:-mx-8 lg:-mt-8">
         <div className="mx-auto max-w-7xl px-8 py-10">
           <div className="mb-8 flex items-center gap-2">
             <Search className="h-5 w-5 text-primary" />
-            <h2 className="text-xl font-black text-slate-900">
-              {loadingAll
-                ? "Buscando..."
-                : `${searchResults.length} resultado${searchResults.length !== 1 ? "s" : ""} para "${query.trim()}"`}
-            </h2>
+            <h1 className="text-2xl font-black text-slate-900">
+              Resultados para &quot;{query}&quot;
+            </h1>
           </div>
           {loadingAll ? (
             <SkeletonGrid />
           ) : searchResults.length === 0 ? (
-            <p className="text-sm text-slate-400">No se encontraron herramientas con ese nombre o categoría.</p>
+            <p className="text-slate-500">No se encontraron herramientas.</p>
           ) : (
-            <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {searchResults.map((tool) => (
                 <ToolCard key={toolService.getToolId(tool)} tool={tool} />
               ))}
@@ -101,9 +116,9 @@ export function Home() {
   }
 
   return (
-    <div className="-mx-8 -mt-8">
+    <div className="-mx-4 -mt-4 sm:-mx-6 sm:-mt-6 lg:-mx-8 lg:-mt-8">
       <HomeHero />
-      <div className="mx-auto max-w-7xl px-8 py-12">
+      <div className="mx-auto max-w-7xl space-y-12 px-8 py-10">
         <PopularSection tools={popularFiltered} loading={loadingPopular} />
         <RecentSection tools={recent} loading={loadingAll} />
         <ProviderCta />

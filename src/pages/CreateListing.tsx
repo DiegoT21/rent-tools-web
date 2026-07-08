@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   Package,
@@ -16,6 +16,14 @@ import {
   Check,
 } from "lucide-react";
 import { LocationPicker } from "@/components/LocationPicker";
+import {
+  brandService,
+  categoryService,
+  DEFAULT_BRANDS,
+  DEFAULT_CATEGORY_TREE,
+  type CategoryTreeNode,
+} from "@/services/catalogService";
+import { CategoryCascadeSelect } from "@/components/catalog/CategoryCascadeSelect";
 import { PhotoCaptureDialog, dataUrlToFile } from "@/components/ui/PhotoCaptureDialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -94,6 +102,19 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [cameraDialogOpen, setCameraDialogOpen] = useState(false);
+  const [brandOptions, setBrandOptions] = useState(DEFAULT_BRANDS);
+  const [categoryTree, setCategoryTree] = useState<CategoryTreeNode[]>(DEFAULT_CATEGORY_TREE);
+
+  useEffect(() => {
+    Promise.all([categoryService.listTree(), brandService.list()])
+      .then(([tree, brands]) => {
+        if (tree.length) setCategoryTree(tree);
+        if (brands.length) setBrandOptions(brands.map((b) => ({ name: b.name, slug: b.slug })));
+      })
+      .catch(() => {
+        /* defaults */
+      });
+  }, []);
 
   const existingFileKeys: string[] = editTool?.fileKeys ?? [];
   const existingImageUrls: string[] = editTool?.imageUrls ?? [];
@@ -101,8 +122,12 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
 
   const [formData, setFormData] = useState({
     name: editTool?.name ?? "",
-    brand: editTool?.brand ?? "",
-    category: editTool?.category ?? "",
+    brand: (() => {
+      const raw = editTool?.brand ?? "";
+      const bySlug = DEFAULT_BRANDS.find((b) => b.slug === raw);
+      return bySlug?.name ?? raw;
+    })(),
+    categoryId: editTool?.categoryId ?? "",
     description: editTool?.description ?? "",
     pricePerDay: editTool?.pricePerDay?.toString() ?? "",
     serialNumber: editTool?.serialNumber ?? "",
@@ -120,7 +145,7 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
     setFormData({
       name: "",
       brand: "",
-      category: "",
+      categoryId: "",
       description: "",
       pricePerDay: "",
       serialNumber: "",
@@ -205,12 +230,12 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
         await alerts.warning("Campo requerido", "Ingresa el nombre de la herramienta.");
         return false;
       }
-      if (!formData.brand) {
-        await alerts.warning("Campo requerido", "Selecciona la marca.");
+      if (!formData.brand.trim() || formData.brand.trim().length < 2) {
+        await alerts.warning("Campo requerido", "Escribe la marca del equipo.");
         return false;
       }
-      if (!formData.category) {
-        await alerts.warning("Campo requerido", "Selecciona la categoría.");
+      if (!formData.categoryId) {
+        await alerts.warning("Campo requerido", "Selecciona la categoría y subcategoría.");
         return false;
       }
       if (!formData.description.trim()) {
@@ -316,6 +341,7 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
 
       const payload = {
         ...formData,
+        brand: formData.brand.trim(),
         pricePerDay: Number(formData.pricePerDay),
         meetingLocations: meetingPayload,
         fileKeys: finalFileKeys,
@@ -351,7 +377,7 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
   };
 
   return (
-    <div className={cn("space-y-8", !embedded && "container mx-auto max-w-4xl py-6 px-4")}>
+    <div className={cn("space-y-6 sm:space-y-8", !embedded && "container mx-auto max-w-4xl px-2 py-4 sm:px-4 sm:py-6")}>
       {/* Encabezado */}
       <div className="space-y-6">
         <button
@@ -434,35 +460,39 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label className="text-slate-600 font-semibold">Marca</Label>
-                    <Select onValueChange={(val) => handleSelectChange(val, "brand")} value={formData.brand}>
-                      <SelectTrigger className="bg-slate-50 border-slate-200 rounded-xl h-12">
-                        <SelectValue placeholder="Selecciona una marca" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="hilti">Hilti</SelectItem>
-                        <SelectItem value="dewalt">DeWalt</SelectItem>
-                        <SelectItem value="milwaukee">Milwaukee</SelectItem>
-                        <SelectItem value="makita">Makita</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-slate-600 font-semibold">Categoría</Label>
-                    <Select onValueChange={(val) => handleSelectChange(val, "category")} value={formData.category}>
-                      <SelectTrigger className="bg-slate-50 border-slate-200 rounded-xl h-12">
-                        <SelectValue placeholder="Selecciona categoría" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="drills">Taladros y Martillos</SelectItem>
-                        <SelectItem value="saws">Sierras</SelectItem>
-                        <SelectItem value="generators">Generadores</SelectItem>
-                        <SelectItem value="access">Acceso y Elevación</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <CategoryCascadeSelect
+                  tree={categoryTree}
+                  value={formData.categoryId}
+                  onChange={(categoryId) => setFormData((prev) => ({ ...prev, categoryId }))}
+                />
+
+                <div className="space-y-2">
+                  <Label htmlFor="brand" className="text-slate-600 font-semibold">
+                    Marca
+                  </Label>
+                  <Input
+                    id="brand"
+                    list="brand-suggestions"
+                    placeholder={
+                      formData.categoryId
+                        ? "Ej. DeWalt, Hilti, Milwaukee..."
+                        : "Selecciona primero una categoría principal"
+                    }
+                    disabled={!formData.categoryId}
+                    className="bg-slate-50 border-slate-200 rounded-xl h-12 focus-visible:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    value={formData.brand}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, brand: e.target.value }))}
+                  />
+                  <datalist id="brand-suggestions">
+                    {brandOptions.map((b) => (
+                      <option key={b.slug} value={b.name} />
+                    ))}
+                  </datalist>
+                  <p className="text-xs text-slate-400">
+                    {formData.categoryId
+                      ? 'Escribe la marca manualmente. Las sugerencias son opcionales.'
+                      : 'Debes seleccionar una categoría principal arriba para poder escribir la marca.'}
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -628,7 +658,7 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
                   <p className="text-sm text-slate-500 font-semibold">
                     Fotos actuales ({existingImageUrls.length})
                   </p>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
                     {existingImageUrls.map((url, i) => (
                       <img
                         key={i}

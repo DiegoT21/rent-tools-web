@@ -1,20 +1,40 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../store/authStore';
+import {
+  broadcastTokenUpdate,
+  withRefreshLock,
+} from './sessionSync';
 
-// Instancia base de Axios
+const PRODUCTION_API_URL = 'https://rent-tools-back-production.up.railway.app/api';
+
+function resolveApiBaseUrl() {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  if (import.meta.env.PROD) return PRODUCTION_API_URL;
+  return 'http://localhost:3000/api';
+}
+
+function isAuthFailure(error: unknown): boolean {
+  if (!axios.isAxiosError(error)) return false;
+  const status = error.response?.status;
+  return status === 401 || status === 403;
+}
+
+function shouldForceLogout(error: unknown): boolean {
+  return isAuthFailure(error);
+}
+
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api', // URL base del Backend
-  withCredentials: true, // CRÍTICO: Permite enviar/recibir cookies HTTP-only (refreshToken)
+  baseURL: resolveApiBaseUrl(),
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Variables para el control de peticiones concurrentes y estado de refresco
 let isRefreshing = false;
 let failedQueue: Array<{
   resolve: (value?: string) => void;
-  reject: (reason?: any) => void;
+  reject: (reason?: unknown) => void;
 }> = [];
 
 const processQueue = (error: AxiosError | null, token: string | null = null) => {
@@ -28,10 +48,13 @@ const processQueue = (error: AxiosError | null, token: string | null = null) => 
   failedQueue = [];
 };
 
-// ==========================================
-// 1. Interceptor de Peticiones (Request)
-// ==========================================
-// Inyecta el Access Token en cada petición protegida si existe en memoria
+export function redirectToLogin() {
+  useAuthStore.getState().clearSession();
+  if (window.location.pathname !== '/login') {
+    window.location.href = '/login';
+  }
+}
+
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const accessToken = useAuthStore.getState().accessToken;
@@ -40,19 +63,22 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 );
 
-// ==========================================
-// 2. Interceptor de Respuestas (Response)
-// ==========================================
-// Maneja la expiración del token (401) y ejecuta el refresco silencioso
+async function performRefresh(): Promise<string> {
+  const response = await api.post('/auth/refresh');
+  const newAccessToken = response.data.data.accessToken as string;
+  useAuthStore.getState().setAccessToken(newAccessToken);
+  broadcastTokenUpdate(newAccessToken);
+  return newAccessToken;
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    // Validar si el error es 401 y no viene de las rutas de auth (para evitar bucle infinito)
     if (
       error.response?.status === 401 &&
       originalRequest &&
@@ -60,7 +86,6 @@ api.interceptors.response.use(
       originalRequest.url !== '/auth/login' &&
       originalRequest.url !== '/auth/refresh'
     ) {
-      // Si ya hay un refresco en curso, encolamos las peticiones fallidas
       if (isRefreshing) {
         return new Promise<string>((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -76,31 +101,26 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        // Llamar endpoint de refresh (las cookies viajan automáticamente gracias a withCredentials: true)
-        const response = await api.post('/auth/refresh');
+        const refreshResult = await withRefreshLock(performRefresh);
+        if (!refreshResult) {
+          await new Promise((r) => setTimeout(r, 400));
+          const token = useAuthStore.getState().accessToken;
+          if (token) {
+            processQueue(null, token);
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return api(originalRequest);
+          }
+          throw error;
+        }
 
-        // El backend responde con { success: true, data: { accessToken: '...' } }
-        const newAccessToken = response.data.data.accessToken;
-
-        // Actualizar el token en el estado global (Zustand)
-        useAuthStore.getState().setAccessToken(newAccessToken);
-
-        // Procesar la cola de peticiones retenidas pasándoles el nuevo token
-        processQueue(null, newAccessToken);
-
-        // Reintentar la petición original con el nuevo token
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        processQueue(null, refreshResult);
+        originalRequest.headers.Authorization = `Bearer ${refreshResult}`;
         return api(originalRequest);
       } catch (refreshError) {
-        // Si el refresco falla (el refreshToken expiró o fue revocado)
         processQueue(refreshError as AxiosError, null);
-
-        // Limpiar el estado de sesión en el frontend
-        useAuthStore.getState().clearSession();
-
-        // Redirigir al usuario al Login forzosamente (usando window.location o el enrutador)
-        window.location.href = '/login';
-
+        if (shouldForceLogout(refreshError)) {
+          redirectToLogin();
+        }
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
@@ -108,5 +128,5 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );

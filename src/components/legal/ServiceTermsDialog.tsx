@@ -38,7 +38,12 @@ const sections = [
       "RentTools trata tus datos personales conforme a su política de privacidad industrial. La información de identidad, contacto, ubicación y evidencias fotográficas se utiliza para verificación, gestión de alquileres, prevención de fraude y cumplimiento legal.",
   },
   {
-    title: "7. Modificaciones",
+    title: "7. Notificaciones por correo electrónico",
+    body:
+      "Al crear tu cuenta y aceptar estos términos, autorizas a RentTools a enviarte notificaciones transaccionales al correo electrónico que registraste. Estas comunicaciones incluyen confirmación de cuenta, solicitudes de alquiler, aprobaciones, rechazos, cancelaciones y actualizaciones relacionadas con tu actividad en la plataforma. No enviamos correos promocionales masivos sin consentimiento adicional.",
+  },
+  {
+    title: "8. Modificaciones",
     body:
       "RentTools puede actualizar estos términos. Los cambios relevantes se comunicarán por la plataforma o por correo electrónico. El uso continuado del servicio después de una actualización implica la aceptación de los nuevos términos.",
   },
@@ -53,7 +58,7 @@ export function ServiceTermsDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+      <DialogContent className="max-h-[85vh] max-w-2xl w-[calc(100vw-2rem)] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Términos y condiciones de servicio</DialogTitle>
           <DialogDescription>

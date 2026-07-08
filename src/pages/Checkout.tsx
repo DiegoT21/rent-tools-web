@@ -116,7 +116,7 @@ export const Checkout = () => {
     <div className="max-w-3xl mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold text-slate-900 mb-8">Pago en Garantía</h1>
       
-      <div className="grid md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

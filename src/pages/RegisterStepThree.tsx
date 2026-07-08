@@ -18,7 +18,7 @@ import {
   verifyIdentity,
 } from "@/services/verificationService";
 import { validateSelfieImage } from "@/lib/faceVerification";
-
+import { BackToHomeButton } from "@/components/auth/BackToHomeButton";
 
 export function RegisterStepThree() {
   const location = useLocation();
@@ -27,16 +27,16 @@ export function RegisterStepThree() {
   const documentImage =
     location.state?.documentImage || getRegistrationDocument() || null;
   const accessToken = location.state?.accessToken || storeToken;
+  const hasHydrated = useAuthStore((s) => s.hasHydrated);
 
-  // Protección total: Validar sesión y que venga del Paso 2
   React.useEffect(() => {
+    if (!hasHydrated) return;
     if (!accessToken) {
-      navigate("/register");
+      navigate("/login");
     } else if (!documentImage) {
-      // Si hay sesión pero no hay foto de cédula, mandarlo al Paso 2
       navigate("/register/step-2");
     }
-  }, [accessToken, documentImage, navigate]);
+  }, [accessToken, documentImage, hasHydrated, navigate]);
 
   const [selfieImage, setSelfieImage] = useState<string | null>(null);
   const [selfieWarning, setSelfieWarning] = useState<string | null>(null);
@@ -107,20 +107,20 @@ export function RegisterStepThree() {
         {/* Header */}
         <header className="flex items-center justify-between py-4">
           <span className="text-xl font-black tracking-tight">RentTools</span>
-          <button className="text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">Help</button>
+          <BackToHomeButton className="text-sm font-medium text-slate-500 hover:text-slate-800" />
         </header>
 
         <main className="mt-6 flex-1 flex flex-col items-center">
           <div className="w-full text-center space-y-4 mb-10">
             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#e86f00]">Paso 3 de 3</span>
-            <h1 className="text-[2.5rem] font-black tracking-tight text-slate-950">Verificación facial</h1>
+            <h1 className="text-2xl font-black tracking-tight text-slate-950 sm:text-[2.5rem]">Verificación facial</h1>
             <p className="text-slate-500 text-base max-w-2xl mx-auto">
               Tómate una selfie. Compararemos tu rostro con la foto de tu cédula del paso anterior. Si no coinciden, no podrás completar el registro.
             </p>
           </div>
 
           <div className="w-full">
-            <section className="rounded-[24px] bg-white border border-slate-200 p-8 flex flex-col space-y-6 shadow-sm">
+            <section className="rounded-[24px] bg-white border border-slate-200 p-4 sm:p-6 lg:p-8 flex flex-col space-y-6 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="bg-[#ff7a00] p-1.5 rounded-lg">
                   <UserCircle className="h-5 w-5 text-white" />

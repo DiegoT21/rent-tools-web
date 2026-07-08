@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { api } from '../../lib/api';
 import { MessageSquare, X, Send, RefreshCw } from 'lucide-react';
+import { isAdminUser } from '@/lib/isAdmin';
 
 interface SupportMessage {
   _id: string;
@@ -27,10 +28,7 @@ export function SupportChatBubble() {
   
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const isVisible =
-    Boolean(accessToken && user) &&
-    user?.role !== 'admin' &&
-    user?.email !== 'diegoorlando211170@gmail.com';
+  const isVisible = Boolean(accessToken && user) && !isAdminUser(user);
 
   // Cargar historial de chat
   const loadMessages = async (showLoader = false) => {
@@ -89,10 +87,9 @@ export function SupportChatBubble() {
   if (!isVisible) return null;
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
-      {/* Ventana de Chat */}
+    <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end sm:bottom-6 sm:right-6">
       {isOpen && (
-        <div className="w-[360px] h-[480px] bg-white rounded-2xl shadow-2xl border border-slate-100 mb-4 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
+        <div className="mb-4 flex h-[min(480px,calc(100vh-8rem))] w-[calc(100vw-2rem)] max-w-[360px] flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-2xl animate-in slide-in-from-bottom-5 duration-300">
           {/* Header */}
           <div className="bg-indigo-600 text-white p-4 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-2.5">

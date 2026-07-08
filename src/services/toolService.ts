@@ -64,8 +64,10 @@ const resolveMaybeKeyToUrl = (value: string): string | null => {
 };
 
 export const toolService = {
-  getPublicTools: async (): Promise<PublicTool[]> => {
-    const response = await api.get("/tools");
+  getPublicTools: async (category?: string): Promise<PublicTool[]> => {
+    const response = await api.get("/tools", {
+      params: category ? { category } : undefined,
+    });
     const data = (response as any).data?.data ?? (response as any).data;
     if (Array.isArray(data)) return data;
     if (Array.isArray(data?.items)) return data.items;
@@ -81,8 +83,10 @@ export const toolService = {
     return null;
   },
 
-  getPopularTools: async (days = 7, limit = 8): Promise<PublicTool[]> => {
-    const response = await api.get("/tools/popular", { params: { days, limit } });
+  getPopularTools: async (days = 7, limit = 8, category?: string): Promise<PublicTool[]> => {
+    const response = await api.get("/tools/popular", {
+      params: { days, limit, ...(category ? { category } : {}) },
+    });
     const data = (response as any).data?.data ?? (response as any).data;
     if (Array.isArray(data)) return data;
     return [];
@@ -127,5 +131,25 @@ export const toolService = {
 
   getToolId: (tool: PublicTool): string => {
     return String(tool.uuid ?? tool.id ?? tool._id ?? "");
+  },
+
+  listAdmin: async (page = 1, q?: string, ownerEmail?: string) => {
+    const res = await api.get('/tools/admin/list', {
+      params: { page, limit: 15, q, ownerEmail },
+    });
+    return {
+      items: res.data?.items ?? [],
+      pagination: res.data?.pagination ?? { page: 1, totalPages: 1 },
+    };
+  },
+
+  adminDelete: async (uuid: string) => {
+    const res = await api.delete(`/tools/admin/${uuid}`);
+    return res.data;
+  },
+
+  adminUpdate: async (uuid: string, payload: Record<string, unknown>) => {
+    const res = await api.patch(`/tools/admin/${uuid}`, payload);
+    return res.data?.data;
   },
 };

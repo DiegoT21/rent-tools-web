@@ -51,7 +51,7 @@ export const DeliveryProtocol = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
+    <div className="max-w-2xl mx-auto px-4 py-6 sm:py-8">
       <h1 className="text-3xl font-bold text-slate-900 mb-8">Protocolo de Entrega Segura</h1>
       
       {/* Paso 1: GPS */}

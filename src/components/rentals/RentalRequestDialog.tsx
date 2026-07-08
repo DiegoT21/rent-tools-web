@@ -410,7 +410,7 @@ export function RentalRequestDialog({
         </DialogHeader>
 
         <div className="overflow-hidden px-4 py-3 sm:px-5">
-          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)_220px]">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)_220px]">
             {/* Columna 1: Calendario + hora */}
             <section className="rounded-xl border border-slate-200 bg-white p-3">
               <div className="mb-2 flex items-center gap-2">

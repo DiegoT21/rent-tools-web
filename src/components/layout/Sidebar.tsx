@@ -1,15 +1,21 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Grid, Pickaxe, Settings, ShoppingCart, TestTube } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { categoryService, DEFAULT_CATEGORY_TREE, type CategoryTreeNode } from "@/services/catalogService";
 
-const categories = [
-  { name: "Todo el Equipo", slug: null, icon: Grid },
-  { name: "Herramientas de Poder", slug: "drills", icon: Pickaxe },
-  { name: "Excavadoras", slug: "access", icon: Settings },
-  { name: "Manejo de Materiales", slug: "generators", icon: ShoppingCart },
-  { name: "Lab. de Precisión", slug: "saws", icon: TestTube },
-];
+const iconBySlug: Record<string, typeof Grid> = {
+  "herramientas-poder": Pickaxe,
+  "medicion-precision": TestTube,
+  "energia-generacion": ShoppingCart,
+  "excavacion-demolicion": Settings,
+  "elevacion-manejo": Grid,
+  "laboratorio-ti": TestTube,
+  drills: Pickaxe,
+  access: Settings,
+  generators: ShoppingCart,
+  saws: TestTube,
+};
 
 export function Sidebar({
   className,
@@ -21,6 +27,22 @@ export function Sidebar({
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const activeCategory = searchParams.get("category");
+  const [categories, setCategories] = useState<Array<{ name: string; slug: string }>>(
+    DEFAULT_CATEGORY_TREE.map((c) => ({ name: c.name, slug: c.slug })),
+  );
+
+  useEffect(() => {
+    categoryService
+      .listTree()
+      .then((items: CategoryTreeNode[]) => {
+        if (items.length > 0) {
+          setCategories(items.map((c) => ({ name: c.name, slug: c.slug })));
+        }
+      })
+      .catch(() => {
+        /* fallback defaults */
+      });
+  }, []);
 
   const handleSelect = (slug: string | null) => {
     const next = new URLSearchParams(searchParams);
@@ -39,11 +61,25 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 space-y-1.5">
+        <button
+          type="button"
+          onClick={() => handleSelect(null)}
+          className={cn(
+            "flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200",
+            !activeCategory
+              ? "bg-white text-primary shadow-sm ring-1 ring-slate-900/5"
+              : "text-slate-600 hover:bg-white/50 hover:text-slate-900",
+          )}
+        >
+          <Grid className={cn("h-5 w-5", !activeCategory ? "text-primary" : "text-slate-400")} />
+          Todo el Equipo
+        </button>
         {categories.map((cat) => {
-          const isActive = cat.slug ? activeCategory === cat.slug : !activeCategory;
+          const Icon = iconBySlug[cat.slug] ?? Pickaxe;
+          const isActive = activeCategory === cat.slug;
           return (
             <button
-              key={cat.name}
+              key={cat.slug}
               type="button"
               onClick={() => handleSelect(cat.slug)}
               className={cn(
@@ -53,7 +89,7 @@ export function Sidebar({
                   : "text-slate-600 hover:bg-white/50 hover:text-slate-900",
               )}
             >
-              <cat.icon className={cn("h-5 w-5", isActive ? "text-primary" : "text-slate-400")} />
+              <Icon className={cn("h-5 w-5", isActive ? "text-primary" : "text-slate-400")} />
               {cat.name}
             </button>
           );

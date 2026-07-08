@@ -1,5 +1,5 @@
 import React from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { RootLayout } from './components/layout/RootLayout'
 import { Home } from './pages/Home'
 import { useAuthStore } from './store/authStore'
@@ -15,14 +15,17 @@ import { Checkout } from './pages/Checkout'
 import { CheckoutRental } from './pages/CheckoutRental'
 import { DeliveryProtocol } from './pages/DeliveryProtocol'
 import { AdminDashboard } from './pages/AdminDashboard'
-import { MyRentals } from './pages/MyRentals'
+import { ProtectedRoute } from './components/auth/ProtectedRoute'
+import { SessionBootstrap } from './components/auth/SessionBootstrap'
+import { isAdminUser } from './lib/isAdmin'
 
 function App() {
   const user = useAuthStore((state) => state.user);
-  const isAdmin = user?.role === 'admin' || user?.email === 'diegoorlando211170@gmail.com';
+  const isAdmin = isAdminUser(user);
 
 
   return (
+    <SessionBootstrap>
     <BrowserRouter>
       <Routes>
         <Route path="/" element={
@@ -46,9 +49,11 @@ function App() {
           </RootLayout>
         } />
         <Route path="/profile" element={
-          <RootLayout>
-            <UserProfile />
-          </RootLayout>
+          <ProtectedRoute>
+            <RootLayout>
+              <UserProfile />
+            </RootLayout>
+          </ProtectedRoute>
         } />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
@@ -77,12 +82,13 @@ function App() {
           } />
         )}
         <Route path="/my-rentals" element={
-          <RootLayout>
-            <MyRentals />
-          </RootLayout>
+          <ProtectedRoute>
+            <Navigate to="/profile?tab=alquileres" replace />
+          </ProtectedRoute>
         } />
       </Routes>
     </BrowserRouter>
+    </SessionBootstrap>
   )
 }
 

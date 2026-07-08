@@ -1,4 +1,5 @@
 import { api } from '../lib/api';
+import { setRememberMePreference } from '../lib/authStorage';
 import { useAuthStore } from '../store/authStore';
 import { useAuthStore as usePersistedAuthStore } from '../store/useAuthStore';
 import { uploadAvatar } from '../lib/mediaUpload';
@@ -6,12 +7,14 @@ import { uploadAvatar } from '../lib/mediaUpload';
 export interface LoginCredentials {
   email: string;
   password?: string;
+  rememberMe?: boolean;
   [key: string]: any;
 }
 
 export interface RegisterData {
   email: string;
   password?: string;
+  acceptTerms?: true;
   [key: string]: any;
 }
 
@@ -22,7 +25,32 @@ function syncUserToStores(user: any) {
 
 export const authService = {
   login: async (credentials: LoginCredentials) => {
-    const response = await api.post('/auth/login', credentials);
+    const { rememberMe = true, email, password } = credentials;
+    setRememberMePreference(rememberMe);
+
+    const response = await api.post('/auth/login', { email, password });
+    const { accessToken, user } = response.data.data || response.data;
+
+    if (accessToken) {
+      useAuthStore.getState().setAccessToken(accessToken);
+      usePersistedAuthStore.getState().setToken(accessToken);
+    }
+    if (user) syncUserToStores(user);
+
+    return response.data;
+  },
+
+  loginWithGoogle: async (googleData: {
+    accessToken?: string;
+    isMock?: boolean;
+    mockEmail?: string;
+    mockName?: string;
+    rememberMe?: boolean;
+  }) => {
+    const { rememberMe = true, ...payload } = googleData;
+    setRememberMePreference(rememberMe);
+
+    const response = await api.post('/auth/google', payload);
     const { accessToken, user } = response.data.data || response.data;
 
     if (accessToken) {
@@ -65,6 +93,11 @@ export const authService = {
   },
 
   logout: async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      /* cookie may already be cleared */
+    }
     useAuthStore.getState().clearSession();
     usePersistedAuthStore.getState().clearAuth();
     window.location.href = '/login';

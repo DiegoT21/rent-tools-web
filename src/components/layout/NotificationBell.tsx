@@ -57,7 +57,7 @@ export function NotificationBell() {
         </button>
       </PopoverTrigger>
 
-      <PopoverContent align="end" className="w-80 p-0">
+      <PopoverContent align="end" className="w-[calc(100vw-2rem)] max-w-80 p-0 sm:w-80">
         <div className="border-b border-slate-100 px-4 py-3">
           <p className="text-sm font-bold text-slate-900">Notificaciones</p>
           <p className="text-xs text-slate-500">Solicitudes de alquiler recibidas</p>
