@@ -951,26 +951,32 @@ export function UserProfile() {
   return (
     <div className="mx-auto flex min-h-[calc(100vh-140px)] max-w-7xl flex-col gap-4 px-2 py-4 sm:px-4 sm:py-6 lg:flex-row lg:gap-8 lg:py-8">
       {/* Navegación móvil / tablet */}
-      <div className="flex gap-2 overflow-x-auto pb-1 lg:hidden">
-        {menuItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => setActiveTab(item.id)}
-            className={cn(
-              "flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold transition-colors",
-              activeTab === item.id ? "bg-primary text-white" : "bg-slate-100 text-slate-600",
-            )}
-          >
-            <item.icon className="h-4 w-4" />
-            {item.label}
-          </button>
-        ))}
+      <div className="space-y-2 lg:hidden">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {menuItems.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setActiveTab(item.id)}
+              className={cn(
+                "flex min-h-[4.5rem] flex-col items-center justify-center gap-1.5 rounded-2xl px-2 py-3 text-xs font-semibold transition-colors",
+                activeTab === item.id
+                  ? "bg-primary text-white shadow-sm shadow-primary/20"
+                  : "border border-slate-100 bg-white text-slate-600 hover:bg-slate-50",
+              )}
+            >
+              <item.icon className="h-5 w-5 shrink-0" />
+              <span className="text-center leading-tight">{item.label}</span>
+            </button>
+          ))}
+        </div>
         <button
+          type="button"
           onClick={handleLogout}
-          className="flex shrink-0 items-center gap-2 rounded-full bg-red-50 px-4 py-2.5 text-xs font-semibold text-red-600"
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600 hover:bg-red-100"
         >
           <LogOut className="h-4 w-4" />
-          Salir
+          Cerrar sesión
         </button>
       </div>
 
@@ -1143,7 +1149,7 @@ export function UserProfile() {
 
             <Card className="border-none shadow-sm bg-white">
               <CardContent className="p-8">
-                <div className="flex items-center gap-8 border-b border-slate-100 -mt-2 mb-8">
+                <div className="mb-6 -mt-2 grid grid-cols-1 gap-2 sm:mb-8 sm:flex sm:items-center sm:gap-6 sm:border-b sm:border-slate-100">
                   {([
                     ["resenas", "Reseñas"],
                     ["listados", "Mis Listados"],
@@ -1154,10 +1160,10 @@ export function UserProfile() {
                       type="button"
                       onClick={() => setProfileTab(value)}
                       className={cn(
-                        "pb-4 text-sm font-semibold border-b-2 transition-colors -mb-px",
+                        "rounded-xl px-4 py-3 text-sm font-semibold transition-colors sm:rounded-none sm:border-b-2 sm:bg-transparent sm:px-0 sm:py-4 sm:-mb-px",
                         profileTab === value
-                          ? "text-primary border-primary"
-                          : "text-slate-500 border-transparent hover:text-slate-900"
+                          ? "bg-primary/10 text-primary sm:border-primary sm:bg-transparent"
+                          : "bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-900 sm:border-transparent sm:bg-transparent",
                       )}
                     >
                       {label}
