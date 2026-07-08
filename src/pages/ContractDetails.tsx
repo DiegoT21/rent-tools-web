@@ -296,36 +296,59 @@ export function ContractDetails() {
       }
     }
     const actor = isOwner ? "owner" : "tenant";
-    const { isConfirmed, value } = await Swal.fire({
-      title: phase === "handover" ? "Firmar entrega" : "Firmar devolución",
-      html: `
-        <div style="text-align:left">
-          <div style="color:#64748b;font-size:13px;margin-bottom:10px;">
-            Para firmar, confirma tu contraseña. Se generará un token temporal para esta fase.
+    const isGoogleAccount = Boolean(user?.isGoogleAccount);
+
+    let password: string | undefined;
+    if (isGoogleAccount) {
+      const { isConfirmed } = await Swal.fire({
+        title: phase === "handover" ? "Firmar entrega" : "Firmar devolución",
+        html: `
+          <div style="text-align:left;color:#64748b;font-size:13px;">
+            Entraste con Google. Confirma que deseas firmar esta fase del contrato.
           </div>
-          <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
-            Contraseña
-            <input id="rt_pwd" type="password" class="swal2-input" style="margin:0;height:40px" placeholder="Tu contraseña" />
-          </label>
-        </div>
-      `,
-      showCancelButton: true,
-      confirmButtonText: "Generar y firmar",
-      cancelButtonText: "Cancelar",
-      confirmButtonColor: "#f97316",
-      cancelButtonColor: "#0f172a",
-      preConfirm: () => {
-        const pwd = (document.getElementById("rt_pwd") as HTMLInputElement | null)?.value ?? "";
-        if (!pwd.trim()) {
-          Swal.showValidationMessage("Ingresa tu contraseña.");
-          return;
-        }
-        return pwd.trim();
-      },
-    });
-    if (!isConfirmed || !value) return;
+        `,
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonText: "Confirmar y firmar",
+        cancelButtonText: "Cancelar",
+        confirmButtonColor: "#f97316",
+        cancelButtonColor: "#0f172a",
+      });
+      if (!isConfirmed) return;
+    } else {
+      const { isConfirmed, value } = await Swal.fire({
+        title: phase === "handover" ? "Firmar entrega" : "Firmar devolución",
+        html: `
+          <div style="text-align:left">
+            <div style="color:#64748b;font-size:13px;margin-bottom:10px;">
+              Para firmar, confirma tu contraseña. Se generará un token temporal para esta fase.
+            </div>
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
+              Contraseña
+              <input id="rt_pwd" type="password" class="swal2-input" style="margin:0;height:40px" placeholder="Tu contraseña" />
+            </label>
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: "Generar y firmar",
+        cancelButtonText: "Cancelar",
+        confirmButtonColor: "#f97316",
+        cancelButtonColor: "#0f172a",
+        preConfirm: () => {
+          const pwd = (document.getElementById("rt_pwd") as HTMLInputElement | null)?.value ?? "";
+          if (!pwd.trim()) {
+            Swal.showValidationMessage("Ingresa tu contraseña.");
+            return;
+          }
+          return pwd.trim();
+        },
+      });
+      if (!isConfirmed || !value) return;
+      password = value;
+    }
+
     try {
-      const token = await contractService.getSignatureToken(uuid, { actor, phase, password: value });
+      const token = await contractService.getSignatureToken(uuid, { actor, phase, password });
       if (!token.signatureToken) {
         await alerts.error("Sin token", "No se pudo obtener el token de firma.");
         return;
@@ -594,7 +617,11 @@ export function ContractDetails() {
               </div>
             )}
 
-            <div className="text-xs text-slate-500 pt-2">La firma genera un token temporal validando tu contraseña.</div>
+            <div className="text-xs text-slate-500 pt-2">
+              {user?.isGoogleAccount
+                ? "Con cuenta Google solo confirmas la firma; no se pide contraseña."
+                : "La firma genera un token temporal validando tu contraseña."}
+            </div>
 
             {(isOwner || isTenant) && ["in_progress", "completed"].includes(status) && (
               <div className="pt-2 border-t border-slate-100">

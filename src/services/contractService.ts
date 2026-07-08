@@ -141,7 +141,7 @@ export const contractService = {
 
   getSignatureToken: async (
     contractUuid: string,
-    body: { actor: "tenant" | "owner"; phase: "handover" | "return"; password: string }
+    body: { actor: "tenant" | "owner"; phase: "handover" | "return"; password?: string }
   ) => {
     const response = await api.post(`/rentals/contracts/${encodeURIComponent(contractUuid)}/signature-token`, body);
     const data = unwrap(response);
