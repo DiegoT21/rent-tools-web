@@ -130,6 +130,31 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
     topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [currentStep]);
 
+  const existingFileKeys: string[] = editTool?.fileKeys ?? [];
+  const existingImageUrls: string[] = editTool?.imageUrls ?? [];
+  const existingInvoiceFileKey: string = editTool?.invoiceFileKey ?? "";
+
+  const initialCategoryId = (() => {
+    const raw = editTool?.categoryId;
+    if (raw && typeof raw === "object" && raw.uuid) return String(raw.uuid);
+    if (typeof raw === "string" && raw.includes("-")) return raw;
+    return "";
+  })();
+
+  const [formData, setFormData] = useState({
+    name: editTool?.name ?? "",
+    brand: (() => {
+      const raw = editTool?.brand ?? "";
+      const bySlug = DEFAULT_BRANDS.find((b) => b.slug === raw);
+      return bySlug?.name ?? raw;
+    })(),
+    categoryId: initialCategoryId,
+    description: editTool?.description ?? "",
+    pricePerDay: editTool?.pricePerDay?.toString() ?? "",
+    serialNumber: editTool?.serialNumber ?? "",
+    usageLevel: (editTool?.usageLevel as ToolUsageLevel | "") ?? "",
+  });
+
   const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
   useEffect(() => {
     const urls = selectedMediaFiles.map((file) => URL.createObjectURL(file));
@@ -156,31 +181,6 @@ export function CreateListing({ embedded = false, onBack }: CreateListingProps) 
       }
     }
   }, [categoryTree, isEditing, editTool, formData.categoryId]);
-
-  const existingFileKeys: string[] = editTool?.fileKeys ?? [];
-  const existingImageUrls: string[] = editTool?.imageUrls ?? [];
-  const existingInvoiceFileKey: string = editTool?.invoiceFileKey ?? "";
-
-  const initialCategoryId = (() => {
-    const raw = editTool?.categoryId;
-    if (raw && typeof raw === "object" && raw.uuid) return String(raw.uuid);
-    if (typeof raw === "string" && raw.includes("-")) return raw;
-    return "";
-  })();
-
-  const [formData, setFormData] = useState({
-    name: editTool?.name ?? "",
-    brand: (() => {
-      const raw = editTool?.brand ?? "";
-      const bySlug = DEFAULT_BRANDS.find((b) => b.slug === raw);
-      return bySlug?.name ?? raw;
-    })(),
-    categoryId: initialCategoryId,
-    description: editTool?.description ?? "",
-    pricePerDay: editTool?.pricePerDay?.toString() ?? "",
-    serialNumber: editTool?.serialNumber ?? "",
-    usageLevel: (editTool?.usageLevel as ToolUsageLevel | "") ?? "",
-  });
 
   const resetForm = () => {
     setMeetingLocations([
