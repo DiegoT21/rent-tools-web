@@ -17,7 +17,6 @@ import {
 import { AdminCatalogTab } from '@/components/admin/AdminCatalogTab';
 import { AdminListingsTab } from '@/components/admin/AdminListingsTab';
 import { AdminEditUserDialog } from '@/components/admin/AdminEditUserDialog';
-import { AdminTabNav } from '@/components/admin/AdminTabNav';
 import { isAdminUser, getAdminAccessMessage, formatApiError } from '@/lib/isAdmin';
 import { adminService } from '@/services/adminService';
 import Swal from 'sweetalert2';
@@ -392,8 +391,6 @@ export function AdminDashboard() {
           <p className="text-slate-500 mt-1">Supervisión general, registros de auditoría y soporte de usuarios.</p>
         </div>
       </div>
-
-      <AdminTabNav />
 
       <AdminEditUserDialog
         user={editingUser}

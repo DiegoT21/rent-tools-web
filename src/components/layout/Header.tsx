@@ -16,6 +16,7 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
   const [searchParams] = useSearchParams();
   const { user } = useAuthStore();
   const isAdmin = isAdminUser(user);
+  const activeTab = searchParams.get("tab") || "users";
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") ?? "");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -106,6 +107,29 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
             <nav className="hidden items-center gap-6 lg:flex">
               <button type="button" onClick={toggleSidebar} className={navLinkClass(Boolean(isSidebarOpen))}>
                 Categorías
+              </button>
+            </nav>
+          )}
+
+          {isAdmin && isAdminRoute && (
+            <nav className="hidden items-center gap-4 lg:flex lg:gap-6">
+              <button onClick={() => navigate("/admin?tab=users")} className={navLinkClass(activeTab === "users")}>
+                Usuarios
+              </button>
+              <button onClick={() => navigate("/admin?tab=audit")} className={navLinkClass(activeTab === "audit")}>
+                Auditoría
+              </button>
+              <button onClick={() => navigate("/admin?tab=chat")} className={navLinkClass(activeTab === "chat")}>
+                Soporte
+              </button>
+              <button onClick={() => navigate("/admin?tab=disputes")} className={navLinkClass(activeTab === "disputes")}>
+                Disputas
+              </button>
+              <button onClick={() => navigate("/admin?tab=catalog")} className={navLinkClass(activeTab === "catalog")}>
+                Catálogo
+              </button>
+              <button onClick={() => navigate("/admin?tab=listings")} className={navLinkClass(activeTab === "listings")}>
+                Publicaciones
               </button>
             </nav>
           )}
@@ -325,9 +349,29 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
                   )}
                 </>
               ) : (
-                <button onClick={() => { navigate("/"); setMobileMenuOpen(false); }} className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">
-                  Ver sitio web
-                </button>
+                <>
+                  <button onClick={() => { navigate("/admin?tab=users"); setMobileMenuOpen(false); }} className="rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    Usuarios
+                  </button>
+                  <button onClick={() => { navigate("/admin?tab=audit"); setMobileMenuOpen(false); }} className="rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    Auditoría
+                  </button>
+                  <button onClick={() => { navigate("/admin?tab=chat"); setMobileMenuOpen(false); }} className="rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    Soporte
+                  </button>
+                  <button onClick={() => { navigate("/admin?tab=disputes"); setMobileMenuOpen(false); }} className="rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    Disputas
+                  </button>
+                  <button onClick={() => { navigate("/admin?tab=catalog"); setMobileMenuOpen(false); }} className="rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    Catálogo
+                  </button>
+                  <button onClick={() => { navigate("/admin?tab=listings"); setMobileMenuOpen(false); }} className="rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    Publicaciones
+                  </button>
+                  <button onClick={() => { navigate("/"); setMobileMenuOpen(false); }} className="mt-2 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">
+                    Ver sitio web
+                  </button>
+                </>
               )}
             </nav>
           </div>
