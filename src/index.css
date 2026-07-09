@@ -140,10 +140,12 @@
   }
 }
 
-/* SweetAlert2 por encima de Radix Dialog y sin bloqueo por inert */
+/* SweetAlert2 por encima de Radix Dialog y usable en móvil */
 .swal2-container {
   z-index: 999999 !important;
   pointer-events: auto !important;
+  padding: 0.75rem !important;
+  align-items: center !important;
 }
 
 .swal2-container .swal2-popup,
@@ -151,4 +153,67 @@
 .swal2-container .swal2-confirm,
 .swal2-container .swal2-cancel {
   pointer-events: auto !important;
+}
+
+.swal2-popup.swal2-modal {
+  width: min(100%, 24rem) !important;
+  max-width: calc(100vw - 1.5rem) !important;
+  max-height: min(90dvh, 100svh) !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  margin: 0 !important;
+  padding: 1rem 1rem max(1rem, env(safe-area-inset-bottom)) !important;
+  box-sizing: border-box !important;
+}
+
+.swal2-title {
+  font-size: 1.125rem !important;
+  line-height: 1.35 !important;
+  padding: 0 0 0.5rem !important;
+}
+
+.swal2-html-container {
+  overflow-y: auto !important;
+  max-height: 52dvh !important;
+  margin: 0 !important;
+  padding: 0.25rem 0 !important;
+  text-align: left !important;
+}
+
+.swal2-input,
+.swal2-textarea {
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.swal2-actions {
+  flex-shrink: 0 !important;
+  width: 100% !important;
+  flex-direction: column-reverse !important;
+  gap: 0.5rem !important;
+  margin: 1rem 0 0 !important;
+  padding: 0 !important;
+}
+
+.swal2-actions .swal2-styled {
+  width: 100% !important;
+  margin: 0 !important;
+}
+
+@media (min-width: 640px) {
+  .swal2-popup.swal2-modal {
+    width: 32rem !important;
+    max-width: 32rem !important;
+  }
+
+  .swal2-actions {
+    flex-direction: row !important;
+    justify-content: flex-end !important;
+    width: auto !important;
+  }
+
+  .swal2-actions .swal2-styled {
+    width: auto !important;
+  }
 }

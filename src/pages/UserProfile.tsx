@@ -600,7 +600,7 @@ export function UserProfile() {
         <div style="text-align:left;display:grid;gap:12px">
           <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;">
             <div style="font-size:12px;font-weight:700;color:#94a3b8;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">Fechas</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div style="display:grid;grid-template-columns:1fr;gap:10px;">
               <div>
                 <div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;">Fecha de entrega</div>
                 <div style="font-size:15px;font-weight:800;color:#0f172a;">${startText}</div>
@@ -617,7 +617,7 @@ export function UserProfile() {
             <div style="font-size:13px;line-height:1.45;color:#475569;">${pickupText}</div>
             <div style="margin-top:8px;font-size:13px;color:#64748b;"><b>Hora de entrega:</b> ${pickupAtText}</div>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div style="display:grid;grid-template-columns:1fr;gap:10px;">
             <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:14px;padding:14px 16px;">
               <div style="font-size:12px;font-weight:700;color:#94a3b8;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">Subtotal</div>
               <div style="font-size:18px;font-weight:800;color:#0f172a;">$${subtotal}</div>
@@ -648,7 +648,7 @@ export function UserProfile() {
             Lugar (texto)
             <input id="cp_addr" class="swal2-input" style="margin:0;height:40px" placeholder="Ej. Albrook Mall - entrada norte" />
           </label>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          <div style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:10px;">
             <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
               Lat (opcional)
               <input id="cp_lat" class="swal2-input" style="margin:0;height:40px" placeholder="8.99" />
@@ -662,7 +662,7 @@ export function UserProfile() {
             Hora de entrega
             <input id="cp_at" type="datetime-local" class="swal2-input" style="margin:0;height:40px" />
           </label>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+          <div style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:10px;">
             <label style="display:flex;flex-direction:column;gap:6px;font-size:13px;">
               Nueva fecha inicio (opcional)
               <input id="cp_start" type="date" class="swal2-input" style="margin:0;height:40px" />

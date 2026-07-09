@@ -378,7 +378,7 @@ export function AdminDashboard() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-2 pb-8 sm:px-4 sm:pb-12">
+    <div className="mx-auto max-w-7xl pb-8 sm:pb-12">
       {apiError && (
         <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -401,9 +401,9 @@ export function AdminDashboard() {
 
 {/* Tab: Users */}
       {activeTab === 'users' && (
-        <Card className="shadow-lg border-slate-100">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-xl font-bold text-slate-800">Usuarios Registrados</CardTitle>
+        <Card className="shadow-lg border-slate-100 overflow-hidden">
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="text-lg sm:text-xl font-bold text-slate-800">Usuarios Registrados</CardTitle>
             <button
               onClick={() => loadUsers(usersPage)}
               className="text-slate-500 hover:text-slate-800 transition-colors p-1"
@@ -411,21 +411,21 @@ export function AdminDashboard() {
               <RefreshCw className={`w-5 h-5 ${usersLoading ? 'animate-spin' : ''}`} />
             </button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 sm:px-6">
             {/* Filters */}
-            <div className="flex flex-wrap gap-3 mb-5">
+            <div className="flex flex-col gap-3 mb-5 sm:flex-row sm:flex-wrap">
               <input
                 type="text"
                 value={usersSearch}
                 placeholder="Buscar por nombre o email..."
                 onChange={(e) => setUsersSearch(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && loadUsers(1)}
-                className="flex-1 min-w-[200px] px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
+                className="w-full min-w-0 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 sm:flex-1 sm:min-w-[200px]"
               />
               <select
                 value={usersRole}
                 onChange={(e) => { setUsersRole(e.target.value); loadUsers(1, { role: e.target.value }); }}
-                className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-600"
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-600 sm:w-auto"
               >
                 <option value="">Todos los roles</option>
                 <option value="user">Usuario</option>
@@ -434,7 +434,7 @@ export function AdminDashboard() {
               <select
                 value={usersAccountStatus}
                 onChange={(e) => { setUsersAccountStatus(e.target.value); loadUsers(1, { accountStatus: e.target.value }); }}
-                className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-600"
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-600 sm:w-auto"
               >
                 <option value="">Todos los estados</option>
                 <option value="active">Activo</option>
@@ -444,7 +444,7 @@ export function AdminDashboard() {
               <select
                 value={usersKycStatus}
                 onChange={(e) => { setUsersKycStatus(e.target.value); loadUsers(1, { kycStatus: e.target.value }); }}
-                className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-600"
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white text-slate-600 sm:w-auto"
               >
                 <option value="">Todos los KYC</option>
                 <option value="pending">Pendiente</option>
@@ -454,7 +454,7 @@ export function AdminDashboard() {
               </select>
               <button
                 onClick={() => loadUsers(1)}
-                className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                className="w-full px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors sm:w-auto"
               >
                 Buscar
               </button>
@@ -470,7 +470,54 @@ export function AdminDashboard() {
                 {apiError ? 'Error al cargar usuarios. Revisa el mensaje arriba.' : 'No hay usuarios registrados en el sistema.'}
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <>
+                <div className="space-y-3 md:hidden">
+                  {usersList.map((usr) => (
+                    <div key={usr.uuid} className="rounded-xl border border-slate-100 bg-slate-50/40 p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-semibold text-slate-800">{usr.firstName} {usr.lastName}</div>
+                          <div className="mt-1 break-all text-sm text-slate-500">{usr.email}</div>
+                        </div>
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleEditUser(usr)}
+                            className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-white"
+                            title="Editar"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUser(usr)}
+                            className="rounded-lg border border-red-200 p-2 text-red-600 hover:bg-red-50"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge className={usr.role === 'admin' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-blue-50 text-blue-600 border-blue-100'} variant={undefined}>
+                          {usr.role.toUpperCase()}
+                        </Badge>
+                        <Badge className={usr.accountStatus === 'active' ? 'bg-green-50 text-green-600 border-green-100' : 'bg-amber-50 text-amber-600 border-amber-100'} variant={undefined}>
+                          {usr.accountStatus.toUpperCase()}
+                        </Badge>
+                        <Badge className={usr.kycStatus === 'approved' ? 'bg-green-50 text-green-600 border-green-100' :
+                          usr.kycStatus === 'pending' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-red-50 text-red-600 border-red-100'} variant={undefined}>
+                          KYC {usr.kycStatus.toUpperCase()}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        Registro: {new Date(usr.createdAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-slate-100 text-slate-400 text-xs font-semibold uppercase tracking-wider bg-slate-50/50">
@@ -556,7 +603,30 @@ export function AdminDashboard() {
                     </button>
                   </div>
                 )}
-              </div>
+                </div>
+
+                {usersTotalPages > 1 && (
+                  <div className="mt-6 flex items-center justify-center gap-2 md:hidden">
+                    <button
+                      disabled={usersPage <= 1}
+                      onClick={() => loadUsers(usersPage - 1)}
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 text-sm"
+                    >
+                      Anterior
+                    </button>
+                    <span className="text-sm text-slate-500 px-2">
+                      Página {usersPage} de {usersTotalPages}
+                    </span>
+                    <button
+                      disabled={usersPage >= usersTotalPages}
+                      onClick={() => loadUsers(usersPage + 1)}
+                      className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 text-sm"
+                    >
+                      Siguiente
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>

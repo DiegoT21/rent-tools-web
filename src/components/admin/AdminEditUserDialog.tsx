@@ -109,101 +109,107 @@ export function AdminEditUserDialog({ user, open, onOpenChange, onSaved }: Props
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="text-left text-xl font-bold">Editar usuario</DialogTitle>
-          <DialogDescription className="text-left">
-            Actualiza rol, estado de cuenta y verificación KYC.
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="flex max-h-[min(92dvh,100svh)] max-w-md flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 pt-5 sm:px-6 sm:pt-6">
+            <DialogHeader className="pr-8">
+              <DialogTitle className="text-left text-xl font-bold">Editar usuario</DialogTitle>
+              <DialogDescription className="text-left">
+                Actualiza rol, estado de cuenta y verificación KYC.
+              </DialogDescription>
+            </DialogHeader>
 
-        <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-sm font-bold text-indigo-700">
-            {initials || "?"}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="truncate font-semibold text-slate-900">
-              {user.firstName} {user.lastName}
-            </div>
-            <div className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-slate-500">
-              <Mail className="h-3.5 w-3.5 shrink-0" />
-              {user.email}
-            </div>
-          </div>
-          <Badge className={user.role === "admin" ? "bg-red-50 text-red-600 border-red-100" : "bg-blue-50 text-blue-600 border-blue-100"}>
-            {user.role}
-          </Badge>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <Label className="flex items-center gap-1.5 text-slate-700">
-              <UserCog className="h-4 w-4 text-slate-400" />
-              Rol
-            </Label>
-            <select className={selectClassName()} value={role} onChange={(e) => setRole(e.target.value as "user" | "admin")}>
-              {roleOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-slate-500">{roleOptions.find((o) => o.value === role)?.hint}</p>
-          </div>
-
-          <div>
-            <Label className="flex items-center gap-1.5 text-slate-700">
-              <Shield className="h-4 w-4 text-slate-400" />
-              Estado de cuenta
-            </Label>
-            <select
-              className={selectClassName()}
-              value={accountStatus}
-              onChange={(e) => setAccountStatus(e.target.value as "active" | "suspended" | "blocked")}
-            >
-              {accountOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-slate-500">{accountOptions.find((o) => o.value === accountStatus)?.hint}</p>
-          </div>
-
-          <div>
-            <Label className="text-slate-700">Estado KYC</Label>
-            <select
-              className={selectClassName()}
-              value={kycStatus}
-              onChange={(e) => setKycStatus(e.target.value as typeof kycStatus)}
-            >
-              {kycOptions.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-slate-500">{kycOptions.find((o) => o.value === kycStatus)?.hint}</p>
-          </div>
-
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-3">
-            <input
-              type="checkbox"
-              checked={isVerified}
-              onChange={(e) => setIsVerified(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-indigo-600"
-            />
-            <div>
-              <div className="text-sm font-semibold text-slate-800">Identidad verificada</div>
-              <div className="text-xs text-slate-500">
-                Permite alquilar y publicar herramientas. Se activa automáticamente con KYC aprobado.
+            <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-4 sm:flex-row sm:items-center">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-sm font-bold text-indigo-700">
+                  {initials || "?"}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-semibold text-slate-900">
+                    {user.firstName} {user.lastName}
+                  </div>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500">
+                    <Mail className="h-3.5 w-3.5 shrink-0" />
+                    <span className="break-all">{user.email}</span>
+                  </div>
+                </div>
               </div>
+              <Badge className={`w-fit ${user.role === "admin" ? "bg-red-50 text-red-600 border-red-100" : "bg-blue-50 text-blue-600 border-blue-100"}`}>
+                {user.role}
+              </Badge>
             </div>
-          </label>
-        </div>
 
-        <DialogFooter className="gap-2 sm:gap-2">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancelar
-          </Button>
-          <Button type="button" onClick={() => void handleSave()} disabled={saving} className="bg-indigo-600 hover:bg-indigo-700">
-            {saving ? "Guardando..." : "Guardar cambios"}
-          </Button>
-        </DialogFooter>
+            <div className="mt-4 space-y-4">
+              <div>
+                <Label className="flex items-center gap-1.5 text-slate-700">
+                  <UserCog className="h-4 w-4 text-slate-400" />
+                  Rol
+                </Label>
+                <select className={selectClassName()} value={role} onChange={(e) => setRole(e.target.value as "user" | "admin")}>
+                  {roleOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-slate-500">{roleOptions.find((o) => o.value === role)?.hint}</p>
+              </div>
+
+              <div>
+                <Label className="flex items-center gap-1.5 text-slate-700">
+                  <Shield className="h-4 w-4 text-slate-400" />
+                  Estado de cuenta
+                </Label>
+                <select
+                  className={selectClassName()}
+                  value={accountStatus}
+                  onChange={(e) => setAccountStatus(e.target.value as "active" | "suspended" | "blocked")}
+                >
+                  {accountOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-slate-500">{accountOptions.find((o) => o.value === accountStatus)?.hint}</p>
+              </div>
+
+              <div>
+                <Label className="text-slate-700">Estado KYC</Label>
+                <select
+                  className={selectClassName()}
+                  value={kycStatus}
+                  onChange={(e) => setKycStatus(e.target.value as typeof kycStatus)}
+                >
+                  {kycOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-slate-500">{kycOptions.find((o) => o.value === kycStatus)?.hint}</p>
+              </div>
+
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-3">
+                <input
+                  type="checkbox"
+                  checked={isVerified}
+                  onChange={(e) => setIsVerified(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-indigo-600"
+                />
+                <div>
+                  <div className="text-sm font-semibold text-slate-800">Identidad verificada</div>
+                  <div className="text-xs text-slate-500">
+                    Permite alquilar y publicar herramientas. Se activa automáticamente con KYC aprobado.
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <DialogFooter className="shrink-0 gap-2 border-t border-slate-100 bg-white px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
+            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => onOpenChange(false)} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button type="button" className="w-full bg-indigo-600 hover:bg-indigo-700 sm:w-auto" onClick={() => void handleSave()} disabled={saving}>
+              {saving ? "Guardando..." : "Guardar cambios"}
+            </Button>
+          </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );
