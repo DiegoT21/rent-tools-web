@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { AdminCatalogTab } from '@/components/admin/AdminCatalogTab';
 import { AdminListingsTab } from '@/components/admin/AdminListingsTab';
+import { AdminEditUserDialog } from '@/components/admin/AdminEditUserDialog';
+import { AdminTabNav } from '@/components/admin/AdminTabNav';
 import { isAdminUser, getAdminAccessMessage, formatApiError } from '@/lib/isAdmin';
 import { adminService } from '@/services/adminService';
 import Swal from 'sweetalert2';
@@ -100,6 +102,8 @@ export function AdminDashboard() {
   const [usersRole, setUsersRole] = useState('');
   const [usersAccountStatus, setUsersAccountStatus] = useState('');
   const [usersKycStatus, setUsersKycStatus] = useState('');
+  const [editingUser, setEditingUser] = useState<UserItem | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   // Tab 2: Audit search
   const [auditSearch, setAuditSearch] = useState('');
@@ -131,6 +135,7 @@ export function AdminDashboard() {
   const [resolving, setResolving] = useState(false);
   const [disputeDetails, setDisputeDetails] = useState<Record<string, any>>({});
   const [disputeDetailsLoading, setDisputeDetailsLoading] = useState<Record<string, boolean>>({});
+  const [disputesError, setDisputesError] = useState<string | null>(null);
 
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const clearSession = useAuthStore((state) => state.clearSession);
@@ -191,6 +196,7 @@ export function AdminDashboard() {
 
   const loadDisputes = async (page = 1, overrides?: { search?: string; status?: string }) => {
     setDisputesLoading(true);
+    setDisputesError(null);
     try {
       const params = new URLSearchParams({ page: String(page), limit: '10' });
       const search = overrides?.search ?? disputesSearch;
@@ -199,12 +205,16 @@ export function AdminDashboard() {
       if (status) params.set('status', status);
       const res = await api.get(`/disputes/admin/list?${params}`);
       if (res.data.success) {
-        setDisputesList(res.data.data.items);
-        setDisputesTotalPages(res.data.data.pagination.totalPages);
+        setDisputesList(res.data.data?.items ?? []);
+        setDisputesTotalPages(res.data.data?.pagination?.totalPages ?? 1);
         setDisputesPage(page);
+      } else {
+        setDisputesList([]);
+        setDisputesError('No se pudo cargar el listado de disputas.');
       }
     } catch (err) {
-      console.error('Error loading disputes:', err);
+      setDisputesList([]);
+      setDisputesError(formatApiError(err));
     } finally {
       setDisputesLoading(false);
     }
@@ -326,30 +336,9 @@ export function AdminDashboard() {
     );
   }
 
-  const handleEditUser = async (usr: UserItem) => {
-    const { value: formValues } = await Swal.fire({
-      title: `Editar: ${usr.firstName} ${usr.lastName}`,
-      html:
-        `<select id="swal-role" class="swal2-input"><option value="user" ${usr.role === 'user' ? 'selected' : ''}>user</option><option value="admin" ${usr.role === 'admin' ? 'selected' : ''}>admin</option></select>` +
-        `<select id="swal-status" class="swal2-input"><option value="active" ${usr.accountStatus === 'active' ? 'selected' : ''}>active</option><option value="suspended" ${usr.accountStatus === 'suspended' ? 'selected' : ''}>suspended</option><option value="blocked" ${usr.accountStatus === 'blocked' ? 'selected' : ''}>blocked</option></select>` +
-        `<select id="swal-kyc" class="swal2-input"><option value="pending" ${usr.kycStatus === 'pending' ? 'selected' : ''}>pending</option><option value="in_review" ${usr.kycStatus === 'in_review' ? 'selected' : ''}>in_review</option><option value="approved" ${usr.kycStatus === 'approved' ? 'selected' : ''}>approved</option><option value="rejected" ${usr.kycStatus === 'rejected' ? 'selected' : ''}>rejected</option></select>`,
-      focusConfirm: false,
-      showCancelButton: true,
-      confirmButtonText: 'Guardar',
-      preConfirm: () => ({
-        role: (document.getElementById('swal-role') as HTMLSelectElement).value as 'user' | 'admin',
-        accountStatus: (document.getElementById('swal-status') as HTMLSelectElement).value as 'active' | 'suspended' | 'blocked',
-        kycStatus: (document.getElementById('swal-kyc') as HTMLSelectElement).value as 'pending' | 'in_review' | 'approved' | 'rejected',
-      }),
-    });
-    if (!formValues) return;
-    try {
-      await adminService.updateUser(usr.uuid, formValues);
-      await Swal.fire('Actualizado', 'Usuario modificado correctamente.', 'success');
-      loadUsers(usersPage);
-    } catch (err) {
-      await Swal.fire('Error', formatApiError(err), 'error');
-    }
+  const handleEditUser = (usr: UserItem) => {
+    setEditingUser(usr);
+    setEditDialogOpen(true);
   };
 
   const handleDeleteUser = async (usr: UserItem) => {
@@ -397,12 +386,21 @@ export function AdminDashboard() {
           <span>{apiError}</span>
         </div>
       )}
-      <div className="mb-6 flex flex-col items-start justify-between border-b border-slate-100 pb-4 sm:mb-8 sm:flex-row sm:items-center sm:pb-5">
+      <div className="mb-4 flex flex-col items-start justify-between border-b border-slate-100 pb-4 sm:mb-6 sm:flex-row sm:items-center sm:pb-5">
         <div>
           <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight sm:text-3xl">Panel de Administración</h1>
           <p className="text-slate-500 mt-1">Supervisión general, registros de auditoría y soporte de usuarios.</p>
         </div>
       </div>
+
+      <AdminTabNav />
+
+      <AdminEditUserDialog
+        user={editingUser}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onSaved={() => loadUsers(usersPage)}
+      />
 
 {/* Tab: Users */}
       {activeTab === 'users' && (
@@ -750,12 +748,21 @@ export function AdminDashboard() {
               </button>
             </div>
 
+            {disputesError && (
+              <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{disputesError}</span>
+              </div>
+            )}
+
             {disputesLoading ? (
               <div className="flex items-center justify-center py-16 text-slate-400">
                 <RefreshCw className="w-8 h-8 animate-spin mr-3 text-slate-300" />Cargando disputas...
               </div>
             ) : disputesList.length === 0 ? (
-              <div className="text-center py-16 text-slate-400">No hay disputas registradas.</div>
+              <div className="text-center py-16 text-slate-400">
+                {disputesError ? 'No se pudieron cargar las disputas.' : 'No hay disputas registradas.'}
+              </div>
             ) : (
               <div className="space-y-3">
                 {disputesList.map((d: any) => {

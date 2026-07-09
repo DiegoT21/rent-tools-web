@@ -112,7 +112,7 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
           )}
 
           {isAdmin && isAdminRoute && (
-            <nav className="hidden items-center gap-4 md:gap-6 lg:flex">
+            <nav className="hidden items-center gap-4 md:flex md:gap-6">
               <button onClick={() => navigate("/admin?tab=users")} className={navLinkClass(activeTab === "users")}>
                 Usuarios
               </button>
@@ -357,6 +357,9 @@ export function Header({ toggleSidebar, isSidebarOpen }: { toggleSidebar?: () =>
                   </button>
                   <button onClick={() => { navigate("/admin?tab=chat"); setMobileMenuOpen(false); }} className="rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
                     Soporte
+                  </button>
+                  <button onClick={() => { navigate("/admin?tab=disputes"); setMobileMenuOpen(false); }} className="rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    Disputas
                   </button>
                   <button onClick={() => { navigate("/admin?tab=catalog"); setMobileMenuOpen(false); }} className="rounded-xl px-4 py-3 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
                     Catálogo
