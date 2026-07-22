@@ -6,25 +6,33 @@ import {
 } from './sessionSync';
 
 const PRODUCTION_API_URL = 'https://rent-tools-back-production.up.railway.app/api';
+const LOCAL_API_URL = 'http://localhost:3000/api';
 
 function isLocalApiUrl(url: string | undefined): boolean {
   if (!url) return true;
   return /localhost|127\.0\.0\.1|0\.0\.0\.0/i.test(url);
 }
 
+function isLocalBrowserHost(): boolean {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname;
+  return host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0';
+}
+
 /**
- * En producción nunca uses localhost (aunque Vercel tenga VITE_API_URL mal).
- * En desarrollo prioriza .env / proxy local.
+ * Resuelve la API en runtime:
+ * - Host local (npm run dev) → localhost o VITE_API_URL
+ * - Dominio publicado (Vercel / renttools.site) → Railway (nunca localhost)
  */
 function resolveApiBaseUrl() {
   const fromEnv = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
 
-  if (import.meta.env.PROD) {
-    if (fromEnv && !isLocalApiUrl(fromEnv)) return fromEnv;
-    return PRODUCTION_API_URL;
+  if (isLocalBrowserHost()) {
+    return fromEnv || LOCAL_API_URL;
   }
 
-  return fromEnv || 'http://localhost:3000/api';
+  if (fromEnv && !isLocalApiUrl(fromEnv)) return fromEnv;
+  return PRODUCTION_API_URL;
 }
 
 function isAuthFailure(error: unknown): boolean {
