@@ -1,3 +1,5 @@
+import { normalizeImageSrc } from "@/lib/imageNormalize";
+
 const MODEL_URL =
   "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model";
 
@@ -94,12 +96,29 @@ function getFaceAreaRatio(
 async function getFaceDescriptor(imageSrc: string) {
   const faceapi = await getFaceApi();
   await loadModels();
-  const img = await loadImage(imageSrc);
 
-  const detections = await faceapi
+  // Corrige EXIF y reduce tamaño: crítico para fotos de cámara nativa en móvil
+  let normalizedSrc = imageSrc;
+  try {
+    normalizedSrc = await normalizeImageSrc(imageSrc);
+  } catch (err) {
+    console.warn("Normalización de imagen falló; se usa original.", err);
+  }
+
+  const img = await loadImage(normalizedSrc);
+
+  // Primero con umbral estándar; si falla (cédulas con poco contraste), reintentar más permisivo
+  let detections = await faceapi
     .detectAllFaces(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 }))
     .withFaceLandmarks()
     .withFaceDescriptors();
+
+  if (detections.length === 0) {
+    detections = await faceapi
+      .detectAllFaces(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.25 }))
+      .withFaceLandmarks()
+      .withFaceDescriptors();
+  }
 
   if (detections.length === 0) {
     return null;

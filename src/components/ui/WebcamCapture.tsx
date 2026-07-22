@@ -10,6 +10,7 @@ import {
   ChevronLeft,
 } from "lucide-react";
 import { Button } from "./button";
+import { normalizeCaptureFile } from "@/lib/imageNormalize";
 
 export interface WebcamCaptureProps {
   onCapture: (imageSrc: string, file?: File) => void;
@@ -57,6 +58,16 @@ function fileToDataUrl(file: File): Promise<string> {
     reader.onerror = () => reject(new Error("No se pudo leer la imagen"));
     reader.readAsDataURL(file);
   });
+}
+
+/** Preferir normalización (EXIF + resize); fallback a FileReader crudo. */
+async function prepareFileImage(file: File): Promise<string> {
+  try {
+    return await normalizeCaptureFile(file);
+  } catch (err) {
+    console.warn("No se pudo normalizar la captura; usando archivo original.", err);
+    return fileToDataUrl(file);
+  }
 }
 
 function SourcePicker({
@@ -259,6 +270,7 @@ export function WebcamCapture({
   const [source, setSource] = useState<CaptureSource | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | undefined>();
+  const [isPreparing, setIsPreparing] = useState(false);
 
   const captureMode =
     overlayType === "face" ? "user" : "environment";
@@ -287,18 +299,24 @@ export function WebcamCapture({
       return;
     }
 
-    if (!file.type.startsWith("image/")) {
-      return;
+    if (!file.type.startsWith("image/") && file.type !== "") {
+      // Algunos Android envían type vacío en captura nativa
+      if (!file.name.match(/\.(jpe?g|png|webp|heic|heif)$/i)) {
+        return;
+      }
     }
 
+    setIsPreparing(true);
     try {
-      const dataUrl = await fileToDataUrl(file);
+      const dataUrl = await prepareFileImage(file);
       setSelectedFile(file);
       setPreviewImage(dataUrl);
       setStep("preview");
     } catch {
       setStep("choose");
       setSource(null);
+    } finally {
+      setIsPreparing(false);
     }
   };
 
@@ -355,7 +373,16 @@ export function WebcamCapture({
         onChange={handleFileChange}
       />
 
-      {step === "choose" && <SourcePicker onSelect={handleSourceSelect} />}
+      {step === "choose" && (
+        <>
+          <SourcePicker onSelect={handleSourceSelect} />
+          {isPreparing && (
+            <p className="mt-3 text-center text-xs font-medium text-slate-500">
+              Preparando imagen…
+            </p>
+          )}
+        </>
+      )}
 
       {step === "capture" && source === "web" && (
         <WebcamStream
