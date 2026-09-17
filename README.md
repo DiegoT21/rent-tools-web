@@ -50,14 +50,6 @@ El backend y MongoDB están en Railway. La web solo necesita `VITE_API_URL` en `
 - **API:** `https://rent-tools-back-production.up.railway.app/api`
 - **Documentación:** [docs/CONEXION-RAILWAY.md](docs/CONEXION-RAILWAY.md)
 
-
-## 👥 Integrantes (Grupo 1GS141)
-*   Samir Caballero
-*   Laura Saucedo
-*   Orianis Castro
-*   Diego Torres
-*   Javier Valdés
-
 ---
 
 ## 📊 Estado Actual
